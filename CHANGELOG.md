@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026.06.1] — 2026-06-01
+
+### Changed
+- Container runs as non-root user `uptop` (UID/GID 1000) instead of root (#44)
+- SSH host key relocated to `/data/.ssh/id_ed25519` for non-root compatibility (#44)
+- Release workflow prunes dangling images and build cache after Docker push (#44)
+
+### Added
+- SBOM and provenance attestations on Docker images for supply chain compliance (#44)
+- Entrypoint script with volume writability check and migration guidance (#44)
+
+### Breaking
+- Existing Docker volumes with root-owned files require migration before upgrading:
+  `docker run --rm -v <volume>:/data alpine chown -R 1000:1000 /data`
+
 ## [2026.05.5] — 2026-05-29
 
 ### Added
