@@ -18,17 +18,20 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM alpine:3.23
 WORKDIR /app
 RUN apk add --no-cache ca-certificates && apk upgrade --no-cache
-RUN mkdir /data
+RUN addgroup -g 1000 -S uptop && adduser -u 1000 -S uptop -G uptop
+RUN mkdir -p /data/.ssh && chown -R uptop:uptop /data
 
 COPY --from=builder /app/uptop .
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/
 
-# Set Default Configuration via ENV
-# Docker users can override these in docker-compose.yml
 ENV LIPGLOSS_RENDERER_HAS_DARK_BACKGROUND=true
 ENV UPTOP_DB_TYPE=sqlite
 ENV UPTOP_DB_DSN=/data/uptop.db
 ENV UPTOP_KEYS=/data/authorized_keys
+ENV UPTOP_SSH_HOST_KEY=/data/.ssh/id_ed25519
 ENV UPTOP_PORT=23234
 
 EXPOSE 23234
+USER uptop
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["./uptop"]
