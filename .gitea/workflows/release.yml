@@ -66,6 +66,8 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
+          sbom: true
+          provenance: mode=max
           tags: |
             lerkolabs/uptop:${{ github.ref_name }}
             lerkolabs/uptop:latest
@@ -80,3 +82,9 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: lerkolabs/uptop
+
+      - name: Cleanup Docker artifacts
+        if: always()
+        run: |
+          docker image prune -f
+          docker builder prune -f --keep-storage=2GB
