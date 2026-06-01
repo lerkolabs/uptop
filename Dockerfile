@@ -19,10 +19,10 @@ FROM alpine:3.23
 WORKDIR /app
 RUN apk add --no-cache ca-certificates && apk upgrade --no-cache
 RUN addgroup -g 1000 -S uptop && adduser -u 1000 -S uptop -G uptop
-RUN mkdir /data && chown uptop:uptop /data
+RUN mkdir -p /data/.ssh && chown -R uptop:uptop /data
 
 COPY --from=builder /app/uptop .
-COPY docker-entrypoint.sh /usr/local/bin/
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/
 
 ENV LIPGLOSS_RENDERER_HAS_DARK_BACKGROUND=true
 ENV UPTOP_DB_TYPE=sqlite

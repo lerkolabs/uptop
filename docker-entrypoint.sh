@@ -9,4 +9,6 @@ if [ ! -w /data ]; then
     exit 1
 fi
 
+mkdir -p /data/.ssh
+
 exec "$@"
