@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026.06.2] — 2026-06-02 (infrastructure)
+
+### Changed
+- Split release pipeline into separate binary and Docker workflows (#45)
+- Pin Docker base images by digest (#45)
+- Add GitHub release relay — mirrors Gitea releases to GitHub (#49)
+- Add Grype CVE scanning to Docker pipeline (#45)
+- Make CVE scan non-blocking for non-exploitable wish SCP vulnerability (#48)
+
+### Fixed
+- git-cliff install in CI — resolve download URL dynamically, extract to /tmp (#46, #47)
+
 ## [2026.06.1] — 2026-06-01
 
 ### Changed
@@ -14,6 +26,14 @@
 ### Breaking
 - Existing Docker volumes with root-owned files require migration before upgrading:
   `docker run --rm -v <volume>:/data alpine chown -R 1000:1000 /data`
+
+## [2026.05.6] — 2026-05-30 (infrastructure)
+
+### Changed
+- Sync README to Docker Hub on release (#43)
+
+### Security
+- Patch Docker Scout CVEs, remove unused openssh-client (#41)
 
 ## [2026.05.5] — 2026-05-29
 
