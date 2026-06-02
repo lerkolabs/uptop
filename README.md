@@ -86,9 +86,9 @@ First run: set `UPTOP_ADMIN_KEY` to your SSH public key, or attach to the contai
 </details>
 
 <details>
-<summary><strong>Binary</strong></summary>
+<summary><strong>Binary (Linux amd64)</strong></summary>
 
-Download from [Releases](https://gitea.lerkolabs.com/lerkolabs/uptop/releases).
+Download from [Releases](https://github.com/lerkolabs/uptop/releases).
 
 </details>
 
