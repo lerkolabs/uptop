@@ -133,7 +133,7 @@ Full reference in [docs/config-as-code.md](docs/config-as-code.md).
 | `UPTOP_STATUS_TITLE` | `System Status` | Status page title |
 | `UPTOP_ENCRYPTION_KEY` | | AES-256-GCM key for alert credentials ([details](#encryption)) |
 | `UPTOP_CLUSTER_MODE` | `leader` | `leader`, `follower`, or `probe` |
-| `UPTOP_PEER_URL` | | Leader URL for follower nodes |
+| `UPTOP_PEER_URL` | | Leader URL for follower and probe nodes |
 | `UPTOP_CLUSTER_SECRET` | | Shared key for cluster + API auth |
 | `UPTOP_INSECURE_SKIP_VERIFY` | `false` | Skip TLS verification for checks |
 | `UPTOP_ALLOW_PRIVATE_TARGETS` | `false` | Allow monitoring RFC1918/loopback addresses |
