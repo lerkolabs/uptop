@@ -8,3 +8,5 @@ vendor/
 *.local.json
 *.local.md
 *.local
+.env
+.github/

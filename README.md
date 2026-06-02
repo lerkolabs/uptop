@@ -86,9 +86,9 @@ First run: set `UPTOP_ADMIN_KEY` to your SSH public key, or attach to the contai
 </details>
 
 <details>
-<summary><strong>Binary</strong></summary>
+<summary><strong>Binary (Linux amd64)</strong></summary>
 
-Download from [Releases](https://gitea.lerkolabs.com/lerkolabs/uptop/releases).
+Download from [Releases](https://github.com/lerkolabs/uptop/releases).
 
 </details>
 
@@ -100,6 +100,8 @@ go install gitea.lerkolabs.com/lerkolabs/uptop/cmd/uptop@latest
 ```
 
 </details>
+
+**Upgrading:** Pull the new image (or binary) and restart. Database migrations run automatically on startup.
 
 ## Config as code
 
@@ -129,11 +131,29 @@ Full reference in [docs/config-as-code.md](docs/config-as-code.md).
 | `UPTOP_DB_DSN` | `uptop.db` | Database path or connection string |
 | `UPTOP_STATUS_ENABLED` | `false` | Enable public status page |
 | `UPTOP_STATUS_TITLE` | `System Status` | Status page title |
-| `UPTOP_CLUSTER_MODE` | `leader` | `leader` or `follower` |
-| `UPTOP_PEER_URL` | | Leader URL for follower nodes |
+| `UPTOP_ENCRYPTION_KEY` | | AES-256-GCM key for alert credentials ([details](#encryption)) |
+| `UPTOP_CLUSTER_MODE` | `leader` | `leader`, `follower`, or `probe` |
+| `UPTOP_PEER_URL` | | Leader URL for follower and probe nodes |
 | `UPTOP_CLUSTER_SECRET` | | Shared key for cluster + API auth |
 | `UPTOP_INSECURE_SKIP_VERIFY` | `false` | Skip TLS verification for checks |
+| `UPTOP_ALLOW_PRIVATE_TARGETS` | `false` | Allow monitoring RFC1918/loopback addresses |
 | `UPTOP_ADMIN_KEY` | | SSH public key seeded as first admin on startup |
+
+See [`.env.example`](.env.example) for all options including TLS, probes, and advanced settings.
+
+### Encryption
+
+Set `UPTOP_ENCRYPTION_KEY` to encrypt alert credentials (SMTP passwords, webhook URLs, API tokens) at rest with AES-256-GCM. Generate a key:
+
+    openssl rand -hex 32
+
+Without this, credentials are stored as plaintext in the database. uptop warns on startup if unset. To encrypt credentials on an existing install, run `uptop migrate-secrets` with the key set.
+
+## Clustering
+
+uptop supports three modes: **leader** (default single node), **follower** (HA failover — takes over if the leader goes down), and **probe** (stateless distributed checks from multiple regions).
+
+See [docs/clustering.md](docs/clustering.md) for setup guides, or the working examples in [`deploy/`](deploy/).
 
 ## Migrating from Uptime Kuma
 
