@@ -1,0 +1,53 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - "[0-9]*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: sh
+    steps:
+      - name: Install build tools
+        run: apk add --no-cache git gcc musl-dev
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: release-go-${{ hashFiles('go.sum') }}
+          restore-keys: release-go-
+
+      - name: Install git-cliff
+        run: |
+          apk add --no-cache curl
+          curl -sSL https://github.com/orhun/git-cliff/releases/latest/download/git-cliff-x86_64-unknown-linux-musl.tar.gz | tar xz
+          mv git-cliff-*/git-cliff /usr/local/bin/
+          git-cliff --version
+
+      - name: Generate release notes
+        run: git-cliff --current --strip header -o /tmp/release-notes.md
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean --release-notes=/tmp/release-notes.md
+        env:
+          GORELEASER_FORCE_TOKEN: gitea
+          GITEA_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITEA_API_URL: http://gitea:3000/api/v1

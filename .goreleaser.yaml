@@ -33,10 +33,41 @@ archives:
 checksum:
   name_template: checksums.txt
 
+nfpms:
+  - package_name: uptop
+    file_name_template: "{{ .ConventionalFileName }}"
+    vendor: LerkoLabs
+    homepage: https://gitea.lerkolabs.com/lerkolabs/uptop
+    maintainer: Tyler Koenig <tyler@lerkolabs.com>
+    description: Self-hosted uptime monitoring with a TUI over SSH
+    license: MIT
+    section: net
+    priority: optional
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+    contents:
+      - src: ./LICENSE
+        dst: /usr/share/doc/uptop/LICENSE
+        type: doc
+
+homebrew_casks:
+  - name: uptop
+    homepage: https://gitea.lerkolabs.com/lerkolabs/uptop
+    description: Self-hosted uptime monitoring with a TUI over SSH
+    directory: Casks
+    skip_upload: true
+    commit_msg_template: "update uptop to {{ .Tag }}"
+    url:
+      template: "https://gitea.lerkolabs.com/lerkolabs/uptop/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    repository:
+      owner: lerkolabs
+      name: homebrew-tap
+      git:
+        url: "ssh://git@gitea.lerkolabs.com:2222/lerkolabs/homebrew-tap.git"
+        private_key: "{{ if index .Env \"TAP_SSH_KEY\" }}{{ .Env.TAP_SSH_KEY }}{{ end }}"
+        ssh_command: "ssh -o StrictHostKeyChecking=accept-new"
+
 changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^chore:"
-      - "^style:"
+  disable: true
