@@ -1,0 +1,69 @@
+name: Mirror Release to GitHub
+
+on:
+  push:
+    tags:
+      - "[0-9]*"
+
+permissions:
+  contents: write
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Gitea release
+        id: gitea
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          API="https://gitea.lerkolabs.com/api/v1/repos/lerkolabs/uptop/releases/tags/${TAG}"
+
+          for i in $(seq 1 20); do
+            if RESPONSE=$(curl -sf "$API" 2>/dev/null); then
+              ASSET_COUNT=$(echo "$RESPONSE" | jq '.assets | length')
+              if [ "$ASSET_COUNT" -gt 0 ]; then
+                echo "Found release with $ASSET_COUNT assets"
+                break
+              fi
+              echo "Release exists but no assets yet... attempt $i/20"
+            else
+              echo "Waiting for Gitea release... attempt $i/20"
+            fi
+            sleep 30
+          done
+
+          if [ -z "$RESPONSE" ] || [ "$ASSET_COUNT" -eq 0 ]; then
+            echo "::error::Gitea release for ${TAG} not found or has no assets after 10 minutes"
+            exit 1
+          fi
+
+          echo "$RESPONSE" | jq -r '.body // empty' > /tmp/release-notes.md
+
+          if [ ! -s /tmp/release-notes.md ]; then
+            echo "Release ${TAG} from [Gitea](https://gitea.lerkolabs.com/lerkolabs/uptop/releases/tag/${TAG})" > /tmp/release-notes.md
+          fi
+
+          mkdir -p /tmp/assets
+          echo "$RESPONSE" | jq -r '.assets[] | .browser_download_url' | while read -r url; do
+            filename=$(basename "$url")
+            echo "Downloading $filename"
+            curl -sSL -o "/tmp/assets/${filename}" "$url"
+          done
+
+      - name: Delete existing GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$TAG" \
+            --notes-file /tmp/release-notes.md \
+            /tmp/assets/*
