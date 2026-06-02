@@ -35,8 +35,8 @@ jobs:
         run: |
           apk add --no-cache curl jq
           VERSION=$(curl -sS https://api.github.com/repos/orhun/git-cliff/releases/latest | jq -r '.tag_name' | sed 's/^v//')
-          curl -sSL "https://github.com/orhun/git-cliff/releases/download/v${VERSION}/git-cliff-${VERSION}-x86_64-unknown-linux-musl.tar.gz" | tar xz
-          mv git-cliff-*/git-cliff /usr/local/bin/
+          curl -sSL "https://github.com/orhun/git-cliff/releases/download/v${VERSION}/git-cliff-${VERSION}-x86_64-unknown-linux-musl.tar.gz" | tar xz -C /tmp
+          mv /tmp/git-cliff-*/git-cliff /usr/local/bin/
           git-cliff --version
 
       - name: Generate release notes
