@@ -60,6 +60,11 @@ jobs:
             COMMIT=${{ github.sha }}
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
 
+      - name: Scan image for CVEs
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+          grype lerkolabs/uptop:${{ steps.meta.outputs.tag }} --fail-on critical --output table
+
       - name: Update Docker Hub description
         uses: peter-evans/dockerhub-description@v4
         with:
