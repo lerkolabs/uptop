@@ -128,7 +128,7 @@ func fmtRetries(site models.Site) string {
 	return s
 }
 
-func fmtStatus(status string, paused bool, inMaint bool) string {
+func fmtStatus(status string, paused bool, inMaint bool, errCategory ErrorCategory) string {
 	if paused {
 		return warnStyle.Render("PAUSED")
 	}
@@ -136,7 +136,13 @@ func fmtStatus(status string, paused bool, inMaint bool) string {
 		return maintStyle.Render("MAINT")
 	}
 	switch status {
-	case "DOWN", "SSL EXP":
+	case "DOWN":
+		label := "DOWN"
+		if errCategory != ErrCatUnknown {
+			label = "DOWN:" + string(errCategory)
+		}
+		return dangerStyle.Render(label)
+	case "SSL EXP":
 		return dangerStyle.Render(status)
 	case "LATE":
 		return warnStyle.Render(status)

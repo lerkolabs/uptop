@@ -40,7 +40,8 @@ func (m Model) viewDetailPanel() string {
 		b.WriteString("\n" + subtleStyle.Render("  "+label) + "\n")
 	}
 
-	row("Status", fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)))
+	errCat := classifyError(site.LastError, site.Type, site.StatusCode)
+	row("Status", fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID), errCat))
 
 	if (site.Status == "DOWN" || site.Status == "SSL EXP" || site.Status == "LATE") && site.LastError != "" {
 		row("Error", dangerStyle.Render(limitStr(site.LastError, 60)))
@@ -48,6 +49,34 @@ func (m Model) viewDetailPanel() string {
 
 	if site.Type == "http" && site.StatusCode > 0 {
 		row("HTTP Code", strconv.Itoa(site.StatusCode))
+	}
+
+	if (site.Status == "DOWN" || site.Status == "SSL EXP") && site.LastError != "" {
+		chain := connectionChain(site.LastError, site.Type, site.StatusCode, strings.HasPrefix(site.URL, "https"))
+		if len(chain) > 0 {
+			b.WriteString("\n")
+			for _, step := range chain {
+				var icon string
+				switch step.Status {
+				case stepPassed:
+					icon = specialStyle.Render("✓")
+				case stepFailed:
+					icon = dangerStyle.Render("✗")
+				case stepSkipped:
+					icon = subtleStyle.Render("·")
+				}
+				line := fmt.Sprintf("  %s %-16s", icon, step.Name)
+				if step.Detail != "" {
+					switch step.Status {
+					case stepFailed:
+						line += " " + dangerStyle.Render(step.Detail)
+					case stepSkipped:
+						line += " " + subtleStyle.Render(step.Detail)
+					}
+				}
+				b.WriteString(line + "\n")
+			}
+		}
 	}
 
 	if !site.StatusChangedAt.IsZero() {

@@ -52,8 +52,8 @@ func (m Model) computeLayout() tableLayout {
 		fixed = 4 + 10 + 10 + 10 + 8 + 7 + 9
 	} else {
 		headers = []string{"#", "NAME", "TYPE", "STATUS", "LAT", "UP%", "HISTORY", "SSL", "RT"}
-		widths = []int{4, 0, 8, 8, 7, 8, 0, 5, 5}
-		fixed = 4 + 8 + 8 + 7 + 8 + 5 + 5
+		widths = []int{4, 0, 8, 10, 7, 8, 0, 5, 5}
+		fixed = 4 + 8 + 10 + 7 + 8 + 5 + 5
 	}
 
 	numCols := len(headers)
@@ -137,7 +137,7 @@ func (m Model) viewSitesTab() string {
 						strconv.Itoa(i + 1),
 						m.zones.Mark(fmt.Sprintf("site-%d", i), icon+" "+limitStr(site.Name, nameW-4)),
 						"group",
-						fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)),
+						fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID), ErrCatUnknown),
 						subtleStyle.Render("—"),
 						m.groupUptime(site.ID),
 						m.groupSparkline(site.ID, sparkWidth),
@@ -162,7 +162,13 @@ func (m Model) viewSitesTab() string {
 					nameLen := len([]rune(name))
 					errSpace := nameW - nameLen - 3
 					if errSpace > 10 {
-						name = name + " " + subtleStyle.Render(limitStr(site.LastError, errSpace))
+						cat := classifyError(site.LastError, site.Type, site.StatusCode)
+						tag := categoryTag(cat)
+						errText := site.LastError
+						if tag != "" {
+							errText = tag + " " + errText
+						}
+						name = name + " " + subtleStyle.Render(limitStr(errText, errSpace))
 					}
 				}
 
@@ -178,7 +184,7 @@ func (m Model) viewSitesTab() string {
 					strconv.Itoa(i + 1),
 					m.zones.Mark(fmt.Sprintf("site-%d", i), name),
 					typeIcon(site.Type, false) + " " + site.Type,
-					fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)),
+					fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID), classifyError(site.LastError, site.Type, site.StatusCode)),
 					fmtLatency(site.Latency),
 					fmtUptime(hist.Statuses),
 					spark,

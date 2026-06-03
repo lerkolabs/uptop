@@ -55,6 +55,36 @@ func TestSiteOrder(t *testing.T) {
 	}
 }
 
+func TestFmtStatus_ErrorCategory(t *testing.T) {
+	tests := []struct {
+		status  string
+		paused  bool
+		inMaint bool
+		cat     ErrorCategory
+		wantSub string
+	}{
+		{"DOWN", false, false, ErrCatDNS, "DOWN:DNS"},
+		{"DOWN", false, false, ErrCatTLS, "DOWN:TLS"},
+		{"DOWN", false, false, ErrCatHTTP, "DOWN:HTTP"},
+		{"DOWN", false, false, ErrCatTCP, "DOWN:TCP"},
+		{"DOWN", false, false, ErrCatTimeout, "DOWN:TMO"},
+		{"DOWN", false, false, ErrCatICMP, "DOWN:ICMP"},
+		{"DOWN", false, false, ErrCatPrivate, "DOWN:PRIV"},
+		{"DOWN", false, false, ErrCatUnknown, "DOWN"},
+		{"UP", false, false, ErrCatUnknown, "UP"},
+		{"SSL EXP", false, false, ErrCatUnknown, "SSL EXP"},
+		{"DOWN", true, false, ErrCatDNS, "PAUSED"},
+		{"DOWN", false, true, ErrCatDNS, "MAINT"},
+	}
+	for _, tt := range tests {
+		got := fmtStatus(tt.status, tt.paused, tt.inMaint, tt.cat)
+		if !containsPlain(got, tt.wantSub) {
+			t.Errorf("fmtStatus(%q, paused=%v, maint=%v, %q): %q missing %q",
+				tt.status, tt.paused, tt.inMaint, tt.cat, got, tt.wantSub)
+		}
+	}
+}
+
 func TestFmtDuration(t *testing.T) {
 	tests := []struct {
 		d    time.Duration
