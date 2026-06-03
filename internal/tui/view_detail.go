@@ -44,7 +44,12 @@ func (m Model) viewDetailPanel() string {
 	row("Status", fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID), errCat))
 
 	if (site.Status == "DOWN" || site.Status == "SSL EXP" || site.Status == "LATE") && site.LastError != "" {
-		row("Error", dangerStyle.Render(limitStr(site.LastError, 60)))
+		errWidth := m.termWidth - chromePadH - 19
+		if errWidth < 30 {
+			errWidth = 30
+		}
+		wrapped := lipgloss.NewStyle().Width(errWidth).Render(site.LastError)
+		row("Error", dangerStyle.Render(wrapped))
 	}
 
 	if site.Type == "http" && site.StatusCode > 0 {
@@ -162,7 +167,7 @@ func (m Model) viewDetailPanel() string {
 			ago := time.Since(result.CheckedAt).Truncate(time.Second)
 			line := fmt.Sprintf("  %-14s %s  %dms  %s ago", nodeID, status, latency, ago)
 			if !result.IsUp && result.ErrorReason != "" {
-				line += "  " + dangerStyle.Render(limitStr(result.ErrorReason, 30))
+				line += "  " + dangerStyle.Render(result.ErrorReason)
 			}
 			b.WriteString(line + "\n")
 		}
@@ -181,7 +186,7 @@ func (m Model) viewDetailPanel() string {
 			}
 			line := fmt.Sprintf("  %s  %s", arrow, subtleStyle.Render(ago+" ago"))
 			if sc.ErrorReason != "" && sc.ToStatus != "UP" {
-				line += "  " + dangerStyle.Render(limitStr(sc.ErrorReason, 40))
+				line += "  " + dangerStyle.Render(sc.ErrorReason)
 			}
 			b.WriteString(line + "\n")
 		}
