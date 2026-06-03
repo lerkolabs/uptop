@@ -43,6 +43,7 @@ func TestClassifyError(t *testing.T) {
 		{"connection reset by peer", "http", 0, ErrCatTCP},
 		{"dial tcp: no route to host", "http", 0, ErrCatTCP},
 		{"network unreachable", "http", 0, ErrCatTCP},
+		{"failed to connect to 10.0.0.1:443", "http", 0, ErrCatTCP},
 
 		// HTTP
 		{"HTTP 500 (expected 200-299)", "http", 500, ErrCatHTTP},

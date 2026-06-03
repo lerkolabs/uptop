@@ -51,7 +51,7 @@ func classifyError(errorReason string, siteType string, statusCode int) ErrorCat
 
 	if strings.Contains(lower, "connection refused") || strings.Contains(lower, "connection reset") ||
 		strings.Contains(lower, "no route to host") || strings.Contains(lower, "network unreachable") ||
-		strings.Contains(lower, "network is unreachable") {
+		strings.Contains(lower, "network is unreachable") || strings.Contains(lower, "failed to connect") {
 		return ErrCatTCP
 	}
 
