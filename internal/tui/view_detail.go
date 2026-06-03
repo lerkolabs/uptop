@@ -176,7 +176,7 @@ func (m Model) viewDetailPanel() string {
 	stateChanges := m.engine.GetStateChanges(site.ID, 5)
 	if len(stateChanges) > 0 {
 		b.WriteString("\n" + subtleStyle.Render("  STATE CHANGES") + "\n")
-		for _, sc := range stateChanges {
+		for i, sc := range stateChanges {
 			ago := fmtDuration(time.Since(sc.ChangedAt))
 			arrow := subtleStyle.Render(sc.FromStatus) + " → "
 			if sc.ToStatus == "UP" {
@@ -185,11 +185,15 @@ func (m Model) viewDetailPanel() string {
 				arrow += dangerStyle.Render(sc.ToStatus)
 			}
 			line := fmt.Sprintf("  %s  %s", arrow, subtleStyle.Render(ago+" ago"))
+			if dur := computeOutageDuration(stateChanges, i); dur > 0 {
+				line += "  " + warnStyle.Render("outage "+fmtDuration(dur))
+			}
 			if sc.ErrorReason != "" && sc.ToStatus != "UP" {
 				line += "  " + dangerStyle.Render(sc.ErrorReason)
 			}
 			b.WriteString(line + "\n")
 		}
+		b.WriteString("  " + subtleStyle.Render("[h] History") + "\n")
 	}
 
 	b.WriteString("\n")
@@ -235,7 +239,7 @@ func (m Model) viewDetailPanel() string {
 	}
 
 	b.WriteString("\n\n")
-	b.WriteString(subtleStyle.Render("  [i/Esc] Back  [e] Edit  [q] Quit"))
+	b.WriteString(subtleStyle.Render("  [i/Esc] Back  [e] Edit  [h] History  [q] Quit"))
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }

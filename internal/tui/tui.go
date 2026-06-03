@@ -70,6 +70,7 @@ const (
 	stateFormUser
 	stateConfirmDelete
 	stateFormMaint
+	stateHistory
 )
 
 type Model struct {
@@ -91,8 +92,12 @@ type Model struct {
 
 	logViewport        viewport.Model
 	logFilterImportant bool
-	isAdmin            bool
-	zones              *zone.Manager
+
+	historyViewport viewport.Model
+	historyChanges  []models.StateChange
+	historySiteName string
+	isAdmin         bool
+	zones           *zone.Manager
 
 	deleteID   int
 	deleteName string

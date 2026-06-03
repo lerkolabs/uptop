@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 )
@@ -122,6 +123,8 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	}
 	m.logViewport.Width = msg.Width - chromePadH
 	m.logViewport.Height = msg.Height - (chromePadV + chromeHeader + chromeGaps + chromeFooter)
+	m.historyViewport.Width = msg.Width - chromePadH
+	m.historyViewport.Height = msg.Height - 10
 	return m, tea.ClearScreen
 }
 
@@ -134,6 +137,14 @@ func (m *Model) handleTick(t time.Time) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if m.state == stateHistory {
+		if msg.Button == tea.MouseButtonWheelUp {
+			m.historyViewport.ScrollUp(3)
+		} else if msg.Button == tea.MouseButtonWheelDown {
+			m.historyViewport.ScrollDown(3)
+		}
+		return m, nil
+	}
 	if m.state != stateDashboard && m.state != stateLogs && m.state != stateUsers {
 		return m, nil
 	}
@@ -187,6 +198,8 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.state {
 	case stateDetail:
 		return m.handleDetailKey(msg)
+	case stateHistory:
+		return m.handleHistoryKey(msg)
 	case stateAlertDetail:
 		return m.handleAlertDetailKey(msg)
 	case stateDashboard, stateLogs, stateUsers:
@@ -229,7 +242,42 @@ func (m *Model) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "i", "esc":
 		m.state = stateDashboard
+	case "h":
+		if m.cursor < len(m.sites) {
+			site := m.sites[m.cursor]
+			m.historySiteName = site.Name
+			m.historyChanges = m.engine.GetStateChanges(site.ID, 100)
+			m.historyViewport = viewport.New(
+				m.termWidth-chromePadH,
+				m.termHeight-10,
+			)
+			m.historyViewport.SetContent(m.buildHistoryContent())
+			m.historyViewport.GotoTop()
+			m.state = stateHistory
+		}
 	case "q":
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
+func (m *Model) handleHistoryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q", "esc":
+		m.state = stateDetail
+	case "up", "k":
+		m.historyViewport.LineUp(1)
+	case "down", "j":
+		m.historyViewport.LineDown(1)
+	case "pgup":
+		m.historyViewport.HalfViewUp()
+	case "pgdown":
+		m.historyViewport.HalfViewDown()
+	case "home", "g":
+		m.historyViewport.GotoTop()
+	case "end", "G":
+		m.historyViewport.GotoBottom()
+	case "ctrl+c":
 		return m, tea.Quit
 	}
 	return m, nil
