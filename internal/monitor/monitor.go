@@ -509,12 +509,17 @@ func (e *Engine) checkPush(site models.Site) {
 	}
 
 	overdue := site.LastCheck.Add(interval)
+	staleMark := overdue.Add(grace / 2)
 	graceEnd := overdue.Add(grace)
 	now := time.Now()
 
 	if now.After(graceEnd) {
 		if site.Status != "DOWN" {
 			e.handleStatusChange(site, "DOWN", 0, 0, "heartbeat missed")
+		}
+	} else if now.After(staleMark) {
+		if site.Status != "STALE" {
+			e.handleStatusChange(site, "STALE", 0, 0, "heartbeat stale")
 		}
 	} else if now.After(overdue) {
 		if site.Status != "LATE" {

@@ -119,9 +119,14 @@ func (m Model) buildHistoryContent() string {
 		ts := sc.ChangedAt.Format("2006-01-02 15:04")
 
 		arrow := subtleStyle.Render(sc.FromStatus) + " → "
-		if sc.ToStatus == "UP" {
+		switch sc.ToStatus {
+		case "UP":
 			arrow += specialStyle.Render(sc.ToStatus)
-		} else {
+		case "LATE":
+			arrow += warnStyle.Render(sc.ToStatus)
+		case "STALE":
+			arrow += staleStyle.Render(sc.ToStatus)
+		default:
 			arrow += dangerStyle.Render(sc.ToStatus)
 		}
 

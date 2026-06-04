@@ -22,6 +22,8 @@ func siteOrder(s models.Site) int {
 	switch s.Status {
 	case "DOWN", "SSL EXP":
 		return 0
+	case "STALE":
+		return 1
 	case "LATE":
 		return 1
 	case "PENDING":
@@ -142,6 +144,8 @@ func fmtStatus(status string, paused bool, inMaint bool, errCategory ErrorCatego
 		return dangerStyle.Render(status)
 	case "LATE":
 		return warnStyle.Render(status)
+	case "STALE":
+		return staleStyle.Render(status)
 	case "PENDING":
 		return subtleStyle.Render(status)
 	default:

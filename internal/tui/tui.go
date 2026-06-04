@@ -20,6 +20,7 @@ var (
 	subtleStyle  lipgloss.Style
 	specialStyle lipgloss.Style
 	warnStyle    lipgloss.Style
+	staleStyle   lipgloss.Style
 	dangerStyle  lipgloss.Style
 	titleStyle   lipgloss.Style
 	activeTab    lipgloss.Style
@@ -30,6 +31,7 @@ func applyTheme(t Theme) {
 	subtleStyle = lipgloss.NewStyle().Foreground(t.Subtle)
 	specialStyle = lipgloss.NewStyle().Foreground(t.Success)
 	warnStyle = lipgloss.NewStyle().Foreground(t.Warning)
+	staleStyle = lipgloss.NewStyle().Foreground(t.Stale)
 	dangerStyle = lipgloss.NewStyle().Foreground(t.Danger)
 	titleStyle = lipgloss.NewStyle().Foreground(t.Accent).Bold(true)
 	activeTab = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, false, true, false).BorderForeground(t.Accent).Foreground(t.Accent).Bold(true).Padding(0, 1)

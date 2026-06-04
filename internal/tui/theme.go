@@ -22,6 +22,7 @@ type Theme struct {
 	// Semantic
 	Success lipgloss.Color
 	Warning lipgloss.Color
+	Stale   lipgloss.Color
 	Danger  lipgloss.Color
 	Info    lipgloss.Color
 	Accent  lipgloss.Color
@@ -54,6 +55,7 @@ var themeFlexokiDark = Theme{
 	Subtle:     "#6F6E69",
 	Success:    "#879A39",
 	Warning:    "#D0A215",
+	Stale:      "#DA702C",
 	Danger:     "#D14D41",
 	Info:       "#4385BE",
 	Accent:     "#3AA99F",
@@ -74,6 +76,7 @@ var themeTokyoNight = Theme{
 	Subtle:     "#565f89",
 	Success:    "#9ece6a",
 	Warning:    "#e0af68",
+	Stale:      "#ff9e64",
 	Danger:     "#f7768e",
 	Info:       "#7aa2f7",
 	Accent:     "#7dcfff",
@@ -94,6 +97,7 @@ var themeGruvbox = Theme{
 	Subtle:     "#7c6f64",
 	Success:    "#b8bb26",
 	Warning:    "#fabd2f",
+	Stale:      "#fe8019",
 	Danger:     "#fb4934",
 	Info:       "#83a598",
 	Accent:     "#8ec07c",
@@ -114,6 +118,7 @@ var themeCatppuccinMocha = Theme{
 	Subtle:     "#6c7086",
 	Success:    "#a6e3a1",
 	Warning:    "#f9e2af",
+	Stale:      "#fab387",
 	Danger:     "#f38ba8",
 	Info:       "#89b4fa",
 	Accent:     "#94e2d5",
@@ -134,6 +139,7 @@ var themeNord = Theme{
 	Subtle:     "#4c566a",
 	Success:    "#a3be8c",
 	Warning:    "#ebcb8b",
+	Stale:      "#d08770",
 	Danger:     "#bf616a",
 	Info:       "#81a1c1",
 	Accent:     "#88c0d0",

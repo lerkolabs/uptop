@@ -158,7 +158,7 @@ func (m Model) viewSitesTab() string {
 					name = limitStr(name, nameW-2)
 				}
 
-				if (site.Status == "DOWN" || site.Status == "SSL EXP" || site.Status == "LATE") && site.LastError != "" {
+				if (site.Status == "DOWN" || site.Status == "SSL EXP" || site.Status == "LATE" || site.Status == "STALE") && site.LastError != "" {
 					nameLen := len([]rune(name))
 					errSpace := nameW - nameLen - 3
 					if errSpace > 10 {

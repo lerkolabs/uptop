@@ -571,6 +571,26 @@ func TestCheckPush_OverdueBecomesLate(t *testing.T) {
 	}
 }
 
+func TestCheckPush_OverdueBecomesStale(t *testing.T) {
+	ms := newMockStore()
+	e := newTestEngine(ms)
+	// interval=300, grace=150 (300/2), staleMark=overdue+75
+	// at 380s: past staleMark(375) but before graceEnd(450)
+	site := models.Site{
+		ID: 1, Name: "push", Type: "push", Status: "UP",
+		Interval:  300,
+		LastCheck: time.Now().Add(-380 * time.Second),
+	}
+	injectSite(e, site)
+
+	e.checkPush(site)
+
+	s, _ := getSite(e, 1)
+	if s.Status != "STALE" {
+		t.Errorf("expected STALE when past midpoint of grace, got %s", s.Status)
+	}
+}
+
 func TestCheckPush_WithinDeadline(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)

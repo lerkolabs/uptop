@@ -43,7 +43,7 @@ func (m Model) viewDetailPanel() string {
 	errCat := classifyError(site.LastError, site.Type, site.StatusCode)
 	row("Status", fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID), errCat))
 
-	if (site.Status == "DOWN" || site.Status == "SSL EXP" || site.Status == "LATE") && site.LastError != "" {
+	if (site.Status == "DOWN" || site.Status == "SSL EXP" || site.Status == "LATE" || site.Status == "STALE") && site.LastError != "" {
 		errWidth := m.termWidth - chromePadH - 19
 		if errWidth < 30 {
 			errWidth = 30
