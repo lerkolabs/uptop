@@ -246,6 +246,8 @@ func (m *Model) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "i", "esc":
 		m.state = stateDashboard
+	case "e":
+		return m.handleEditItem()
 	case "h":
 		if m.cursor < len(m.sites) {
 			site := m.sites[m.cursor]
