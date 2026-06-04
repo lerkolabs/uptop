@@ -185,7 +185,7 @@ func (m Model) viewDashboard() string {
 	if contentHeight < 1 {
 		contentHeight = 1
 	}
-	paddedContent := lipgloss.NewStyle().Height(contentHeight).Render(content)
+	paddedContent := lipgloss.NewStyle().Height(contentHeight).MaxHeight(contentHeight).Render(content)
 
 	return outerPad.Render(lipgloss.JoinVertical(lipgloss.Top, header, paddedContent, footer))
 }
