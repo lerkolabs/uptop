@@ -748,7 +748,11 @@ func (e *Engine) checkGroup(site models.Site) {
 		}
 		if child.Status == "DOWN" || child.Status == "SSL EXP" {
 			status = "DOWN"
-		} else if child.Status == "PENDING" && status != "DOWN" {
+		} else if child.Status == "STALE" && status != "DOWN" {
+			status = "STALE"
+		} else if child.Status == "LATE" && status != "DOWN" && status != "STALE" {
+			status = "LATE"
+		} else if child.Status == "PENDING" && status != "DOWN" && status != "STALE" && status != "LATE" {
 			status = "PENDING"
 		}
 	}
