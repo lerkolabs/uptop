@@ -25,6 +25,10 @@ var (
 	titleStyle   lipgloss.Style
 	activeTab    lipgloss.Style
 	inactiveTab  lipgloss.Style
+
+	sparkSuccess string
+	sparkWarning string
+	sparkDanger  string
 )
 
 func applyTheme(t Theme) {
@@ -33,6 +37,11 @@ func applyTheme(t Theme) {
 	warnStyle = lipgloss.NewStyle().Foreground(t.Warning)
 	staleStyle = lipgloss.NewStyle().Foreground(t.Stale)
 	dangerStyle = lipgloss.NewStyle().Foreground(t.Danger)
+
+	sparkSuccess = string(t.Success)
+	sparkWarning = string(t.Warning)
+	sparkDanger = string(t.Danger)
+
 	titleStyle = lipgloss.NewStyle().Foreground(t.Accent).Bold(true)
 	activeTab = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, false, true, false).BorderForeground(t.Accent).Foreground(t.Accent).Bold(true).Padding(0, 1)
 	inactiveTab = lipgloss.NewStyle().Padding(0, 1).Foreground(t.Muted)

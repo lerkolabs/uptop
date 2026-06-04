@@ -1,15 +1,63 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 var sparkChars = []rune{'▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
 
-func latencySparkline(latencies []time.Duration, statuses []bool, width int) string {
+func parseHex(hex string) (r, g, b uint8) {
+	if len(hex) == 7 && hex[0] == '#' {
+		fmt.Sscanf(hex[1:], "%02x%02x%02x", &r, &g, &b)
+	}
+	return
+}
+
+func dimColor(hex string, brightness float64) lipgloss.Color {
+	r, g, b := parseHex(hex)
+	f := 0.3 + brightness*0.7
+	return lipgloss.Color(fmt.Sprintf("#%02x%02x%02x",
+		uint8(float64(r)*f),
+		uint8(float64(g)*f),
+		uint8(float64(b)*f),
+	))
+}
+
+func withBg(s lipgloss.Style, bg lipgloss.Color) lipgloss.Style {
+	if bg != "" {
+		return s.Background(bg)
+	}
+	return s
+}
+
+func latencyStyle(ms int64, bg lipgloss.Color) lipgloss.Style {
+	var hex string
+	var t float64
+	switch {
+	case ms < 200:
+		hex = sparkSuccess
+		t = float64(ms) / 200
+	case ms < 500:
+		hex = sparkWarning
+		t = float64(ms-200) / 300
+	default:
+		hex = sparkDanger
+		t = float64(ms-500) / 1500
+		if t > 1 {
+			t = 1
+		}
+	}
+	s := lipgloss.NewStyle().Foreground(dimColor(hex, t))
+	return withBg(s, bg)
+}
+
+func latencySparkline(latencies []time.Duration, statuses []bool, width int, bg lipgloss.Color) string {
 	if len(latencies) == 0 {
-		return subtleStyle.Render(strings.Repeat("·", width))
+		return withBg(subtleStyle, bg).Render(strings.Repeat("·", width))
 	}
 
 	samples := latencies
@@ -30,12 +78,12 @@ func latencySparkline(latencies []time.Duration, statuses []bool, width int) str
 			maxL = l
 		}
 	}
+	spread := maxL - minL
 
 	var sb strings.Builder
 	if remaining := width - len(samples); remaining > 0 {
-		sb.WriteString(subtleStyle.Render(strings.Repeat("·", remaining)))
+		sb.WriteString(withBg(subtleStyle, bg).Render(strings.Repeat("·", remaining)))
 	}
-	spread := maxL - minL
 	for i, l := range samples {
 		idx := 0
 		if spread > 0 {
@@ -47,24 +95,17 @@ func latencySparkline(latencies []time.Duration, statuses []bool, width int) str
 		ch := string(sparkChars[idx])
 		isDown := i < len(sampledStatuses) && !sampledStatuses[i]
 		if isDown {
-			sb.WriteString(dangerStyle.Render(ch))
+			sb.WriteString(withBg(dangerStyle, bg).Render(ch))
 		} else {
-			ms := l.Milliseconds()
-			if ms < 200 {
-				sb.WriteString(specialStyle.Render(ch))
-			} else if ms < 500 {
-				sb.WriteString(warnStyle.Render(ch))
-			} else {
-				sb.WriteString(dangerStyle.Render(ch))
-			}
+			sb.WriteString(latencyStyle(l.Milliseconds(), bg).Render(ch))
 		}
 	}
 	return sb.String()
 }
 
-func heartbeatSparkline(statuses []bool, width int) string {
+func heartbeatSparkline(statuses []bool, width int, bg lipgloss.Color) string {
 	if len(statuses) == 0 {
-		return subtleStyle.Render(strings.Repeat("·", width))
+		return withBg(subtleStyle, bg).Render(strings.Repeat("·", width))
 	}
 
 	samples := statuses
@@ -74,19 +115,19 @@ func heartbeatSparkline(statuses []bool, width int) string {
 
 	var sb strings.Builder
 	if remaining := width - len(samples); remaining > 0 {
-		sb.WriteString(subtleStyle.Render(strings.Repeat("·", remaining)))
+		sb.WriteString(withBg(subtleStyle, bg).Render(strings.Repeat("·", remaining)))
 	}
 	for _, up := range samples {
 		if up {
-			sb.WriteString(specialStyle.Render("▁"))
+			sb.WriteString(withBg(specialStyle, bg).Render("▁"))
 		} else {
-			sb.WriteString(dangerStyle.Render("█"))
+			sb.WriteString(withBg(dangerStyle, bg).Render("█"))
 		}
 	}
 	return sb.String()
 }
 
-func (m Model) groupSparkline(groupID int, width int) string {
+func (m Model) groupSparkline(groupID int, width int, bg lipgloss.Color) string {
 	allSites := m.engine.GetAllSites()
 	var childStatuses [][]bool
 	for _, s := range allSites {
@@ -99,7 +140,7 @@ func (m Model) groupSparkline(groupID int, width int) string {
 	}
 
 	if len(childStatuses) == 0 {
-		return subtleStyle.Render(strings.Repeat("·", width))
+		return withBg(subtleStyle, bg).Render(strings.Repeat("·", width))
 	}
 
 	maxLen := 0
@@ -127,13 +168,13 @@ func (m Model) groupSparkline(groupID int, width int) string {
 
 	var sb strings.Builder
 	if remaining := width - len(aggregated); remaining > 0 {
-		sb.WriteString(subtleStyle.Render(strings.Repeat("·", remaining)))
+		sb.WriteString(withBg(subtleStyle, bg).Render(strings.Repeat("·", remaining)))
 	}
 	for _, up := range aggregated {
 		if up {
-			sb.WriteString(specialStyle.Render("•"))
+			sb.WriteString(withBg(subtleStyle, bg).Render("·"))
 		} else {
-			sb.WriteString(dangerStyle.Render("•"))
+			sb.WriteString(withBg(dangerStyle, bg).Render("•"))
 		}
 	}
 	return sb.String()

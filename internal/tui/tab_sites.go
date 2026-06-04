@@ -86,6 +86,9 @@ func (m Model) computeLayout() tableLayout {
 	if sparkW < 15 {
 		sparkW = 15
 	}
+	if sparkW > 62 {
+		sparkW = 62
+	}
 
 	widths[1] = nameW
 	widths[6] = sparkW
@@ -110,6 +113,9 @@ func (m Model) viewSitesTab() string {
 	if sparkWidth < 8 {
 		sparkWidth = 8
 	}
+	if sparkWidth > 60 {
+		sparkWidth = 60
+	}
 
 	var groupRows map[int]bool
 	return m.renderTable(
@@ -120,6 +126,13 @@ func (m Model) viewSitesTab() string {
 			var rows [][]string
 			for i := start; i < end; i++ {
 				site := m.sites[i]
+				rowIdx := i - start
+				var rowBg lipgloss.Color
+				if i == m.cursor {
+					rowBg = m.theme.SelectedBg
+				} else if rowIdx%2 == 1 {
+					rowBg = m.theme.ZebraBg
+				}
 
 				if site.Type == "group" {
 					groupRows[i-start] = true
@@ -131,7 +144,7 @@ func (m Model) viewSitesTab() string {
 						fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)),
 						subtleStyle.Render("—"),
 						m.groupUptime(site.ID),
-						m.groupSparkline(site.ID, sparkWidth),
+						m.groupSparkline(site.ID, sparkWidth, rowBg),
 						subtleStyle.Render("-"),
 						subtleStyle.Render("—"),
 					})
@@ -166,9 +179,9 @@ func (m Model) viewSitesTab() string {
 				hist, _ := m.engine.GetHistory(site.ID)
 				var spark string
 				if site.Type == "push" {
-					spark = heartbeatSparkline(hist.Statuses, sparkWidth)
+					spark = heartbeatSparkline(hist.Statuses, sparkWidth, rowBg)
 				} else {
-					spark = latencySparkline(hist.Latencies, hist.Statuses, sparkWidth)
+					spark = latencySparkline(hist.Latencies, hist.Statuses, sparkWidth, rowBg)
 				}
 
 				rows = append(rows, []string{

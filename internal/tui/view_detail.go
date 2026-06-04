@@ -203,7 +203,7 @@ func (m Model) viewDetailPanel() string {
 	b.WriteString(m.divider() + "\n")
 	const sparkWidth = 40
 	if site.Type == "push" {
-		b.WriteString("  " + heartbeatSparkline(hist.Statuses, sparkWidth))
+		b.WriteString("  " + heartbeatSparkline(hist.Statuses, sparkWidth, ""))
 		if len(hist.Statuses) > 0 {
 			up := 0
 			for _, s := range hist.Statuses {
@@ -216,7 +216,7 @@ func (m Model) viewDetailPanel() string {
 				up, len(hist.Statuses))
 		}
 	} else {
-		b.WriteString("  " + latencySparkline(hist.Latencies, hist.Statuses, sparkWidth))
+		b.WriteString("  " + latencySparkline(hist.Latencies, hist.Statuses, sparkWidth, ""))
 		var minL, maxL, total time.Duration
 		count := 0
 		for i, l := range hist.Latencies {

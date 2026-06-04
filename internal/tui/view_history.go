@@ -47,6 +47,8 @@ func computeHistoryStats(changes []models.StateChange) historyStats {
 	return s
 }
 
+var stateChangeChars = []rune{'▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
+
 func stateChangeSparkline(changes []models.StateChange, width int) string {
 	if len(changes) < 2 || width < 4 {
 		return ""
@@ -91,7 +93,7 @@ func stateChangeSparkline(changes []models.StateChange, width int) string {
 		if idx > 7 {
 			idx = 7
 		}
-		ch := string(sparkChars[idx])
+		ch := string(stateChangeChars[idx])
 		switch {
 		case v >= 3:
 			sb.WriteString(dangerStyle.Render(ch))
