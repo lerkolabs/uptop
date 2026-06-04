@@ -107,7 +107,7 @@ func (m Model) viewDetailPanel() string {
 	row("Type", site.Type)
 	if site.Type == "push" && site.Token != "" {
 		row("Token", site.Token)
-		row("Push URL", "/api/push/"+site.Token)
+		row("Push", "curl -X POST -H 'Authorization: Bearer "+site.Token+"' <host>/api/push")
 	}
 	if site.URL != "" {
 		row("URL", site.URL)
