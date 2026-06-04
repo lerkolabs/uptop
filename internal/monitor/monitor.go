@@ -832,3 +832,11 @@ func (e *Engine) GetStateChanges(siteID int, limit int) []models.StateChange {
 	}
 	return changes
 }
+
+func (e *Engine) GetStateChangesSince(siteID int, since time.Time) []models.StateChange {
+	changes, err := e.db.GetStateChangesSince(siteID, since)
+	if err != nil {
+		return nil
+	}
+	return changes
+}

@@ -243,7 +243,7 @@ func (m Model) viewDetailPanel() string {
 	}
 
 	b.WriteString("\n\n")
-	b.WriteString(subtleStyle.Render("  [i/Esc] Back  [e] Edit  [h] History  [q] Quit"))
+	b.WriteString(subtleStyle.Render("  [i/Esc] Back  [e] Edit  [h] History  [s] SLA  [q] Quit"))
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }

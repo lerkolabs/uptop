@@ -98,6 +98,8 @@ func (m Model) View() string {
 		return m.viewDetailPanel()
 	case stateHistory:
 		return m.viewHistoryPanel()
+	case stateSLA:
+		return m.viewSLAPanel()
 	case stateAlertDetail:
 		return m.viewAlertDetailPanel()
 	default:

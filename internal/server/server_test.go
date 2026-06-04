@@ -82,7 +82,10 @@ func (m *mockStore) GetPreference(string) (string, error)                   { re
 func (m *mockStore) SetPreference(string, string) error                     { return nil }
 func (m *mockStore) SaveStateChange(int, string, string, string) error      { return nil }
 func (m *mockStore) GetStateChanges(int, int) ([]models.StateChange, error) { return nil, nil }
-func (m *mockStore) Close() error                                           { return nil }
+func (m *mockStore) GetStateChangesSince(int, time.Time) ([]models.StateChange, error) {
+	return nil, nil
+}
+func (m *mockStore) Close() error { return nil }
 
 func (m *mockStore) ExportData() (models.Backup, error) {
 	return models.Backup{

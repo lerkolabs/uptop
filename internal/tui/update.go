@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/monitor"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
@@ -128,6 +130,8 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.logViewport.Height = msg.Height - (chromePadV + chromeHeader + chromeGaps + chromeFooter)
 	m.historyViewport.Width = msg.Width - chromePadH
 	m.historyViewport.Height = msg.Height - 10
+	m.slaViewport.Width = msg.Width - chromePadH
+	m.slaViewport.Height = msg.Height - 16
 	return m, tea.ClearScreen
 }
 
@@ -146,6 +150,15 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.historyViewport.ScrollUp(3)
 		case tea.MouseButtonWheelDown:
 			m.historyViewport.ScrollDown(3)
+		}
+		return m, nil
+	}
+	if m.state == stateSLA {
+		switch msg.Button {
+		case tea.MouseButtonWheelUp:
+			m.slaViewport.ScrollUp(3)
+		case tea.MouseButtonWheelDown:
+			m.slaViewport.ScrollDown(3)
 		}
 		return m, nil
 	}
@@ -204,6 +217,8 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleDetailKey(msg)
 	case stateHistory:
 		return m.handleHistoryKey(msg)
+	case stateSLA:
+		return m.handleSLAKey(msg)
 	case stateAlertDetail:
 		return m.handleAlertDetailKey(msg)
 	case stateDashboard, stateLogs, stateUsers:
@@ -261,10 +276,67 @@ func (m *Model) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.historyViewport.GotoTop()
 			m.state = stateHistory
 		}
+	case "s":
+		if m.cursor < len(m.sites) {
+			m.openSLAView(m.sites[m.cursor])
+		}
 	case "q":
 		return m, tea.Quit
 	}
 	return m, nil
+}
+
+func (m *Model) handleSLAKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q", "esc":
+		m.state = stateDetail
+	case "1", "2", "3", "4":
+		idx := int(msg.String()[0]-'0') - 1
+		if idx >= 0 && idx < len(slaPeriods) {
+			m.slaPeriodIdx = idx
+			m.recomputeSLA()
+		}
+	case "up", "k":
+		m.slaViewport.ScrollUp(1)
+	case "down", "j":
+		m.slaViewport.ScrollDown(1)
+	case "pgup":
+		m.slaViewport.HalfPageUp()
+	case "pgdown":
+		m.slaViewport.HalfPageDown()
+	case "ctrl+c":
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
+func (m *Model) openSLAView(site models.Site) {
+	m.slaSiteName = site.Name
+	m.slaSiteID = site.ID
+	m.slaPeriodIdx = 2 // default 30d
+	m.recomputeSLA()
+	m.state = stateSLA
+}
+
+func (m *Model) recomputeSLA() {
+	period := slaPeriods[m.slaPeriodIdx]
+	since := time.Now().Add(-period.duration)
+	changes := m.engine.GetStateChangesSince(m.slaSiteID, since)
+
+	var currentStatus string
+	if m.cursor < len(m.sites) {
+		currentStatus = m.sites[m.cursor].Status
+	}
+
+	m.slaReport = monitor.ComputeSLA(changes, currentStatus, period.duration)
+	m.slaDailyBreakdown = monitor.ComputeDailyBreakdown(changes, currentStatus, period.days)
+
+	m.slaViewport = viewport.New(
+		m.termWidth-chromePadH,
+		m.termHeight-16,
+	)
+	m.slaViewport.SetContent(m.buildSLADailyContent())
+	m.slaViewport.GotoTop()
 }
 
 func (m *Model) handleHistoryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

@@ -1,6 +1,8 @@
 package store
 
 import (
+	"time"
+
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 )
 
@@ -41,6 +43,7 @@ type Store interface {
 	// State Changes
 	SaveStateChange(siteID int, fromStatus, toStatus, errorReason string) error
 	GetStateChanges(siteID int, limit int) ([]models.StateChange, error)
+	GetStateChangesSince(siteID int, since time.Time) ([]models.StateChange, error)
 
 	// Nodes
 	RegisterNode(node models.ProbeNode) error

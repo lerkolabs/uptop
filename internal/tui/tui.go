@@ -73,6 +73,7 @@ const (
 	stateConfirmDelete
 	stateFormMaint
 	stateHistory
+	stateSLA
 )
 
 type Model struct {
@@ -98,8 +99,16 @@ type Model struct {
 	historyViewport viewport.Model
 	historyChanges  []models.StateChange
 	historySiteName string
-	isAdmin         bool
-	zones           *zone.Manager
+
+	slaViewport       viewport.Model
+	slaReport         monitor.SLAReport
+	slaDailyBreakdown []monitor.DayReport
+	slaSiteName       string
+	slaSiteID         int
+	slaPeriodIdx      int
+
+	isAdmin bool
+	zones   *zone.Manager
 
 	deleteID   int
 	deleteName string
