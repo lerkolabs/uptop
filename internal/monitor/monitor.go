@@ -254,6 +254,8 @@ func (e *Engine) RecordHeartbeat(token string) bool {
 		e.AddLog(fmt.Sprintf("Push Monitor '%s' received first heartbeat", site.Name))
 	case "LATE":
 		e.AddLog(fmt.Sprintf("Push Monitor '%s' heartbeat arrived (was late)", site.Name))
+	case "STALE":
+		e.AddLog(fmt.Sprintf("Push Monitor '%s' heartbeat arrived (was stale)", site.Name))
 	case "DOWN":
 		downDur := ""
 		if !site.StatusChangedAt.IsZero() {
