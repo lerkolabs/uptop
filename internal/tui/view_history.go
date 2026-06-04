@@ -160,11 +160,11 @@ func (m Model) viewHistoryPanel() string {
 		b.WriteString("  " + subtleStyle.Render(strings.Repeat("─", divWidth)) + "\n")
 	}
 
-	b.WriteString(fmt.Sprintf("  %-18s %-17s %-12s %s\n",
+	fmt.Fprintf(&b, "  %-18s %-17s %-12s %s\n",
 		subtleStyle.Render("TIME"),
 		subtleStyle.Render("TRANSITION"),
 		subtleStyle.Render("DURATION"),
-		subtleStyle.Render("REASON")))
+		subtleStyle.Render("REASON"))
 
 	if len(m.historyChanges) == 0 {
 		b.WriteString("\n  " + subtleStyle.Render("No state changes recorded") + "\n")

@@ -138,9 +138,10 @@ func (m *Model) handleTick(t time.Time) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if m.state == stateHistory {
-		if msg.Button == tea.MouseButtonWheelUp {
+		switch msg.Button {
+		case tea.MouseButtonWheelUp:
 			m.historyViewport.ScrollUp(3)
-		} else if msg.Button == tea.MouseButtonWheelDown {
+		case tea.MouseButtonWheelDown:
 			m.historyViewport.ScrollDown(3)
 		}
 		return m, nil
@@ -266,13 +267,13 @@ func (m *Model) handleHistoryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q", "esc":
 		m.state = stateDetail
 	case "up", "k":
-		m.historyViewport.LineUp(1)
+		m.historyViewport.ScrollUp(1)
 	case "down", "j":
-		m.historyViewport.LineDown(1)
+		m.historyViewport.ScrollDown(1)
 	case "pgup":
-		m.historyViewport.HalfViewUp()
+		m.historyViewport.HalfPageUp()
 	case "pgdown":
-		m.historyViewport.HalfViewDown()
+		m.historyViewport.HalfPageDown()
 	case "home", "g":
 		m.historyViewport.GotoTop()
 	case "end", "G":
