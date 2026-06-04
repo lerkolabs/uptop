@@ -181,7 +181,7 @@ func (m Model) viewDashboard() string {
 		availHeight = 5
 	}
 
-	contentHeight := availHeight - lipgloss.Height(header) - lipgloss.Height(footer) - 2
+	contentHeight := availHeight - lipgloss.Height(header) - lipgloss.Height(footer)
 	if contentHeight < 1 {
 		contentHeight = 1
 	}
