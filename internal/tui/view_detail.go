@@ -30,7 +30,8 @@ func (m Model) viewDetailPanel() string {
 	if breadcrumb == "" {
 		breadcrumb = subtleStyle.Render("  Sites > ") + titleStyle.Render(site.Name)
 	}
-	b.WriteString(breadcrumb + "\n\n")
+	b.WriteString(breadcrumb + "\n")
+	b.WriteString(m.divider() + "\n")
 
 	row := func(label, value string) {
 		fmt.Fprintf(&b, "  %-16s %s\n", subtleStyle.Render(label), value)
@@ -200,7 +201,7 @@ func (m Model) viewDetailPanel() string {
 		b.WriteString("  " + subtleStyle.Render("[h] History") + "\n")
 	}
 
-	b.WriteString("\n")
+	b.WriteString(m.divider() + "\n")
 	const sparkWidth = 40
 	if site.Type == "push" {
 		b.WriteString("  " + heartbeatSparkline(hist.Statuses, sparkWidth))
@@ -242,7 +243,8 @@ func (m Model) viewDetailPanel() string {
 		}
 	}
 
-	b.WriteString("\n\n")
+	b.WriteString("\n")
+	b.WriteString(m.divider() + "\n")
 	b.WriteString(subtleStyle.Render("  [i/Esc] Back  [e] Edit  [h] History  [s] SLA  [q] Quit"))
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())

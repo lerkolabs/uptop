@@ -101,16 +101,7 @@ func (m Model) computeLayout() tableLayout {
 func (m Model) viewSitesTab() string {
 
 	if len(m.sites) == 0 {
-		welcome := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(m.theme.Accent).
-			Padding(1, 3).
-			Render(
-				titleStyle.Render("uptop") + "\n\n" +
-					"No monitors configured yet.\n\n" +
-					subtleStyle.Render("[n] Add your first monitor"),
-			)
-		return "\n" + welcome
+		return m.emptyState(titleStyle.Render("uptop")+"\n\nNo monitors configured yet.", "[n] Add your first monitor")
 	}
 
 	layout := m.computeLayout()

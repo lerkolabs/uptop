@@ -27,20 +27,14 @@ func (m Model) viewSLAPanel() string {
 	header := "  " + titleStyle.Render("SLA REPORT: "+m.slaSiteName)
 	header += "  " + subtleStyle.Render("[q] Back")
 	b.WriteString(header + "\n")
-
-	divWidth := m.termWidth - chromePadH - 4
-	if divWidth < 40 {
-		divWidth = 40
-	}
-	b.WriteString("  " + subtleStyle.Render(strings.Repeat("─", divWidth)) + "\n")
+	b.WriteString(m.divider() + "\n")
 
 	period := slaPeriods[m.slaPeriodIdx]
 	b.WriteString("  " + subtleStyle.Render("Period: Last "+period.label) + "\n\n")
 
 	r := m.slaReport
 
-	// Uptime bar
-	barWidth := divWidth - 30
+	barWidth := m.dividerWidth() - 30
 	if barWidth < 10 {
 		barWidth = 10
 	}
@@ -52,23 +46,23 @@ func (m Model) viewSLAPanel() string {
 	if r.UptimePct < 99.0 {
 		uptimeColor = dangerStyle
 	}
-	fmt.Fprintf(&b, "  %-14s %s  %s\n", subtleStyle.Render("Uptime"), uptimeColor.Render(fmt.Sprintf("%s%%", fmtPct(r.UptimePct))), bar)
-	fmt.Fprintf(&b, "  %-14s %s\n", subtleStyle.Render("Downtime"), fmtDuration(r.Downtime))
-	fmt.Fprintf(&b, "  %-14s %d\n", subtleStyle.Render("Outages"), r.OutageCount)
+	fmt.Fprintf(&b, "  %-16s %s  %s\n", subtleStyle.Render("Uptime"), uptimeColor.Render(fmt.Sprintf("%s%%", fmtPct(r.UptimePct))), bar)
+	fmt.Fprintf(&b, "  %-16s %s\n", subtleStyle.Render("Downtime"), fmtDuration(r.Downtime))
+	fmt.Fprintf(&b, "  %-16s %d\n", subtleStyle.Render("Outages"), r.OutageCount)
 
 	if r.OutageCount > 0 {
-		fmt.Fprintf(&b, "  %-14s %s\n", subtleStyle.Render("Longest"), fmtDuration(r.LongestOut))
-		fmt.Fprintf(&b, "  %-14s %s\n", subtleStyle.Render("MTTR"), fmtDuration(r.MTTR))
-		fmt.Fprintf(&b, "  %-14s %s\n", subtleStyle.Render("MTBF"), fmtDuration(r.MTBF))
+		fmt.Fprintf(&b, "  %-16s %s\n", subtleStyle.Render("Longest"), fmtDuration(r.LongestOut))
+		fmt.Fprintf(&b, "  %-16s %s\n", subtleStyle.Render("MTTR"), fmtDuration(r.MTTR))
+		fmt.Fprintf(&b, "  %-16s %s\n", subtleStyle.Render("MTBF"), fmtDuration(r.MTBF))
 	}
 
-	b.WriteString("\n  " + subtleStyle.Render(strings.Repeat("─", divWidth)) + "\n")
+	b.WriteString("\n" + m.divider() + "\n")
 
 	if len(m.slaDailyBreakdown) > 0 {
 		b.WriteString(m.slaViewport.View())
 	}
 
-	b.WriteString("\n  " + subtleStyle.Render(strings.Repeat("─", divWidth)) + "\n")
+	b.WriteString("\n" + m.divider() + "\n")
 
 	var keys []string
 	for i, p := range slaPeriods {
@@ -80,7 +74,7 @@ func (m Model) viewSLAPanel() string {
 		}
 	}
 	b.WriteString("  " + strings.Join(keys, "  "))
-	b.WriteString("  " + subtleStyle.Render("[j/k/↑/↓] Scroll"))
+	b.WriteString("  " + subtleStyle.Render("[j/k/↑/↓] Scroll  [q/Esc] Back"))
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }
@@ -88,7 +82,7 @@ func (m Model) viewSLAPanel() string {
 func (m Model) buildSLADailyContent() string {
 	var b strings.Builder
 
-	barWidth := m.termWidth - chromePadH - 30
+	barWidth := m.dividerWidth() - 30
 	if barWidth < 10 {
 		barWidth = 10
 	}

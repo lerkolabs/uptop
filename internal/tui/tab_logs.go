@@ -85,7 +85,7 @@ func renderLogLine(line string) string {
 func (m Model) viewLogsTab() string {
 	content := m.logViewport.View()
 	if strings.TrimSpace(content) == "" || content == "Waiting for logs..." {
-		return "\n  No log entries yet. Logs appear as monitors run checks."
+		return m.emptyState("No log entries yet.", "Logs appear as monitors run checks")
 	}
 
 	lines := strings.Split(content, "\n")
@@ -112,7 +112,7 @@ func (m Model) viewLogsTab() string {
 	}
 
 	header := subtleStyle.Render(fmt.Sprintf(
-		"  %d entries  [↑/↓] Scroll  [PgUp/PgDn] Page  [f] Filter: %s", shown, filterLabel))
+		"  %d entries  Filter: %s", shown, filterLabel))
 
 	if m.logFilterImportant && shown < total {
 		header += subtleStyle.Render(fmt.Sprintf("  (%d hidden)", total-shown))

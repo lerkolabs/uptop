@@ -2,10 +2,36 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
+	"github.com/charmbracelet/lipgloss"
 )
+
+func (m Model) dividerWidth() int {
+	w := m.termWidth - chromePadH - 4
+	if w < 40 {
+		w = 40
+	}
+	return w
+}
+
+func (m Model) divider() string {
+	return "  " + subtleStyle.Render(strings.Repeat("─", m.dividerWidth()))
+}
+
+func (m Model) emptyState(message, hint string) string {
+	content := message
+	if hint != "" {
+		content += "\n\n" + subtleStyle.Render(hint)
+	}
+	return "\n" + lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(m.theme.Accent).
+		Padding(1, 3).
+		Render(content)
+}
 
 func limitStr(text string, max int) string {
 	runes := []rune(text)

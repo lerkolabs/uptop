@@ -7,7 +7,7 @@ import (
 
 func (m Model) viewNodesTab() string {
 	if len(m.nodes) == 0 {
-		return "\n  No probe nodes connected."
+		return m.emptyState("No probe nodes connected.", "")
 	}
 
 	var headers []string

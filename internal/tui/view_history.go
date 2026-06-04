@@ -153,16 +153,13 @@ func (m Model) viewHistoryPanel() string {
 	header += "  " + subtleStyle.Render("[q] Back")
 	b.WriteString(header + "\n")
 
-	divWidth := m.termWidth - chromePadH - 4
-	if divWidth < 40 {
-		divWidth = 40
-	}
-	b.WriteString("  " + subtleStyle.Render(strings.Repeat("─", divWidth)) + "\n")
+	divWidth := m.dividerWidth()
+	b.WriteString(m.divider() + "\n")
 
 	sparkline := stateChangeSparkline(m.historyChanges, divWidth)
 	if sparkline != "" {
 		b.WriteString("  " + sparkline + "\n")
-		b.WriteString("  " + subtleStyle.Render(strings.Repeat("─", divWidth)) + "\n")
+		b.WriteString(m.divider() + "\n")
 	}
 
 	fmt.Fprintf(&b, "  %-18s %-17s %-12s %s\n",
@@ -177,7 +174,7 @@ func (m Model) viewHistoryPanel() string {
 		b.WriteString(m.historyViewport.View())
 	}
 
-	b.WriteString("\n  " + subtleStyle.Render(strings.Repeat("─", divWidth)) + "\n")
+	b.WriteString("\n" + m.divider() + "\n")
 
 	stats := computeHistoryStats(m.historyChanges)
 	parts := []string{fmt.Sprintf("%d events", stats.totalEvents)}

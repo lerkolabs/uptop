@@ -93,7 +93,7 @@ func (m Model) isMonitorInMaintenance(monitorID int) bool {
 
 func (m Model) viewMaintTab() string {
 	if len(m.maintenanceWindows) == 0 {
-		return "\n  No maintenance windows or incidents. Press [n] to create one."
+		return m.emptyState("No maintenance windows or incidents.", "[n] Create one")
 	}
 
 	var headers []string

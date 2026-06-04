@@ -266,7 +266,7 @@ func (m Model) renderFooter(stats dashboardStats) string {
 	case 1:
 		keys = "[n]New [e]Edit [i]Info [d]Del [t]Test [T]Theme [Tab]Switch [q]Quit"
 	case 2:
-		keys = "[f]Filter [T]Theme [Tab]Switch [q]Quit"
+		keys = "[↑/↓]Scroll  [PgUp/PgDn]Page  [f]Filter  [T]Theme  [Tab]Switch  [q]Quit"
 	case 4:
 		keys = "[n]New [x]End [d]Del [T]Theme [Tab]Switch [q]Quit"
 	case 5:

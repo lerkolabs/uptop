@@ -29,7 +29,7 @@ func fmtKey(key string) string {
 
 func (m Model) viewUsersTab() string {
 	if len(m.users) == 0 {
-		return "\n  No users configured. Press [n] to add one."
+		return m.emptyState("No users configured.", "[n] Add a user")
 	}
 
 	var headers []string

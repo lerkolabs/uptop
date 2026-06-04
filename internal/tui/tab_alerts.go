@@ -164,7 +164,7 @@ func fmtAlertLastSent(h monitor.AlertHealth) string {
 
 func (m Model) viewAlertsTab() string {
 	if len(m.alerts) == 0 {
-		return "\n  No alert channels configured. Press [n] to add one."
+		return m.emptyState("No alert channels configured.", "[n] Add your first alert")
 	}
 
 	var headers []string
@@ -214,7 +214,8 @@ func (m Model) viewAlertDetailPanel() string {
 
 	var b strings.Builder
 
-	b.WriteString(subtleStyle.Render("  Alerts > ") + titleStyle.Render(a.Name) + "\n\n")
+	b.WriteString(subtleStyle.Render("  Alerts > ") + titleStyle.Render(a.Name) + "\n")
+	b.WriteString(m.divider() + "\n")
 
 	row := func(label, value string) {
 		fmt.Fprintf(&b, "  %-16s %s\n", subtleStyle.Render(label), value)
@@ -240,12 +241,13 @@ func (m Model) viewAlertDetailPanel() string {
 		row("Last Error", dangerStyle.Render(limitStr(h.LastError, 60)))
 	}
 
-	b.WriteString("\n" + subtleStyle.Render("  CONFIGURATION") + "\n")
+	b.WriteString(m.divider() + "\n")
+	b.WriteString(subtleStyle.Render("  CONFIGURATION") + "\n")
 	for k, v := range a.Settings {
 		row(k, v)
 	}
 
-	b.WriteString("\n\n")
+	b.WriteString(m.divider() + "\n")
 	b.WriteString(subtleStyle.Render("  [i/Esc] Back  [e] Edit  [t] Test  [q] Quit"))
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
