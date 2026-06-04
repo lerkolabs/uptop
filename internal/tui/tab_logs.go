@@ -118,5 +118,6 @@ func (m Model) viewLogsTab() string {
 		header += subtleStyle.Render(fmt.Sprintf("  (%d hidden)", total-shown))
 	}
 
-	return "\n" + header + "\n\n" + strings.Join(rendered, "\n")
+	m.logViewport.SetContent(strings.Join(rendered, "\n"))
+	return "\n" + header + "\n\n" + m.logViewport.View()
 }
