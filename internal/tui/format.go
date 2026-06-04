@@ -110,11 +110,7 @@ func fmtSSL(site models.Site) string {
 }
 
 func fmtRetries(site models.Site) string {
-	retriesDone := site.FailureCount - 1
-	if retriesDone < 0 {
-		retriesDone = 0
-	}
-	dispCount := retriesDone
+	dispCount := site.FailureCount
 	if dispCount > site.MaxRetries {
 		dispCount = site.MaxRetries
 	}

@@ -10,6 +10,13 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		return m.handleResize(msg)
+	case time.Time:
+		return m.handleTick(msg)
+	}
+
 	if m.state == stateConfirmDelete {
 		return m.handleConfirmDelete(msg)
 	}
@@ -18,10 +25,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		return m.handleResize(msg)
-	case time.Time:
-		return m.handleTick(msg)
 	case tea.MouseMsg:
 		return m.handleMouse(msg)
 	case tea.KeyMsg:
