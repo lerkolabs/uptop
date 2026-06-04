@@ -22,7 +22,7 @@ Built on [RDGames/go-upkeep](https://github.com/RDGames/go-upkeep). Rewritten fo
 ## Features
 
 - **6 check types** — HTTP, Push (heartbeat), Ping, Port, DNS, Groups
-- **9 alert providers** — Discord, Slack, Email, Ntfy, Webhook, Telegram, PagerDuty, Pushover, Gotify
+- **10 alert providers** — Discord, Slack, Email, Ntfy, Webhook, Telegram, PagerDuty, Pushover, Gotify, Opsgenie
 - **Config as code** — define monitors in YAML, apply declaratively, version control your setup
 - **HA clustering** — leader/follower with automatic failover
 - **Prometheus metrics** — `/metrics` endpoint, wire it straight to Grafana
