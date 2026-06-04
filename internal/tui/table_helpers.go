@@ -66,6 +66,9 @@ func (m Model) renderTable(headers []string, items int, buildRows func(start, en
 			if styleOverride != nil {
 				if s := styleOverride(row, col); s != nil {
 					style := *s
+					if row%2 == 1 {
+						style = style.Background(tableZebraStyle.GetBackground())
+					}
 					if isSelected {
 						style = tableSelectedStyle.Foreground(s.GetForeground())
 					}

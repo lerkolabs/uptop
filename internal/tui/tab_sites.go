@@ -78,13 +78,13 @@ func (m Model) computeLayout() tableLayout {
 	if nameW < 13 {
 		nameW = 13
 	}
-	if nameW > 40 {
-		nameW = 40
+	if nameW > 35 {
+		nameW = 35
 	}
 
 	sparkW := avail - nameW
-	if sparkW < 10 {
-		sparkW = 10
+	if sparkW < 15 {
+		sparkW = 15
 	}
 
 	widths[1] = nameW

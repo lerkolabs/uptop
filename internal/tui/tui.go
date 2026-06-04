@@ -138,9 +138,10 @@ type Model struct {
 	// demoMode renders a stable status dot instead of the animated pulse so
 	// screenshots/recordings don't capture the spinner mid-frame. Set via UPTOP_DEMO=1.
 	demoMode bool
+	version  string
 }
 
-func InitialModel(isAdmin bool, s store.Store, eng *monitor.Engine) Model {
+func InitialModel(isAdmin bool, s store.Store, eng *monitor.Engine, version string) Model {
 	vpLogs := viewport.New(100, 20)
 	vpLogs.SetContent("Waiting for logs...")
 	z := zone.New()
@@ -172,6 +173,7 @@ func InitialModel(isAdmin bool, s store.Store, eng *monitor.Engine) Model {
 		theme:        theme,
 		themeIndex:   themeIdx,
 		demoMode:     os.Getenv("UPTOP_DEMO") == "1",
+		version:      version,
 	}
 }
 

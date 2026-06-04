@@ -131,9 +131,9 @@ func (m Model) groupSparkline(groupID int, width int) string {
 	}
 	for _, up := range aggregated {
 		if up {
-			sb.WriteString(specialStyle.Render("●"))
+			sb.WriteString(specialStyle.Render("•"))
 		} else {
-			sb.WriteString(dangerStyle.Render("●"))
+			sb.WriteString(dangerStyle.Render("•"))
 		}
 	}
 	return sb.String()
