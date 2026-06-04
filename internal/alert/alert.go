@@ -110,6 +110,24 @@ func gotifyPayload(priority string) PayloadFunc {
 	}
 }
 
+func opsgeniePayload(priority string) PayloadFunc {
+	return func(title, message string) ([]byte, error) {
+		return json.Marshal(map[string]any{
+			"message":     limitMessage(title, 130),
+			"description": message,
+			"source":      "uptop",
+			"priority":    priority,
+		})
+	}
+}
+
+func limitMessage(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return s[:max]
+}
+
 func GetProvider(cfg models.AlertConfig) Provider {
 	switch cfg.Type {
 	case "discord":
@@ -172,6 +190,20 @@ func GetProvider(cfg models.AlertConfig) Provider {
 			URL:     serverURL + "/message",
 			Payload: gotifyPayload(priority),
 			Headers: map[string]string{"X-Gotify-Key": cfg.Settings["token"]},
+		}
+	case "opsgenie":
+		priority := "P3"
+		if p, ok := cfg.Settings["priority"]; ok && p != "" {
+			priority = p
+		}
+		apiURL := "https://api.opsgenie.com/v2/alerts"
+		if eu, ok := cfg.Settings["eu"]; ok && eu == "true" {
+			apiURL = "https://api.eu.opsgenie.com/v2/alerts"
+		}
+		return &HTTPProvider{
+			URL:     apiURL,
+			Payload: opsgeniePayload(priority),
+			Headers: map[string]string{"Authorization": "GenieKey " + cfg.Settings["api_key"]},
 		}
 	default:
 		return nil

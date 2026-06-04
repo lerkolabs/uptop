@@ -196,8 +196,76 @@ func TestHTTPProviderGotify(t *testing.T) {
 	}
 }
 
+func TestHTTPProviderOpsgenie(t *testing.T) {
+	var received map[string]any
+	var authHeader string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authHeader = r.Header.Get("Authorization")
+		json.NewDecoder(r.Body).Decode(&received)
+		w.WriteHeader(202)
+	}))
+	defer srv.Close()
+
+	p := GetProvider(models.AlertConfig{Type: "opsgenie", Settings: map[string]string{
+		"api_key":  "test-genie-key",
+		"priority": "P1",
+	}})
+	hp := p.(*HTTPProvider)
+	hp.URL = srv.URL
+
+	if err := p.Send(context.Background(), "Site Down", "mysite.com is unreachable"); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	if authHeader != "GenieKey test-genie-key" {
+		t.Errorf("expected auth 'GenieKey test-genie-key', got '%s'", authHeader)
+	}
+	if received["message"] != "Site Down" {
+		t.Errorf("unexpected message: %v", received["message"])
+	}
+	if received["description"] != "mysite.com is unreachable" {
+		t.Errorf("unexpected description: %v", received["description"])
+	}
+	if received["source"] != "uptop" {
+		t.Errorf("expected source 'uptop', got '%v'", received["source"])
+	}
+	if received["priority"] != "P1" {
+		t.Errorf("expected priority 'P1', got '%v'", received["priority"])
+	}
+}
+
+func TestOpsgenieEUEndpoint(t *testing.T) {
+	p := GetProvider(models.AlertConfig{Type: "opsgenie", Settings: map[string]string{
+		"api_key": "key", "eu": "true",
+	}})
+	hp := p.(*HTTPProvider)
+	if hp.URL != "https://api.eu.opsgenie.com/v2/alerts" {
+		t.Errorf("expected EU URL, got '%s'", hp.URL)
+	}
+}
+
+func TestOpsgenieUSEndpoint(t *testing.T) {
+	p := GetProvider(models.AlertConfig{Type: "opsgenie", Settings: map[string]string{
+		"api_key": "key",
+	}})
+	hp := p.(*HTTPProvider)
+	if hp.URL != "https://api.opsgenie.com/v2/alerts" {
+		t.Errorf("expected US URL, got '%s'", hp.URL)
+	}
+}
+
+func TestLimitMessage(t *testing.T) {
+	short := "short"
+	if got := limitMessage(short, 130); got != short {
+		t.Errorf("expected '%s', got '%s'", short, got)
+	}
+	long := string(make([]byte, 200))
+	if got := limitMessage(long, 130); len(got) != 130 {
+		t.Errorf("expected length 130, got %d", len(got))
+	}
+}
+
 func TestGetProviderNewTypes(t *testing.T) {
-	for _, typ := range []string{"telegram", "pagerduty", "pushover", "gotify"} {
+	for _, typ := range []string{"telegram", "pagerduty", "pushover", "gotify", "opsgenie"} {
 		p := GetProvider(models.AlertConfig{Type: typ, Settings: map[string]string{
 			"token": "x", "chat_id": "1", "routing_key": "k", "user": "u", "url": "http://localhost",
 		}})

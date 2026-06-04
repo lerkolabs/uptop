@@ -39,6 +39,10 @@ type alertFormData struct {
 	GotifyURL      string
 	GotifyToken    string
 	GotifyPriority string
+	// Opsgenie
+	OpsgenieAPIKey   string
+	OpsgeniePriority string
+	OpsgenieEU       bool
 }
 
 func fmtAlertType(t string) string {
@@ -61,6 +65,8 @@ func fmtAlertType(t string) string {
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("#249DF1")).Render(t)
 	case "gotify":
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("#3F8BBA")).Render(t)
+	case "opsgenie":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#2684FF")).Render(t)
 	default:
 		return t
 	}
@@ -106,6 +112,19 @@ func fmtAlertConfig(alert struct {
 	case "gotify":
 		if url := alert.Settings["url"]; url != "" {
 			return limitStr(url, 34)
+		}
+		return subtleStyle.Render("—")
+	case "opsgenie":
+		key := alert.Settings["api_key"]
+		if key != "" {
+			masked := key
+			if len(masked) > 8 {
+				masked = masked[:4] + "…" + masked[len(masked)-4:]
+			}
+			if alert.Settings["eu"] == "true" {
+				return limitStr(fmt.Sprintf("EU %s", masked), 34)
+			}
+			return limitStr(masked, 34)
 		}
 		return subtleStyle.Render("—")
 	default:
@@ -238,6 +257,7 @@ func (m *Model) initAlertHuhForm() tea.Cmd {
 		NtfyPri:           "3",
 		PagerDutySeverity: "critical",
 		GotifyPriority:    "5",
+		OpsgeniePriority:  "P3",
 	}
 
 	if m.editID > 0 {
@@ -275,6 +295,10 @@ func (m *Model) initAlertHuhForm() tea.Cmd {
 					m.alertFormData.GotifyURL = alert.Settings["url"]
 					m.alertFormData.GotifyToken = alert.Settings["token"]
 					m.alertFormData.GotifyPriority = alert.Settings["priority"]
+				case "opsgenie":
+					m.alertFormData.OpsgenieAPIKey = alert.Settings["api_key"]
+					m.alertFormData.OpsgeniePriority = alert.Settings["priority"]
+					m.alertFormData.OpsgenieEU = alert.Settings["eu"] == "true"
 				}
 				break
 			}
@@ -303,6 +327,7 @@ func (m *Model) initAlertHuhForm() tea.Cmd {
 					huh.NewOption("PagerDuty", "pagerduty"),
 					huh.NewOption("Pushover", "pushover"),
 					huh.NewOption("Gotify", "gotify"),
+					huh.NewOption("Opsgenie", "opsgenie"),
 				).Value(&m.alertFormData.AlertType),
 		).Title("Alert Config"),
 		huh.NewGroup(
@@ -410,6 +435,23 @@ func (m *Model) initAlertHuhForm() tea.Cmd {
 		).Title("Gotify Settings").WithHideFunc(func() bool {
 			return m.alertFormData.AlertType != "gotify"
 		}),
+		huh.NewGroup(
+			huh.NewInput().Title("API Key").
+				Placeholder("your-opsgenie-api-key").
+				Value(&m.alertFormData.OpsgenieAPIKey),
+			huh.NewSelect[string]().Title("Priority").
+				Options(
+					huh.NewOption("Critical (P1)", "P1"),
+					huh.NewOption("High (P2)", "P2"),
+					huh.NewOption("Moderate (P3)", "P3"),
+					huh.NewOption("Low (P4)", "P4"),
+					huh.NewOption("Informational (P5)", "P5"),
+				).Value(&m.alertFormData.OpsgeniePriority),
+			huh.NewConfirm().Title("EU Instance?").
+				Value(&m.alertFormData.OpsgenieEU),
+		).Title("Opsgenie Settings").WithHideFunc(func() bool {
+			return m.alertFormData.AlertType != "opsgenie"
+		}),
 	).WithTheme(m.theme.HuhTheme())
 
 	return m.huhForm.Init()
@@ -446,6 +488,12 @@ func (m *Model) submitAlertForm() {
 		settings["url"] = d.GotifyURL
 		settings["token"] = d.GotifyToken
 		settings["priority"] = d.GotifyPriority
+	case "opsgenie":
+		settings["api_key"] = d.OpsgenieAPIKey
+		settings["priority"] = d.OpsgeniePriority
+		if d.OpsgenieEU {
+			settings["eu"] = "true"
+		}
 	default:
 		settings["url"] = d.WebhookURL
 	}
