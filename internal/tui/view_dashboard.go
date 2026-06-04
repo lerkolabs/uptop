@@ -171,6 +171,7 @@ func (m Model) viewDashboard() string {
 		}
 	}
 
+	content = strings.TrimSpace(content)
 	footer := m.renderFooter(stats)
 
 	outerPad := lipgloss.NewStyle().Padding(1, 2)
@@ -285,9 +286,9 @@ func (m Model) renderFooter(stats dashboardStats) string {
 	}
 
 	ver := subtleStyle.Render("v" + m.version)
-	footer := "\n" + statusLine + "  " + subtleStyle.Render(keys) + "  " + ver
+	footer := statusLine + "  " + subtleStyle.Render(keys) + "  " + ver
 	if m.filterText != "" && m.currentTab == 0 {
-		footer = "\n" + subtleStyle.Render(fmt.Sprintf("filter: %s", m.filterText)) + "  " + statusLine + "  " + subtleStyle.Render(keys) + "  " + ver
+		footer = subtleStyle.Render(fmt.Sprintf("filter: %s", m.filterText)) + "  " + statusLine + "  " + subtleStyle.Render(keys) + "  " + ver
 	}
 	return footer
 }
