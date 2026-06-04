@@ -127,7 +127,7 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		m.maxTableRows = 1
 	}
 	m.logViewport.Width = msg.Width - chromePadH
-	m.logViewport.Height = msg.Height - (chromePadV + chromeHeader + chromeGaps + chromeFooter + 3)
+	m.logViewport.Height = msg.Height - (chromePadV + chromeHeader + chromeFooter + 2)
 	m.historyViewport.Width = msg.Width - chromePadH
 	m.historyViewport.Height = msg.Height - 10
 	m.slaViewport.Width = msg.Width - chromePadH
