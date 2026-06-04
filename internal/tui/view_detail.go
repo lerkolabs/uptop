@@ -41,8 +41,7 @@ func (m Model) viewDetailPanel() string {
 		b.WriteString("\n" + subtleStyle.Render("  "+label) + "\n")
 	}
 
-	errCat := classifyError(site.LastError, site.Type, site.StatusCode)
-	row("Status", fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID), errCat))
+	row("Status", fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)))
 
 	if (site.Status == "DOWN" || site.Status == "SSL EXP" || site.Status == "LATE" || site.Status == "STALE") && site.LastError != "" {
 		errWidth := m.termWidth - chromePadH - 19
@@ -128,7 +127,7 @@ func (m Model) viewDetailPanel() string {
 	row("Latency", fmtLatency(site.Latency))
 	row("Uptime", fmtUptime(hist.Statuses))
 	if !site.LastCheck.IsZero() {
-		row("Last Check", site.LastCheck.Format("15:04:05"))
+		row("Last Check", fmtTimeAgo(site.LastCheck))
 	}
 
 	if site.Type == "http" {

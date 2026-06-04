@@ -3,7 +3,6 @@ package tui
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/monitor"
 	tea "github.com/charmbracelet/bubbletea"
@@ -146,20 +145,7 @@ func fmtAlertHealth(h monitor.AlertHealth) string {
 }
 
 func fmtAlertLastSent(h monitor.AlertHealth) string {
-	if h.LastSendAt.IsZero() {
-		return subtleStyle.Render("never")
-	}
-	d := time.Since(h.LastSendAt)
-	if d < time.Minute {
-		return fmt.Sprintf("%ds ago", int(d.Seconds()))
-	}
-	if d < time.Hour {
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	}
-	if d < 24*time.Hour {
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	}
-	return fmt.Sprintf("%dd ago", int(d.Hours())/24)
+	return fmtTimeAgo(h.LastSendAt)
 }
 
 func (m Model) viewAlertsTab() string {

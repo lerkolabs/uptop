@@ -152,31 +152,44 @@ func fmtRetries(site models.Site) string {
 	return s
 }
 
-func fmtStatus(status string, paused bool, inMaint bool, errCategory ErrorCategory) string {
+func fmtStatus(status string, paused bool, inMaint bool) string {
 	if paused {
-		return warnStyle.Render("PAUSED")
+		return warnStyle.Render("◇ PAUSED")
 	}
 	if inMaint {
-		return maintStyle.Render("MAINT")
+		return maintStyle.Render("◼ MAINT")
 	}
 	switch status {
 	case "DOWN":
-		label := "DOWN"
-		if errCategory != ErrCatUnknown {
-			label = "DOWN:" + string(errCategory)
-		}
-		return dangerStyle.Render(label)
+		return dangerStyle.Render("▼ DOWN")
 	case "SSL EXP":
-		return dangerStyle.Render(status)
+		return dangerStyle.Render("▼ SSL EXP")
 	case "LATE":
-		return warnStyle.Render(status)
+		return warnStyle.Render("◆ LATE")
 	case "STALE":
-		return staleStyle.Render(status)
+		return staleStyle.Render("◆ STALE")
 	case "PENDING":
-		return subtleStyle.Render(status)
+		return subtleStyle.Render("○ PENDING")
 	default:
-		return specialStyle.Render(status)
+		return specialStyle.Render("▲ " + status)
 	}
+}
+
+func fmtTimeAgo(t time.Time) string {
+	if t.IsZero() {
+		return subtleStyle.Render("never")
+	}
+	d := time.Since(t)
+	if d < time.Minute {
+		return fmt.Sprintf("%ds ago", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	}
+	if d < 24*time.Hour {
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	}
+	return fmt.Sprintf("%dd ago", int(d.Hours())/24)
 }
 
 func fmtDuration(d time.Duration) string {

@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"fmt"
 	"time"
 )
 
@@ -66,15 +65,5 @@ func fmtNodeStatus(lastSeen time.Time) string {
 }
 
 func fmtNodeLastSeen(t time.Time) string {
-	if t.IsZero() {
-		return subtleStyle.Render("never")
-	}
-	ago := time.Since(t)
-	if ago < time.Minute {
-		return fmt.Sprintf("%ds ago", int(ago.Seconds()))
-	}
-	if ago < time.Hour {
-		return fmt.Sprintf("%dm ago", int(ago.Minutes()))
-	}
-	return fmt.Sprintf("%dh ago", int(ago.Hours()))
+	return fmtTimeAgo(t)
 }
