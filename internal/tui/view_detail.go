@@ -105,6 +105,10 @@ func (m Model) viewDetailPanel() string {
 
 	section("ENDPOINT")
 	row("Type", site.Type)
+	if site.Type == "push" && site.Token != "" {
+		row("Token", site.Token)
+		row("Push URL", "/api/push/"+site.Token)
+	}
 	if site.URL != "" {
 		row("URL", site.URL)
 	}
