@@ -173,11 +173,20 @@ func (m Model) viewDashboard() string {
 
 	footer := m.renderFooter(stats)
 
-	s := lipgloss.NewStyle().Padding(1, 2)
-	if m.termHeight > 0 {
-		s = s.MaxHeight(m.termHeight)
+	outerPad := lipgloss.NewStyle().Padding(1, 2)
+	_, frameV := outerPad.GetFrameSize()
+	availHeight := m.termHeight - frameV
+	if availHeight < 5 {
+		availHeight = 5
 	}
-	return s.Render(header + "\n" + content + "\n" + footer)
+
+	contentHeight := availHeight - lipgloss.Height(header) - lipgloss.Height(footer) - 2
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+	paddedContent := lipgloss.NewStyle().Height(contentHeight).Render(content)
+
+	return outerPad.Render(lipgloss.JoinVertical(lipgloss.Top, header, paddedContent, footer))
 }
 
 func (m Model) renderTabBar(stats dashboardStats) string {
