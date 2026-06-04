@@ -12,7 +12,7 @@ var sparkChars = []rune{'▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
 
 func parseHex(hex string) (r, g, b uint8) {
 	if len(hex) == 7 && hex[0] == '#' {
-		fmt.Sscanf(hex[1:], "%02x%02x%02x", &r, &g, &b)
+		_, _ = fmt.Sscanf(hex[1:], "%02x%02x%02x", &r, &g, &b)
 	}
 	return
 }
