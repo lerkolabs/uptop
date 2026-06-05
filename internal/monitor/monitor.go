@@ -138,7 +138,7 @@ func (e *Engine) AddLog(msg string) {
 }
 
 func (e *Engine) InitLogs() {
-	logs, err := e.db.LoadLogs(100)
+	logs, err := e.db.LoadLogs(maxLogEntries)
 	if err != nil {
 		return
 	}

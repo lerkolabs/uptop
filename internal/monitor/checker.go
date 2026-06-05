@@ -15,6 +15,16 @@ import (
 	probing "github.com/prometheus-community/pro-bing"
 )
 
+const (
+	maxErrorLength       = 256
+	defaultAcceptedCodes = "200-299"
+	defaultHTTPStatusMin = 200
+	defaultHTTPStatusMax = 300
+	defaultTimeout       = 5 * time.Second
+	defaultDNSServer     = "1.1.1.1"
+	defaultDNSPort       = "53"
+)
+
 type CheckResult struct {
 	SiteID      int
 	Status      string // "UP", "DOWN", "SSL EXP"
@@ -90,7 +100,7 @@ func runHTTPCheck(site models.Site, strict, insecure *http.Client, globalInsecur
 
 	if err != nil {
 		result.Status = "DOWN"
-		result.ErrorReason = truncateError(err.Error(), 256)
+		result.ErrorReason = truncateError(err.Error(), maxErrorLength)
 		return result
 	}
 	defer resp.Body.Close()
@@ -100,7 +110,7 @@ func runHTTPCheck(site models.Site, strict, insecure *http.Client, globalInsecur
 		result.Status = "DOWN"
 		expected := site.AcceptedCodes
 		if expected == "" {
-			expected = "200-299"
+			expected = defaultAcceptedCodes
 		}
 		result.ErrorReason = fmt.Sprintf("HTTP %d (expected %s)", resp.StatusCode, expected)
 	}
@@ -160,7 +170,7 @@ func runPortCheck(site models.Site) CheckResult {
 	latency := time.Since(start)
 
 	if err != nil {
-		return CheckResult{SiteID: site.ID, Status: "DOWN", LatencyNs: latency.Nanoseconds(), ErrorReason: truncateError(err.Error(), 256)}
+		return CheckResult{SiteID: site.ID, Status: "DOWN", LatencyNs: latency.Nanoseconds(), ErrorReason: truncateError(err.Error(), maxErrorLength)}
 	}
 	_ = conn.Close()
 	return CheckResult{SiteID: site.ID, Status: "UP", LatencyNs: latency.Nanoseconds()}
@@ -174,10 +184,10 @@ func runDNSCheck(site models.Site) CheckResult {
 
 	server := site.DNSServer
 	if server == "" {
-		server = "1.1.1.1"
+		server = defaultDNSServer
 	}
 	if _, _, err := net.SplitHostPort(server); err != nil {
-		server = net.JoinHostPort(server, "53")
+		server = net.JoinHostPort(server, defaultDNSPort)
 	}
 
 	qtype := dns.TypeA
@@ -223,12 +233,12 @@ func siteTimeout(site models.Site) time.Duration {
 	if site.Timeout > 0 {
 		return time.Duration(site.Timeout) * time.Second
 	}
-	return 5 * time.Second
+	return defaultTimeout
 }
 
 func isCodeAccepted(code int, accepted string) bool {
 	if accepted == "" {
-		return code >= 200 && code < 300
+		return code >= defaultHTTPStatusMin && code < defaultHTTPStatusMax
 	}
 	for _, part := range strings.Split(accepted, ",") {
 		part = strings.TrimSpace(part)
