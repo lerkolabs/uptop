@@ -619,6 +619,18 @@ func (s *SQLStore) DeleteMaintenanceWindow(id int) error {
 	return nil
 }
 
+func (s *SQLStore) PruneExpiredMaintenanceWindows(retention time.Duration) (int64, error) {
+	cutoff := time.Now().Add(-retention)
+	result, err := s.db.Exec(
+		s.q("DELETE FROM maintenance_windows WHERE end_time IS NOT NULL AND end_time < ?"),
+		cutoff,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 func (s *SQLStore) IsMonitorInMaintenance(monitorID int) (bool, error) {
 	var count int
 	err := s.db.QueryRow(s.q(`SELECT COUNT(*) FROM maintenance_windows

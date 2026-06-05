@@ -315,3 +315,65 @@ func TestDeleteSiteCascade(t *testing.T) {
 		}
 	}
 }
+
+func TestPruneExpiredMaintenanceWindows(t *testing.T) {
+	s := newTestStore(t)
+
+	now := time.Now()
+
+	// Expired 10 days ago — should be pruned with 7d retention.
+	old := models.MaintenanceWindow{
+		MonitorID: 0,
+		Title:     "Old Window",
+		Type:      "maintenance",
+		StartTime: now.Add(-11 * 24 * time.Hour),
+		EndTime:   now.Add(-10 * 24 * time.Hour),
+	}
+	if err := s.AddMaintenanceWindow(old); err != nil {
+		t.Fatalf("AddMaintenanceWindow (old): %v", err)
+	}
+
+	// Expired 1 day ago — within 7d retention, should survive.
+	recent := models.MaintenanceWindow{
+		MonitorID: 0,
+		Title:     "Recent Window",
+		Type:      "maintenance",
+		StartTime: now.Add(-2 * 24 * time.Hour),
+		EndTime:   now.Add(-1 * 24 * time.Hour),
+	}
+	if err := s.AddMaintenanceWindow(recent); err != nil {
+		t.Fatalf("AddMaintenanceWindow (recent): %v", err)
+	}
+
+	// Ongoing — no end time, should survive.
+	ongoing := models.MaintenanceWindow{
+		MonitorID: 0,
+		Title:     "Ongoing Window",
+		Type:      "maintenance",
+		StartTime: now.Add(-1 * time.Hour),
+	}
+	if err := s.AddMaintenanceWindow(ongoing); err != nil {
+		t.Fatalf("AddMaintenanceWindow (ongoing): %v", err)
+	}
+
+	pruned, err := s.PruneExpiredMaintenanceWindows(7 * 24 * time.Hour)
+	if err != nil {
+		t.Fatalf("PruneExpiredMaintenanceWindows: %v", err)
+	}
+	if pruned != 1 {
+		t.Errorf("expected 1 pruned, got %d", pruned)
+	}
+
+	all, err := s.GetAllMaintenanceWindows(100)
+	if err != nil {
+		t.Fatalf("GetAllMaintenanceWindows: %v", err)
+	}
+	if len(all) != 2 {
+		t.Fatalf("expected 2 remaining windows, got %d", len(all))
+	}
+	for _, w := range all {
+		if w.Title == "Old Window" {
+			t.Error("old window should have been pruned")
+		}
+	}
+}

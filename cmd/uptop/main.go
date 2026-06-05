@@ -379,6 +379,11 @@ func runServe(args []string) {
 	if aggStrategy != "" {
 		eng.SetAggStrategy(monitor.AggregationStrategy(aggStrategy))
 	}
+	if v := os.Getenv("UPTOP_MAINT_RETENTION"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			eng.SetMaintRetention(d)
+		}
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

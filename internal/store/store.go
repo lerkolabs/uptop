@@ -66,6 +66,7 @@ type Store interface {
 	AddMaintenanceWindow(mw models.MaintenanceWindow) error
 	EndMaintenanceWindow(id int) error
 	DeleteMaintenanceWindow(id int) error
+	PruneExpiredMaintenanceWindows(retention time.Duration) (int64, error)
 	IsMonitorInMaintenance(monitorID int) (bool, error)
 
 	// Preferences

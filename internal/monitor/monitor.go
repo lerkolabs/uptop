@@ -17,10 +17,12 @@ import (
 )
 
 const (
-	maxLogEntries    = 100
-	pollInterval     = 5 * time.Second
-	minCheckInterval = 5
-	minPushGrace     = 60 * time.Second
+	maxLogEntries         = 100
+	pollInterval          = 5 * time.Second
+	minCheckInterval      = 5
+	minPushGrace          = 60 * time.Second
+	maintPruneInterval    = 15 * time.Minute
+	defaultMaintRetention = 7 * 24 * time.Hour
 )
 
 type AlertHealth struct {
@@ -59,6 +61,7 @@ type Engine struct {
 	db                  store.Store
 	insecureSkipVerify  bool
 	allowPrivateTargets bool
+	maintRetention      time.Duration
 	strictClient        *http.Client
 	insecureClient      *http.Client
 }
@@ -83,6 +86,7 @@ func newEngine(s store.Store, allowPrivateTargets bool) *Engine {
 		aggStrategy:         AggAnyDown,
 		isActive:            true,
 		allowPrivateTargets: allowPrivateTargets,
+		maintRetention:      defaultMaintRetention,
 		db:                  s,
 		strictClient: &http.Client{
 			Transport: &http.Transport{
@@ -101,6 +105,10 @@ func newEngine(s store.Store, allowPrivateTargets bool) *Engine {
 
 func (e *Engine) SetInsecureSkipVerify(skip bool) {
 	e.insecureSkipVerify = skip
+}
+
+func (e *Engine) SetMaintRetention(d time.Duration) {
+	e.maintRetention = d
 }
 
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
@@ -337,6 +345,35 @@ func (e *Engine) Start(ctx context.Context) {
 			}
 		}
 	}()
+
+	go e.maintenancePruner(ctx)
+}
+
+func (e *Engine) maintenancePruner(ctx context.Context) {
+	ticker := time.NewTicker(maintPruneInterval)
+	defer ticker.Stop()
+
+	e.pruneMaintenanceWindows()
+
+	for {
+		select {
+		case <-ticker.C:
+			e.pruneMaintenanceWindows()
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (e *Engine) pruneMaintenanceWindows() {
+	pruned, err := e.db.PruneExpiredMaintenanceWindows(e.maintRetention)
+	if err != nil {
+		e.AddLog(fmt.Sprintf("Maintenance prune error: %v", err))
+		return
+	}
+	if pruned > 0 {
+		e.AddLog(fmt.Sprintf("Pruned %d expired maintenance window(s)", pruned))
+	}
 }
 
 func (e *Engine) UpdateSiteConfig(site models.Site) {
