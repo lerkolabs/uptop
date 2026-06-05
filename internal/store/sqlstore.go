@@ -152,8 +152,24 @@ func (s *SQLStore) UpdateSitePaused(id int, paused bool) error {
 }
 
 func (s *SQLStore) DeleteSite(id int) error {
-	_, err := s.db.Exec(s.q("DELETE FROM sites WHERE id=?"), id)
+	tx, err := s.db.Begin()
 	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	for _, q := range []string{
+		"DELETE FROM maintenance_windows WHERE monitor_id = ?",
+		"DELETE FROM check_history WHERE site_id = ?",
+		"DELETE FROM state_changes WHERE site_id = ?",
+		"DELETE FROM sites WHERE id = ?",
+	} {
+		if _, err := tx.Exec(s.q(q), id); err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
 		return err
 	}
 	s.dialect.ResetSequenceOnEmpty(s.db, "sites")

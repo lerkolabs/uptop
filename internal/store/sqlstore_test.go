@@ -1,8 +1,10 @@
 package store
 
 import (
-	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 	"testing"
+	"time"
+
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 )
 
 func newTestStore(t *testing.T) *SQLStore {
@@ -227,5 +229,53 @@ func TestCheckHistory(t *testing.T) {
 	}
 	if upCount != 1 {
 		t.Errorf("expected 1 up record for site 1, got %d", upCount)
+	}
+}
+
+func TestDeleteSiteCascade(t *testing.T) {
+	s := newTestStore(t)
+
+	site := models.Site{Name: "Cascade Test", URL: "https://example.com", Interval: 30}
+	if err := s.AddSite(site); err != nil {
+		t.Fatalf("AddSite: %v", err)
+	}
+	sites, _ := s.GetSites()
+	siteID := sites[0].ID
+
+	if err := s.SaveCheck(siteID, 1000, true); err != nil {
+		t.Fatalf("SaveCheck: %v", err)
+	}
+	if err := s.SaveStateChange(siteID, "UP", "DOWN", "timeout"); err != nil {
+		t.Fatalf("SaveStateChange: %v", err)
+	}
+	mw := models.MaintenanceWindow{
+		MonitorID: siteID,
+		Title:     "Test MW",
+		Type:      "maintenance",
+		StartTime: time.Now(),
+	}
+	if err := s.AddMaintenanceWindow(mw); err != nil {
+		t.Fatalf("AddMaintenanceWindow: %v", err)
+	}
+
+	if err := s.DeleteSite(siteID); err != nil {
+		t.Fatalf("DeleteSite: %v", err)
+	}
+
+	history, _ := s.LoadAllHistory(100)
+	if len(history[siteID]) != 0 {
+		t.Errorf("expected 0 check_history rows, got %d", len(history[siteID]))
+	}
+
+	changes, _ := s.GetStateChanges(siteID, 100)
+	if len(changes) != 0 {
+		t.Errorf("expected 0 state_changes rows, got %d", len(changes))
+	}
+
+	windows, _ := s.GetActiveMaintenanceWindows()
+	for _, w := range windows {
+		if w.MonitorID == siteID {
+			t.Errorf("orphaned maintenance window found: id=%d", w.ID)
+		}
 	}
 }
