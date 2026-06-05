@@ -33,27 +33,74 @@ type siteFormData struct {
 	Regions       string
 }
 
+type colKey int
+
+const (
+	colNum colKey = iota
+	colName
+	colType
+	colStatus
+	colLatency
+	colUptime
+	colHistory
+	colSSL
+	colRetries
+)
+
+type columnDef struct {
+	key     colKey
+	wide    string
+	narrow  string
+	wideW   int
+	narrowW int
+	minTerm int // minimum terminal width to show (0 = always)
+}
+
+var siteColumns = []columnDef{
+	{colNum, "#", "#", 4, 4, 0},
+	{colName, "NAME", "NAME", 0, 0, 0},
+	{colType, "TYPE", "TYPE", 10, 8, mediumBreakpoint},
+	{colStatus, "STATUS", "STATUS", 10, 10, 0},
+	{colLatency, "LATENCY", "LAT", 10, 7, 0},
+	{colUptime, "UPTIME", "UP%", 8, 8, mediumBreakpoint},
+	{colHistory, "HISTORY", "HISTORY", 0, 0, mediumBreakpoint},
+	{colSSL, "SSL", "SSL", 7, 5, wideBreakpoint},
+	{colRetries, "RETRIES", "RT", 9, 5, wideBreakpoint},
+}
+
 type tableLayout struct {
 	nameW, sparkW int
 	headers       []string
 	colWidths     []int
+	active        []colKey
 }
 
 func (m Model) computeLayout() tableLayout {
 	wide := m.isWide()
 
-	var fixed int
+	var active []colKey
 	var headers []string
 	var widths []int
+	var fixed int
 
-	if wide {
-		headers = []string{"#", "NAME", "TYPE", "STATUS", "LATENCY", "UPTIME", "HISTORY", "SSL", "RETRIES"}
-		widths = []int{4, 0, 10, 10, 10, 8, 0, 7, 9}
-		fixed = 4 + 10 + 10 + 10 + 8 + 7 + 9
-	} else {
-		headers = []string{"#", "NAME", "TYPE", "STATUS", "LAT", "UP%", "HISTORY", "SSL", "RT"}
-		widths = []int{4, 0, 8, 10, 7, 8, 0, 5, 5}
-		fixed = 4 + 8 + 10 + 7 + 8 + 5 + 5
+	for _, c := range siteColumns {
+		if c.minTerm > 0 && m.termWidth < c.minTerm {
+			continue
+		}
+		active = append(active, c.key)
+		if wide {
+			headers = append(headers, c.wide)
+			widths = append(widths, c.wideW)
+			if c.wideW > 0 {
+				fixed += c.wideW
+			}
+		} else {
+			headers = append(headers, c.narrow)
+			widths = append(widths, c.narrowW)
+			if c.narrowW > 0 {
+				fixed += c.narrowW
+			}
+		}
 	}
 
 	numCols := len(headers)
@@ -71,7 +118,23 @@ func (m Model) computeLayout() tableLayout {
 	}
 	maxName += 4
 
-	nameW := avail / 2
+	hasHistory := false
+	for _, k := range active {
+		if k == colHistory {
+			hasHistory = true
+			break
+		}
+	}
+
+	var nameW, sparkW int
+	if hasHistory {
+		nameW = avail / 2
+		sparkW = avail - nameW
+	} else {
+		nameW = avail
+		sparkW = 0
+	}
+
 	if nameW > maxName {
 		nameW = maxName
 	}
@@ -81,24 +144,39 @@ func (m Model) computeLayout() tableLayout {
 	if nameW > 35 {
 		nameW = 35
 	}
-
-	sparkW := avail - nameW
-	if sparkW < 15 {
-		sparkW = 15
+	if sparkW > 0 {
+		if sparkW < 15 {
+			sparkW = 15
+		}
+		if sparkW > 62 {
+			sparkW = 62
+		}
 	}
-	if sparkW > 62 {
-		sparkW = 62
-	}
 
-	widths[1] = nameW
-	widths[6] = sparkW
+	for i, k := range active {
+		if k == colName {
+			widths[i] = nameW
+		}
+		if k == colHistory {
+			widths[i] = sparkW
+		}
+	}
 
 	return tableLayout{
 		nameW:     nameW,
 		sparkW:    sparkW,
 		headers:   headers,
 		colWidths: widths,
+		active:    active,
 	}
+}
+
+func pickCols(active []colKey, allCells map[colKey]string) []string {
+	row := make([]string, len(active))
+	for i, k := range active {
+		row[i] = allCells[k]
+	}
+	return row
 }
 
 func (m Model) viewSitesTab() string {
@@ -137,17 +215,18 @@ func (m Model) viewSitesTab() string {
 				if site.Type == "group" {
 					groupRows[i-start] = true
 					icon := typeIcon("group", m.collapsed[site.ID])
-					rows = append(rows, []string{
-						strconv.Itoa(i + 1),
-						m.zones.Mark(fmt.Sprintf("site-%d", i), icon+" "+limitStr(site.Name, nameW-4)),
-						"group",
-						fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)),
-						subtleStyle.Render("—"),
-						m.groupUptime(site.ID),
-						m.groupSparkline(site.ID, sparkWidth, rowBg),
-						subtleStyle.Render("-"),
-						subtleStyle.Render("—"),
-					})
+					cells := map[colKey]string{
+						colNum:     strconv.Itoa(i + 1),
+						colName:    m.zones.Mark(fmt.Sprintf("site-%d", i), icon+" "+limitStr(site.Name, nameW-4)),
+						colType:    "group",
+						colStatus:  fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)),
+						colLatency: subtleStyle.Render("—"),
+						colUptime:  m.groupUptime(site.ID),
+						colHistory: m.groupSparkline(site.ID, sparkWidth, rowBg),
+						colSSL:     subtleStyle.Render("-"),
+						colRetries: subtleStyle.Render("—"),
+					}
+					rows = append(rows, pickCols(layout.active, cells))
 					continue
 				}
 
@@ -184,17 +263,18 @@ func (m Model) viewSitesTab() string {
 					spark = latencySparkline(hist.Latencies, hist.Statuses, sparkWidth, rowBg)
 				}
 
-				rows = append(rows, []string{
-					strconv.Itoa(i + 1),
-					m.zones.Mark(fmt.Sprintf("site-%d", i), name),
-					typeIcon(site.Type, false) + " " + site.Type,
-					fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)),
-					fmtLatency(site.Latency),
-					fmtUptime(hist.Statuses),
-					spark,
-					fmtSSL(site),
-					fmtRetries(site),
-				})
+				cells := map[colKey]string{
+					colNum:     strconv.Itoa(i + 1),
+					colName:    m.zones.Mark(fmt.Sprintf("site-%d", i), name),
+					colType:    typeIcon(site.Type, false) + " " + site.Type,
+					colStatus:  fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)),
+					colLatency: fmtLatency(site.Latency),
+					colUptime:  fmtUptime(hist.Statuses),
+					colHistory: spark,
+					colSSL:     fmtSSL(site),
+					colRetries: fmtRetries(site),
+				}
+				rows = append(rows, pickCols(layout.active, cells))
 			}
 			return rows
 		},

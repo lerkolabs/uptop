@@ -15,7 +15,10 @@ var (
 
 type StyleOverride func(row, col int) *lipgloss.Style
 
-const wideBreakpoint = 120
+const (
+	wideBreakpoint   = 120
+	mediumBreakpoint = 90
+)
 
 func (m Model) isWide() bool {
 	return m.termWidth >= wideBreakpoint
