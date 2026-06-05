@@ -190,45 +190,42 @@ func (m Model) viewDashboard() string {
 	return outerPad.Render(lipgloss.JoinVertical(lipgloss.Top, header, paddedContent, footer))
 }
 
+type tabEntry struct {
+	name  string
+	count int
+	warn  int
+}
+
 func (m Model) renderTabBar(stats dashboardStats) string {
-	var sitesLabel string
-	if stats.downCount > 0 {
-		sitesLabel = fmt.Sprintf("Sites (%d↓)", stats.downCount)
-	} else if stats.lateCount > 0 {
-		sitesLabel = fmt.Sprintf("Sites (%d⚠)", stats.lateCount)
-	} else if stats.totalMonitors > 0 {
-		sitesLabel = fmt.Sprintf("Sites (%d)", stats.totalMonitors)
-	} else {
-		sitesLabel = "Sites"
+	tabs := []tabEntry{
+		{"Sites", stats.totalMonitors, stats.downCount + stats.lateCount},
+		{"Alerts", len(m.alerts), 0},
+		{"Logs", 0, 0},
+		{"Nodes", len(m.nodes), stats.offlineNodes},
+		{"Maint", len(m.maintenanceWindows), stats.activeMaint},
 	}
-
-	var nodesLabel string
-	if stats.offlineNodes > 0 {
-		nodesLabel = fmt.Sprintf("Nodes (%d!)", stats.offlineNodes)
-	} else if len(m.nodes) > 0 {
-		nodesLabel = fmt.Sprintf("Nodes (%d)", len(m.nodes))
-	} else {
-		nodesLabel = "Nodes"
-	}
-
-	var maintLabel string
-	if stats.activeMaint > 0 {
-		maintLabel = fmt.Sprintf("Maint (%d)", stats.activeMaint)
-	} else {
-		maintLabel = "Maint"
-	}
-
-	tabs := []string{sitesLabel, "Alerts", "Logs", nodesLabel, maintLabel}
 	if m.isAdmin {
-		tabs = append(tabs, "Users")
+		tabs = append(tabs, tabEntry{"Users", len(m.users), 0})
 	}
+
+	countStyle := lipgloss.NewStyle().Foreground(m.theme.Muted)
+
 	var renderedTabs []string
 	for i, t := range tabs {
+		label := t.name
+		if t.count > 0 {
+			badge := countStyle.Render(fmt.Sprintf(" %d", t.count))
+			if t.warn > 0 {
+				badge = dangerStyle.Render(fmt.Sprintf(" %d", t.warn))
+			}
+			label += badge
+		}
+
 		var rendered string
 		if i == m.currentTab {
-			rendered = activeTab.Render(t)
+			rendered = activeTab.Render(label)
 		} else {
-			rendered = inactiveTab.Render(t)
+			rendered = inactiveTab.Render(label)
 		}
 		renderedTabs = append(renderedTabs, m.zones.Mark(fmt.Sprintf("tab-%d", i), rendered))
 	}

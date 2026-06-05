@@ -43,7 +43,7 @@ func applyTheme(t Theme) {
 	sparkDanger = string(t.Danger)
 
 	titleStyle = lipgloss.NewStyle().Foreground(t.Accent).Bold(true)
-	activeTab = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, false, true, false).BorderForeground(t.Accent).Foreground(t.Accent).Bold(true).Padding(0, 1)
+	activeTab = lipgloss.NewStyle().Background(t.Surface).Foreground(t.Accent).Bold(true).Padding(0, 1)
 	inactiveTab = lipgloss.NewStyle().Padding(0, 1).Foreground(t.Muted)
 
 	tableHeaderStyle = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Padding(0, 1)
