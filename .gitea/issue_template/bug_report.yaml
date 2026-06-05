@@ -3,48 +3,44 @@ about: Something isn't working as expected
 labels:
   - bug
 body:
+  - type: checkboxes
+    id: search
+    attributes:
+      label: Before filing
+      options:
+        - label: I searched existing issues and didn't find a match
+          required: true
   - type: textarea
     id: description
     attributes:
-      label: Description
-      description: What happened?
+      label: What happened?
+      description: Include what you expected to happen instead.
+      placeholder: |
+        When I run `uptop serve`, the TUI crashes after 10 seconds.
+        I expected it to keep running and display monitor status.
     validations:
       required: true
   - type: textarea
     id: reproduction
     attributes:
-      label: Steps to Reproduce
-      description: Minimal steps to trigger the bug.
+      label: Steps to reproduce
       placeholder: |
         1. Run `uptop serve`
-        2. Navigate to ...
-        3. See error
-    validations:
-      required: true
-  - type: textarea
-    id: expected
-    attributes:
-      label: Expected Behavior
-      description: What should have happened instead?
+        2. Wait ~10 seconds
+        3. TUI crashes with panic
     validations:
       required: true
   - type: textarea
     id: environment
     attributes:
-      label: Environment
-      description: OS, Go version, uptop version, terminal emulator.
-      placeholder: |
-        - OS: Debian 13
-        - Go: 1.26
-        - uptop: 2026.06.1
-        - Terminal: Ghostty
-    validations:
-      required: false
-  - type: textarea
-    id: logs
-    attributes:
-      label: Relevant Logs
-      description: Paste any error output or logs.
+      label: Environment & logs
+      description: Output of `uptop version`, OS, terminal. Paste any errors below.
       render: shell
+      placeholder: |
+        uptop version 2026.06.1
+        OS: Debian 13
+        Terminal: Ghostty
+
+        [paste any error output here]
     validations:
       required: false

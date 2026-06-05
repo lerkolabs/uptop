@@ -4,39 +4,17 @@ labels:
   - feature
 body:
   - type: textarea
-    id: description
+    id: problem
     attributes:
-      label: Description
-      description: What do you want and why?
+      label: Problem
+      description: What's frustrating or missing?
+      placeholder: I find myself always needing to ...
     validations:
       required: true
   - type: textarea
-    id: motivation
+    id: solution
     attributes:
-      label: Motivation
-      description: What problem does this solve? What workflow does it improve?
-    validations:
-      required: true
-  - type: textarea
-    id: acceptance
-    attributes:
-      label: Acceptance Criteria
-      description: How do we know this is done?
-      placeholder: |
-        - [ ] Criterion 1
-        - [ ] Criterion 2
-    validations:
-      required: false
-  - type: dropdown
-    id: scope
-    attributes:
-      label: Area
-      options:
-        - TUI
-        - API / Server
-        - Monitoring Engine
-        - Alerts
-        - Distribution / Packaging
-        - Documentation
+      label: Proposed solution
+      description: How would you like this to work?
     validations:
       required: false
