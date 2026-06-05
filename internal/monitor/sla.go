@@ -127,8 +127,7 @@ func ComputeSLA(changes []models.StateChange, currentStatus string, window time.
 	return report
 }
 
-func ComputeDailyBreakdown(changes []models.StateChange, currentStatus string, days int) []DayReport {
-	now := time.Now()
+func ComputeDailyBreakdown(changes []models.StateChange, currentStatus string, days int, now time.Time) []DayReport {
 	reports := make([]DayReport, days)
 
 	for i := 0; i < days; i++ {

@@ -118,13 +118,14 @@ func TestComputeSLA_LateNotDown(t *testing.T) {
 }
 
 func TestComputeDailyBreakdown(t *testing.T) {
-	now := time.Now()
+	// Use a fixed time well past midnight so the outage always falls within today's window.
+	now := time.Date(2026, 6, 4, 15, 0, 0, 0, time.UTC)
 	changes := []models.StateChange{
 		{ToStatus: "UP", ChangedAt: now.Add(-1 * time.Hour)},
 		{ToStatus: "DOWN", FromStatus: "UP", ChangedAt: now.Add(-2 * time.Hour)},
 	}
 
-	days := ComputeDailyBreakdown(changes, "UP", 7)
+	days := ComputeDailyBreakdown(changes, "UP", 7, now)
 
 	if len(days) != 7 {
 		t.Fatalf("expected 7 days, got %d", len(days))

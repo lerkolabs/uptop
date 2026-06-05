@@ -329,7 +329,7 @@ func (m *Model) recomputeSLA() {
 	}
 
 	m.slaReport = monitor.ComputeSLA(changes, currentStatus, period.duration)
-	m.slaDailyBreakdown = monitor.ComputeDailyBreakdown(changes, currentStatus, period.days)
+	m.slaDailyBreakdown = monitor.ComputeDailyBreakdown(changes, currentStatus, period.days, time.Now())
 
 	m.slaViewport = viewport.New(
 		m.termWidth-chromePadH,
