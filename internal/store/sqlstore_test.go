@@ -50,7 +50,10 @@ func TestSiteCRUD(t *testing.T) {
 		t.Fatalf("UpdateSite: %v", err)
 	}
 
-	sites, _ = s.GetSites()
+	sites, err = s.GetSites()
+	if err != nil {
+		t.Fatalf("GetSites: %v", err)
+	}
 	if sites[0].Name != "Updated" {
 		t.Errorf("expected name 'Updated', got '%s'", sites[0].Name)
 	}
@@ -59,7 +62,10 @@ func TestSiteCRUD(t *testing.T) {
 		t.Fatalf("DeleteSite: %v", err)
 	}
 
-	sites, _ = s.GetSites()
+	sites, err = s.GetSites()
+	if err != nil {
+		t.Fatalf("GetSites: %v", err)
+	}
 	if len(sites) != 0 {
 		t.Fatalf("expected 0 sites after delete, got %d", len(sites))
 	}
@@ -98,7 +104,10 @@ func TestAlertCRUD(t *testing.T) {
 		t.Fatalf("UpdateAlert: %v", err)
 	}
 
-	a, _ = s.GetAlert(a.ID)
+	a, err = s.GetAlert(a.ID)
+	if err != nil {
+		t.Fatalf("GetAlert: %v", err)
+	}
 	if a.Type != "slack" {
 		t.Errorf("expected type 'slack', got '%s'", a.Type)
 	}
@@ -107,7 +116,10 @@ func TestAlertCRUD(t *testing.T) {
 		t.Fatalf("DeleteAlert: %v", err)
 	}
 
-	alerts, _ = s.GetAllAlerts()
+	alerts, err = s.GetAllAlerts()
+	if err != nil {
+		t.Fatalf("GetAllAlerts: %v", err)
+	}
 	if len(alerts) != 0 {
 		t.Fatalf("expected 0 alerts after delete, got %d", len(alerts))
 	}
@@ -135,7 +147,10 @@ func TestUserCRUD(t *testing.T) {
 		t.Fatalf("UpdateUser: %v", err)
 	}
 
-	users, _ = s.GetAllUsers()
+	users, err = s.GetAllUsers()
+	if err != nil {
+		t.Fatalf("GetAllUsers: %v", err)
+	}
 	if users[0].Username != "root" {
 		t.Errorf("expected username 'root', got '%s'", users[0].Username)
 	}
@@ -144,7 +159,10 @@ func TestUserCRUD(t *testing.T) {
 		t.Fatalf("DeleteUser: %v", err)
 	}
 
-	users, _ = s.GetAllUsers()
+	users, err = s.GetAllUsers()
+	if err != nil {
+		t.Fatalf("GetAllUsers: %v", err)
+	}
 	if len(users) != 0 {
 		t.Fatalf("expected 0 users after delete, got %d", len(users))
 	}
@@ -157,7 +175,10 @@ func TestPushTokenGeneration(t *testing.T) {
 		t.Fatalf("AddSite: %v", err)
 	}
 
-	sites, _ := s.GetSites()
+	sites, err := s.GetSites()
+	if err != nil {
+		t.Fatalf("GetSites: %v", err)
+	}
 	if len(sites) != 1 {
 		t.Fatalf("expected 1 site, got %d", len(sites))
 	}
@@ -172,9 +193,15 @@ func TestPushTokenGeneration(t *testing.T) {
 func TestImportExport(t *testing.T) {
 	s := newTestStore(t)
 
-	s.AddAlert("Test Alert", "webhook", map[string]string{"url": "https://example.com"})
-	s.AddSite(models.Site{Name: "Site1", URL: "https://example.com", Type: "http", Interval: 30})
-	s.AddUser("user1", "ssh-ed25519 KEY", "user")
+	if err := s.AddAlert("Test Alert", "webhook", map[string]string{"url": "https://example.com"}); err != nil {
+		t.Fatalf("AddAlert: %v", err)
+	}
+	if err := s.AddSite(models.Site{Name: "Site1", URL: "https://example.com", Type: "http", Interval: 30}); err != nil {
+		t.Fatalf("AddSite: %v", err)
+	}
+	if err := s.AddUser("user1", "ssh-ed25519 KEY", "user"); err != nil {
+		t.Fatalf("AddUser: %v", err)
+	}
 
 	backup, err := s.ExportData()
 	if err != nil {
@@ -189,9 +216,18 @@ func TestImportExport(t *testing.T) {
 		t.Fatalf("ImportData: %v", err)
 	}
 
-	sites, _ := s2.GetSites()
-	alerts, _ := s2.GetAllAlerts()
-	users, _ := s2.GetAllUsers()
+	sites, err := s2.GetSites()
+	if err != nil {
+		t.Fatalf("GetSites: %v", err)
+	}
+	alerts, err := s2.GetAllAlerts()
+	if err != nil {
+		t.Fatalf("GetAllAlerts: %v", err)
+	}
+	users, err := s2.GetAllUsers()
+	if err != nil {
+		t.Fatalf("GetAllUsers: %v", err)
+	}
 	if len(sites) != 1 || len(alerts) != 1 || len(users) != 1 {
 		t.Fatalf("import mismatch: %d sites, %d alerts, %d users", len(sites), len(alerts), len(users))
 	}
