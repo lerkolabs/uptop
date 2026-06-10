@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"testing"
@@ -144,6 +145,10 @@ func (m *mockStore) LoadLogs(limit int) ([]string, error) {
 func (m *mockStore) LoadAllHistory(limit int) (map[int][]models.CheckRecord, error) {
 	return m.history, nil
 }
+
+func (m *mockStore) PruneLogs() error         { return nil }
+func (m *mockStore) PruneCheckHistory() error { return nil }
+func (m *mockStore) PruneStateChanges() error { return nil }
 
 // --- Helpers ---
 
@@ -1165,6 +1170,51 @@ func TestHandleStatusChange_RemovedSiteDropped(t *testing.T) {
 	if _, ok := getSite(e, 1); ok {
 		t.Error("removed site was recreated by a late check write-back")
 	}
+}
+
+// --- Group 11: single DB writer ---
+
+// Writes enqueued through the engine are persisted by the writer goroutine and
+// fully drained when the engine stops — no fire-and-forget, no lost writes.
+func TestDBWriter_DrainsOnStop(t *testing.T) {
+	ms := newMockStore()
+	e := newTestEngine(ms)
+	e.Start(context.Background())
+
+	e.enqueueWrite(writeCheck{siteID: 7, latencyNs: 100, isUp: true})
+	e.enqueueWrite(writeLog{message: "drain-me"})
+
+	e.Stop() // blocks until the writer has drained the queue
+
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+	gotCheck := false
+	for _, c := range ms.savedChecks {
+		if c.SiteID == 7 {
+			gotCheck = true
+		}
+	}
+	if !gotCheck {
+		t.Error("check was not persisted before Stop returned")
+	}
+	gotLog := false
+	for _, l := range ms.savedLogs {
+		if l == "drain-me" {
+			gotLog = true
+		}
+	}
+	if !gotLog {
+		t.Error("log was not persisted before Stop returned")
+	}
+}
+
+// Stop must be idempotent — safe to call more than once.
+func TestEngineStop_Idempotent(t *testing.T) {
+	ms := newMockStore()
+	e := newTestEngine(ms)
+	e.Start(context.Background())
+	e.Stop()
+	e.Stop() // must not panic or block
 }
 
 // --- Utilities ---

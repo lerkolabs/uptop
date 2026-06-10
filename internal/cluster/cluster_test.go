@@ -58,6 +58,9 @@ func (m *mockStore) LoadAlertHealth() (map[int]models.AlertHealthRecord, error) 
 }
 func (m *mockStore) SaveAlertHealth(models.AlertHealthRecord) error { return nil }
 func (m *mockStore) SaveLog(string) error                           { return nil }
+func (m *mockStore) PruneLogs() error                               { return nil }
+func (m *mockStore) PruneCheckHistory() error                       { return nil }
+func (m *mockStore) PruneStateChanges() error                       { return nil }
 func (m *mockStore) LoadLogs(int) ([]string, error)                 { return nil, nil }
 func (m *mockStore) GetActiveMaintenanceWindows() ([]models.MaintenanceWindow, error) {
 	return nil, nil

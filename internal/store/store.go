@@ -39,11 +39,13 @@ type Store interface {
 	SaveCheck(siteID int, latencyNs int64, isUp bool) error
 	SaveCheckFromNode(siteID int, nodeID string, latencyNs int64, isUp bool) error
 	LoadAllHistory(limit int) (map[int][]models.CheckRecord, error)
+	PruneCheckHistory() error
 
 	// State Changes
 	SaveStateChange(siteID int, fromStatus, toStatus, errorReason string) error
 	GetStateChanges(siteID int, limit int) ([]models.StateChange, error)
 	GetStateChangesSince(siteID int, since time.Time) ([]models.StateChange, error)
+	PruneStateChanges() error
 
 	// Nodes
 	RegisterNode(node models.ProbeNode) error
@@ -59,6 +61,7 @@ type Store interface {
 	// Logs
 	SaveLog(message string) error
 	LoadLogs(limit int) ([]string, error)
+	PruneLogs() error
 
 	// Maintenance Windows
 	GetActiveMaintenanceWindows() ([]models.MaintenanceWindow, error)

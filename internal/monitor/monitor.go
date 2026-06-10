@@ -23,6 +23,8 @@ const (
 	minPushGrace          = 60 * time.Second
 	maintPruneInterval    = 15 * time.Minute
 	defaultMaintRetention = 7 * 24 * time.Hour
+	dbWriteBuffer         = 4096
+	dbPruneInterval       = 10 * time.Minute
 )
 
 type AlertHealth struct {
@@ -64,6 +66,11 @@ type Engine struct {
 	maintRetention      time.Duration
 	strictClient        *http.Client
 	insecureClient      *http.Client
+
+	dbWrites chan dbWrite
+	writerWG sync.WaitGroup
+	cancel   context.CancelFunc
+	stopOnce sync.Once
 }
 
 func NewEngine(s store.Store) *Engine {
@@ -87,6 +94,7 @@ func newEngine(s store.Store, allowPrivateTargets bool) *Engine {
 		isActive:            true,
 		allowPrivateTargets: allowPrivateTargets,
 		maintRetention:      defaultMaintRetention,
+		dbWrites:            make(chan dbWrite, dbWriteBuffer),
 		db:                  s,
 		strictClient: &http.Client{
 			Transport: &http.Transport{
@@ -133,16 +141,98 @@ func fmtDurationShort(d time.Duration) string {
 	return fmt.Sprintf("%dd %dh", int(d.Hours())/24, int(d.Hours())%24)
 }
 
-func (e *Engine) AddLog(msg string) {
-	e.logMu.Lock()
-	defer e.logMu.Unlock()
+// appendLog adds a timestamped entry to the in-memory ring buffer and returns
+// it. It never touches the database, so it is safe to call from the db-write
+// drop/error path without recursing back through the write queue.
+func (e *Engine) appendLog(msg string) string {
 	ts := time.Now().Format("15:04:05")
 	entry := fmt.Sprintf("[%s] %s", ts, sanitizeLog(msg))
+	e.logMu.Lock()
 	e.logStore = append([]string{entry}, e.logStore...)
 	if len(e.logStore) > maxLogEntries {
 		e.logStore = e.logStore[:maxLogEntries]
 	}
-	go func() { _ = e.db.SaveLog(entry) }()
+	e.logMu.Unlock()
+	return entry
+}
+
+func (e *Engine) AddLog(msg string) {
+	entry := e.appendLog(msg)
+	e.enqueueWrite(writeLog{message: entry})
+}
+
+// enqueueWrite hands a persistence task to the writer goroutine without
+// blocking the caller. If the queue is saturated the write is dropped and noted
+// in the in-memory log only (never re-enqueued, to avoid recursion via AddLog).
+func (e *Engine) enqueueWrite(w dbWrite) {
+	select {
+	case e.dbWrites <- w:
+	default:
+		e.appendLog(fmt.Sprintf("db write queue full, dropped %s", w.desc()))
+	}
+}
+
+// dbWriter is the single goroutine that owns all writes. Serializing writes
+// through one path removes the fire-and-forget goroutine pile-up, surfaces
+// errors, and lets retention run on a timer instead of per-insert. It drains
+// any buffered writes on shutdown before returning.
+func (e *Engine) dbWriter(ctx context.Context) {
+	defer e.writerWG.Done()
+
+	pruneTicker := time.NewTicker(dbPruneInterval)
+	defer pruneTicker.Stop()
+	e.prune()
+
+	for {
+		select {
+		case w := <-e.dbWrites:
+			if err := w.exec(e.db); err != nil {
+				e.appendLog(fmt.Sprintf("db %s write failed: %v", w.desc(), err))
+			}
+		case <-pruneTicker.C:
+			e.prune()
+		case <-ctx.Done():
+			e.drainWrites()
+			return
+		}
+	}
+}
+
+// drainWrites flushes everything still buffered, best-effort, at shutdown.
+func (e *Engine) drainWrites() {
+	for {
+		select {
+		case w := <-e.dbWrites:
+			if err := w.exec(e.db); err != nil {
+				e.appendLog(fmt.Sprintf("db %s write failed (drain): %v", w.desc(), err))
+			}
+		default:
+			return
+		}
+	}
+}
+
+func (e *Engine) prune() {
+	if err := e.db.PruneLogs(); err != nil {
+		e.appendLog(fmt.Sprintf("log prune failed: %v", err))
+	}
+	if err := e.db.PruneCheckHistory(); err != nil {
+		e.appendLog(fmt.Sprintf("check-history prune failed: %v", err))
+	}
+	if err := e.db.PruneStateChanges(); err != nil {
+		e.appendLog(fmt.Sprintf("state-change prune failed: %v", err))
+	}
+}
+
+// Stop signals the writer goroutine to drain and exit, then blocks until it
+// has. Call it before closing the store so no write races a closed DB.
+func (e *Engine) Stop() {
+	e.stopOnce.Do(func() {
+		if e.cancel != nil {
+			e.cancel()
+		}
+		e.writerWG.Wait()
+	})
 }
 
 func (e *Engine) InitLogs() {
@@ -280,7 +370,7 @@ func (e *Engine) RecordHeartbeat(token string) bool {
 	}
 
 	if prevStatus != "UP" && prevStatus != "PENDING" {
-		go func() { _ = e.db.SaveStateChange(targetID, prevStatus, "UP", "") }()
+		e.enqueueWrite(writeStateChange{siteID: targetID, fromStatus: prevStatus, toStatus: "UP"})
 	}
 
 	return true
@@ -302,6 +392,14 @@ func (e *Engine) removeFromTokenIndex(id int) {
 }
 
 func (e *Engine) Start(ctx context.Context) {
+	// e.cancel is invoked by Stop() to drain and halt the writer; gosec can't
+	// trace the cross-method call, and cancelling the parent reaps this child
+	// regardless, so the leak it warns about can't occur.
+	ctx, e.cancel = context.WithCancel(ctx) //nolint:gosec // cancel is called in Stop()
+
+	e.writerWG.Add(1)
+	go e.dbWriter(ctx)
+
 	go func() {
 		for {
 			select {
@@ -708,7 +806,7 @@ func (e *Engine) handleStatusChange(snap models.Site, rawStatus string, code int
 	}
 
 	if changed && prev != "PENDING" {
-		go func() { _ = e.db.SaveStateChange(snap.ID, prev, next, errorReason) }()
+		e.enqueueWrite(writeStateChange{siteID: snap.ID, fromStatus: prev, toStatus: next, reason: errorReason})
 	}
 
 	if sslWarnFire {
@@ -790,17 +888,15 @@ func (e *Engine) recordAlertResult(alertID int, ok bool, errMsg string) {
 	}
 	e.alertHealth[alertID] = h
 
-	// Persist best-effort so health survives restarts; DB IO off the alert path.
-	go func(rec models.AlertHealthRecord) {
-		_ = e.db.SaveAlertHealth(rec)
-	}(models.AlertHealthRecord{
+	// Persist so health survives restarts; DB IO off the alert path.
+	e.enqueueWrite(writeAlertHealth{rec: models.AlertHealthRecord{
 		AlertID:    alertID,
 		LastSendAt: h.LastSendAt,
 		LastSendOK: h.LastSendOK,
 		LastError:  h.LastError,
 		SendCount:  h.SendCount,
 		FailCount:  h.FailCount,
-	})
+	}})
 }
 
 func (e *Engine) GetAlertHealth(alertID int) AlertHealth {

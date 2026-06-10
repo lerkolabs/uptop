@@ -61,7 +61,7 @@ func (e *Engine) recordCheck(siteID int, latency time.Duration, isUp bool) {
 		h.Statuses = h.Statuses[len(h.Statuses)-maxHistoryLen:]
 	}
 
-	go func() { _ = e.db.SaveCheck(siteID, latency.Nanoseconds(), isUp) }()
+	e.enqueueWrite(writeCheck{siteID: siteID, latencyNs: latency.Nanoseconds(), isUp: isUp})
 }
 
 func (e *Engine) GetHistory(siteID int) (SiteHistory, bool) {

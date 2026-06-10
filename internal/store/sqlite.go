@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -10,12 +11,19 @@ import (
 type SQLiteDialect struct{}
 
 func NewSQLiteStore(path string) (*SQLStore, error) {
-	s, err := NewSQLStore("sqlite3", path, &SQLiteDialect{})
+	// Apply pragmas via the DSN so every pooled connection gets them — a
+	// post-open PRAGMA Exec only affects a single connection. WAL allows
+	// concurrent readers alongside the single writer goroutine; busy_timeout
+	// rides out brief lock contention; synchronous=NORMAL is durable under WAL
+	// and far faster than the FULL default. (:memory: is left untouched —
+	// these pragmas are no-ops or harmful for the in-memory test DB.)
+	dsn := path
+	if path != ":memory:" {
+		dsn = fmt.Sprintf("file:%s?_journal_mode=WAL&_busy_timeout=5000&_synchronous=NORMAL", path)
+	}
+	s, err := NewSQLStore("sqlite3", dsn, &SQLiteDialect{})
 	if err != nil {
 		return nil, err
-	}
-	if _, err := s.db.Exec("PRAGMA journal_mode=WAL"); err != nil {
-		log.Printf("WAL mode failed: %v", err)
 	}
 	return s, nil
 }

@@ -431,6 +431,10 @@ func runServe(args []string) {
 	}
 	cancel()
 
+	// Drain pending DB writes before the deferred ss.Close() runs, so no
+	// write races a closed database.
+	eng.Stop()
+
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
 	if httpSrv != nil {

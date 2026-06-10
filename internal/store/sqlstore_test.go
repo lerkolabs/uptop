@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -313,6 +314,69 @@ func TestDeleteSiteCascade(t *testing.T) {
 		if w.MonitorID == siteID {
 			t.Errorf("orphaned maintenance window found: id=%d", w.ID)
 		}
+	}
+}
+
+func TestPruneLogs(t *testing.T) {
+	s := newTestStore(t)
+
+	for i := 0; i < maxLogRows+50; i++ {
+		if err := s.SaveLog(fmt.Sprintf("log %d", i)); err != nil {
+			t.Fatalf("SaveLog: %v", err)
+		}
+	}
+	if err := s.PruneLogs(); err != nil {
+		t.Fatalf("PruneLogs: %v", err)
+	}
+
+	logs, err := s.LoadLogs(maxLogRows * 2)
+	if err != nil {
+		t.Fatalf("LoadLogs: %v", err)
+	}
+	if len(logs) != maxLogRows {
+		t.Errorf("expected %d logs after prune, got %d", maxLogRows, len(logs))
+	}
+	// Newest must survive; oldest must be gone (membership, not position —
+	// LoadLogs ordering ties when rows share a created_at second).
+	present := make(map[string]bool, len(logs))
+	for _, l := range logs {
+		present[l] = true
+	}
+	if !present[fmt.Sprintf("log %d", maxLogRows+50-1)] {
+		t.Error("newest log was pruned")
+	}
+	if present["log 0"] {
+		t.Error("oldest log survived prune")
+	}
+}
+
+func TestPruneCheckHistory(t *testing.T) {
+	s := newTestStore(t)
+
+	for i := 0; i < maxCheckHistory+5; i++ {
+		if err := s.SaveCheck(1, int64(i), true); err != nil {
+			t.Fatalf("SaveCheck site 1: %v", err)
+		}
+	}
+	for i := 0; i < 3; i++ {
+		if err := s.SaveCheck(2, int64(i), true); err != nil {
+			t.Fatalf("SaveCheck site 2: %v", err)
+		}
+	}
+
+	if err := s.PruneCheckHistory(); err != nil {
+		t.Fatalf("PruneCheckHistory: %v", err)
+	}
+
+	history, err := s.LoadAllHistory(maxCheckHistory * 2)
+	if err != nil {
+		t.Fatalf("LoadAllHistory: %v", err)
+	}
+	if len(history[1]) != maxCheckHistory {
+		t.Errorf("site 1: expected %d rows after prune, got %d", maxCheckHistory, len(history[1]))
+	}
+	if len(history[2]) != 3 {
+		t.Errorf("site 2: expected 3 rows untouched, got %d", len(history[2]))
 	}
 }
 

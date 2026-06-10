@@ -13,10 +13,11 @@ import (
 )
 
 const (
-	maxCheckHistory      = 1000
-	checkHistoryPruneAt  = 1100
-	maxMaintenanceExport = 1000
-	maxRequestBody       = 1 << 20
+	maxCheckHistory        = 1000
+	maxLogRows             = 200
+	maxStateChangesPerSite = 5000
+	maxMaintenanceExport   = 1000
+	maxRequestBody         = 1 << 20
 )
 
 type SQLStore struct {
@@ -407,21 +408,39 @@ func (s *SQLStore) SaveCheck(siteID int, latencyNs int64, isUp bool) error {
 	return s.SaveCheckFromNode(siteID, "", latencyNs, isUp)
 }
 
+// SaveCheckFromNode inserts a single check row. Retention is handled out of
+// band by PruneCheckHistory on a timer, not per-insert, to keep the write hot
+// path a plain INSERT.
 func (s *SQLStore) SaveCheckFromNode(siteID int, nodeID string, latencyNs int64, isUp bool) error {
 	_, err := s.db.Exec(s.q("INSERT INTO check_history (site_id, node_id, latency_ns, is_up) VALUES (?, ?, ?, ?)"), siteID, nodeID, latencyNs, isUp)
-	if err != nil {
-		return err
-	}
-	var count int
-	_ = s.db.QueryRow(s.q("SELECT COUNT(*) FROM check_history WHERE site_id = ?"), siteID).Scan(&count)
-	if count > checkHistoryPruneAt {
-		pruneQuery := fmt.Sprintf(`DELETE FROM check_history WHERE site_id = ? AND id NOT IN (
-			SELECT id FROM check_history WHERE site_id = ? ORDER BY checked_at DESC LIMIT %d
-		)`, maxCheckHistory)
-		_, err = s.db.Exec(s.q(pruneQuery), siteID, siteID)
-		return err
-	}
-	return nil
+	return err
+}
+
+// PruneCheckHistory trims check_history to the newest maxCheckHistory rows per
+// site, across all sites, in one pass. Intended to run periodically.
+func (s *SQLStore) PruneCheckHistory() error {
+	q := fmt.Sprintf(`DELETE FROM check_history WHERE id IN (
+		SELECT id FROM (
+			SELECT id, ROW_NUMBER() OVER (PARTITION BY site_id ORDER BY checked_at DESC, id DESC) AS rn
+			FROM check_history
+		) ranked WHERE rn > %d
+	)`, maxCheckHistory)
+	_, err := s.db.Exec(s.q(q))
+	return err
+}
+
+// PruneStateChanges trims state_changes to the newest maxStateChangesPerSite
+// rows per site. Generous so realistic SLA windows are unaffected; bounds the
+// otherwise unbounded growth of a flapping monitor's history.
+func (s *SQLStore) PruneStateChanges() error {
+	q := fmt.Sprintf(`DELETE FROM state_changes WHERE id IN (
+		SELECT id FROM (
+			SELECT id, ROW_NUMBER() OVER (PARTITION BY site_id ORDER BY changed_at DESC, id DESC) AS rn
+			FROM state_changes
+		) ranked WHERE rn > %d
+	)`, maxStateChangesPerSite)
+	_, err := s.db.Exec(s.q(q))
+	return err
 }
 
 func (s *SQLStore) RegisterNode(node models.ProbeNode) error {
@@ -494,14 +513,20 @@ func (s *SQLStore) SaveAlertHealth(h models.AlertHealthRecord) error {
 	return err
 }
 
+// SaveLog inserts a single log row. Retention is handled by PruneLogs on a
+// timer, not per-insert.
 func (s *SQLStore) SaveLog(message string) error {
 	_, err := s.db.Exec(s.q("INSERT INTO logs (message) VALUES (?)"), message)
-	if err != nil {
-		return err
-	}
-	_, err = s.db.Exec(s.q(`DELETE FROM logs WHERE id NOT IN (
-		SELECT id FROM logs ORDER BY created_at DESC LIMIT 200
-	)`))
+	return err
+}
+
+// PruneLogs trims the logs table to the newest maxLogRows rows. The id DESC
+// tiebreak keeps ordering deterministic when rows share a created_at second.
+func (s *SQLStore) PruneLogs() error {
+	q := fmt.Sprintf(`DELETE FROM logs WHERE id NOT IN (
+		SELECT id FROM logs ORDER BY created_at DESC, id DESC LIMIT %d
+	)`, maxLogRows)
+	_, err := s.db.Exec(s.q(q))
 	return err
 }
 
