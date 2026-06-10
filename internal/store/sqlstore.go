@@ -724,11 +724,13 @@ func (s *SQLStore) ImportData(data models.Backup) error {
 		}
 	}
 	for _, a := range data.Alerts {
-		jsonBytes, err := json.Marshal(a.Settings)
+		// Encrypt on import exactly as AddAlert/UpdateAlert do, so a restore
+		// honors UPTOP_ENCRYPTION_KEY instead of writing secrets in plaintext.
+		settingsStr, err := s.marshalSettings(a.Settings)
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(s.q("INSERT INTO alerts (id, name, type, settings) VALUES (?, ?, ?, ?)"), a.ID, a.Name, a.Type, string(jsonBytes)); err != nil {
+		if _, err := tx.Exec(s.q("INSERT INTO alerts (id, name, type, settings) VALUES (?, ?, ?, ?)"), a.ID, a.Name, a.Type, settingsStr); err != nil {
 			return err
 		}
 	}

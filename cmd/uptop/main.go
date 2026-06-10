@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/url"
 	"os"
 	"os/signal"
@@ -83,6 +84,39 @@ func redactDSN(dsn string) string {
 	}
 	u.User = nil
 	return u.String()
+}
+
+// parseTrustedProxies turns UPTOP_TRUSTED_PROXIES (comma-separated CIDRs or
+// bare IPs) into networks the rate limiter trusts to set X-Forwarded-For. Bare
+// IPs are treated as single-host ranges. Invalid entries are warned about and
+// skipped, so a typo degrades to "ignore XFF" (safe) rather than aborting boot.
+func parseTrustedProxies(raw string) []*net.IPNet {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	var cidrs []*net.IPNet
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if !strings.Contains(part, "/") {
+			if ip := net.ParseIP(part); ip != nil {
+				bits := 32
+				if ip.To4() == nil {
+					bits = 128
+				}
+				part = fmt.Sprintf("%s/%d", part, bits)
+			}
+		}
+		_, ipnet, err := net.ParseCIDR(part)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "WARNING: ignoring invalid UPTOP_TRUSTED_PROXIES entry %q: %v\n", part, err)
+			continue
+		}
+		cidrs = append(cidrs, ipnet)
+	}
+	return cidrs
 }
 
 func openStore(dbType, dsn string) store.Store {
@@ -397,15 +431,16 @@ func runServe(args []string) {
 	tlsKey := os.Getenv("UPTOP_TLS_KEY")
 
 	httpSrv := server.Start(server.ServerConfig{
-		Port:          httpPort,
-		EnableStatus:  enableStatus,
-		Title:         statusTitle,
-		ClusterKey:    clusterKey,
-		TLSCert:       tlsCert,
-		TLSKey:        tlsKey,
-		ClusterMode:   clusterMode,
-		MetricsPublic: os.Getenv("UPTOP_METRICS_PUBLIC") == "true",
-		CORSOrigin:    os.Getenv("UPTOP_CORS_ORIGIN"),
+		Port:           httpPort,
+		EnableStatus:   enableStatus,
+		Title:          statusTitle,
+		ClusterKey:     clusterKey,
+		TLSCert:        tlsCert,
+		TLSKey:         tlsKey,
+		ClusterMode:    clusterMode,
+		MetricsPublic:  os.Getenv("UPTOP_METRICS_PUBLIC") == "true",
+		CORSOrigin:     os.Getenv("UPTOP_CORS_ORIGIN"),
+		TrustedProxies: parseTrustedProxies(os.Getenv("UPTOP_TRUSTED_PROXIES")),
 	}, s, eng)
 
 	cluster.Start(ctx, cluster.Config{

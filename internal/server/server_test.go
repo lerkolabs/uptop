@@ -565,3 +565,108 @@ func TestProbeAssignments_Unauthorized(t *testing.T) {
 		t.Errorf("expected 401, got %d", resp.StatusCode)
 	}
 }
+
+// --- Security: X-Forwarded-For trusted-proxy handling ---
+
+func mustCIDR(t *testing.T, s string) *net.IPNet {
+	t.Helper()
+	_, n, err := net.ParseCIDR(s)
+	if err != nil {
+		t.Fatalf("ParseCIDR(%q): %v", s, err)
+	}
+	return n
+}
+
+func TestClientIP_TrustedProxyHandling(t *testing.T) {
+	trusted := []*net.IPNet{mustCIDR(t, "10.0.0.0/8")}
+
+	tests := []struct {
+		name       string
+		remoteAddr string
+		xff        string
+		trusted    []*net.IPNet
+		want       string
+	}{
+		{"no trusted proxies ignores XFF", "203.0.113.9:5000", "1.2.3.4", nil, "203.0.113.9"},
+		{"untrusted peer ignores XFF", "203.0.113.9:5000", "1.2.3.4", trusted, "203.0.113.9"},
+		{"trusted peer honors XFF", "10.0.0.5:5000", "1.2.3.4", trusted, "1.2.3.4"},
+		{"trusted peer, rightmost-untrusted hop", "10.0.0.5:5000", "1.2.3.4, 10.0.0.9", trusted, "1.2.3.4"},
+		{"trusted peer, no XFF falls back to peer", "10.0.0.5:5000", "", trusted, "10.0.0.5"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, _ := http.NewRequest(http.MethodGet, "/", nil)
+			r.RemoteAddr = tt.remoteAddr
+			if tt.xff != "" {
+				r.Header.Set("X-Forwarded-For", tt.xff)
+			}
+			if got := clientIP(r, tt.trusted); got != tt.want {
+				t.Errorf("clientIP = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// A spoofed, rotating X-Forwarded-For from an untrusted peer must NOT bypass
+// the limiter: all requests key on the real RemoteAddr, so the bucket trips.
+func TestRateLimit_SpoofedXFFCannotBypass(t *testing.T) {
+	rl := NewRateLimiter(60, nil) // no trusted proxies
+	allowed := 0
+	for i := 0; i < 200; i++ {
+		r, _ := http.NewRequest(http.MethodGet, "/", nil)
+		r.RemoteAddr = "203.0.113.9:5000"
+		r.Header.Set("X-Forwarded-For", fmt.Sprintf("9.9.9.%d", i%256))
+		if rl.Allow(clientIP(r, rl.trusted)) {
+			allowed++
+		}
+	}
+	if allowed > 60 {
+		t.Errorf("spoofed XFF bypassed limiter: %d/200 allowed (burst is 60)", allowed)
+	}
+}
+
+func TestRateLimit_VisitorMapBounded(t *testing.T) {
+	rl := NewRateLimiter(60, nil)
+	for i := 0; i < maxVisitors+500; i++ {
+		rl.Allow(fmt.Sprintf("10.1.%d.%d", i/256, i%256))
+	}
+	rl.mu.Lock()
+	n := len(rl.visitors)
+	rl.mu.Unlock()
+	if n > maxVisitors {
+		t.Errorf("visitor map exceeded cap: %d > %d", n, maxVisitors)
+	}
+}
+
+// --- Security: export redaction allowlist ---
+
+func TestRedactByProvider(t *testing.T) {
+	tests := []struct {
+		name     string
+		typ      string
+		in       map[string]string
+		redacted []string // keys expected to be ***REDACTED***
+		kept     []string // keys expected to survive verbatim
+	}{
+		{"discord url is secret", "discord", map[string]string{"url": "https://discord.com/api/webhooks/1/abc"}, []string{"url"}, nil},
+		{"opsgenie api_key redacted, priority kept", "opsgenie", map[string]string{"api_key": "k", "priority": "P1", "eu": "true"}, []string{"api_key"}, []string{"priority", "eu"}},
+		{"email creds redacted, routing kept", "email", map[string]string{"host": "smtp.x.com", "port": "587", "to": "a@x.com", "from": "b@x.com", "user": "u", "pass": "p"}, []string{"user", "pass"}, []string{"host", "port", "to", "from"}},
+		{"telegram token redacted, chat_id kept", "telegram", map[string]string{"token": "123:ABC", "chat_id": "42"}, []string{"token"}, []string{"chat_id"}},
+		{"unknown provider redacts everything", "mystery", map[string]string{"anything": "x"}, []string{"anything"}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := redactByProvider(tt.typ, tt.in)
+			for _, k := range tt.redacted {
+				if out[k] != "***REDACTED***" {
+					t.Errorf("key %q: expected redacted, got %q", k, out[k])
+				}
+			}
+			for _, k := range tt.kept {
+				if out[k] != tt.in[k] {
+					t.Errorf("key %q: expected kept %q, got %q", k, tt.in[k], out[k])
+				}
+			}
+		})
+	}
+}

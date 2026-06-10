@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"net"
 	"net/http"
 	"sort"
 	"strings"
@@ -32,18 +33,36 @@ func extractBearerToken(r *http.Request) string {
 	return ""
 }
 
-var sensitiveKeys = map[string]bool{
-	"pass": true, "password": true, "token": true,
-	"routing_key": true, "user": true, "username": true,
+// safeSettingKeys lists, per provider type, the settings that are NOT secret
+// and may be exported in the clear. Everything else is redacted. Providers
+// absent from this map (discord, slack, webhook, pushover) carry their secret
+// in a field a denylist would miss — the webhook URL, the pushover token/user —
+// so all of their settings are redacted.
+var safeSettingKeys = map[string]map[string]bool{
+	"email":     {"host": true, "port": true, "to": true, "from": true},
+	"ntfy":      {"topic": true, "priority": true},
+	"telegram":  {"chat_id": true},
+	"pagerduty": {"severity": true},
+	"gotify":    {"priority": true},
+	"opsgenie":  {"priority": true, "eu": true},
 }
 
-func redactSettings(settings map[string]string) map[string]string {
+// redactByProvider keeps only the known-safe keys for the alert type and
+// redacts everything else. An allowlist fails safe: an unknown or newly added
+// setting is redacted by default instead of leaking. This closes the denylist
+// gap where url (discord/slack/webhook/ntfy/gotify) and api_key (opsgenie) —
+// the actual credentials — were exported in the clear.
+func redactByProvider(alertType string, settings map[string]string) map[string]string {
+	safe := safeSettingKeys[alertType]
 	redacted := make(map[string]string, len(settings))
 	for k, v := range settings {
-		if sensitiveKeys[k] && v != "" {
-			redacted[k] = "***REDACTED***"
-		} else {
+		switch {
+		case v == "":
+			redacted[k] = ""
+		case safe[k]:
 			redacted[k] = v
+		default:
+			redacted[k] = "***REDACTED***"
 		}
 	}
 	return redacted
@@ -182,15 +201,16 @@ var statusTpl = template.Must(template.New("status").Parse(`
 </html>`))
 
 type ServerConfig struct {
-	Port          int
-	EnableStatus  bool
-	Title         string
-	ClusterKey    string
-	TLSCert       string
-	TLSKey        string
-	ClusterMode   string
-	MetricsPublic bool
-	CORSOrigin    string
+	Port           int
+	EnableStatus   bool
+	Title          string
+	ClusterKey     string
+	TLSCert        string
+	TLSKey         string
+	ClusterMode    string
+	MetricsPublic  bool
+	CORSOrigin     string
+	TrustedProxies []*net.IPNet
 }
 
 func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
@@ -198,10 +218,10 @@ func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
 		fmt.Println("WARNING: No UPTOP_CLUSTER_SECRET set. Cluster API endpoints are unauthenticated.")
 	}
 
-	pushRL := NewRateLimiter(60)
-	probeRL := NewRateLimiter(30)
-	backupRL := NewRateLimiter(10)
-	statusRL := NewRateLimiter(120)
+	pushRL := NewRateLimiter(60, cfg.TrustedProxies)
+	probeRL := NewRateLimiter(30, cfg.TrustedProxies)
+	backupRL := NewRateLimiter(10, cfg.TrustedProxies)
+	statusRL := NewRateLimiter(120, cfg.TrustedProxies)
 
 	mux := http.NewServeMux()
 
@@ -258,7 +278,7 @@ func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
 		}
 		if r.URL.Query().Get("redact_secrets") != "false" {
 			for i := range data.Alerts {
-				data.Alerts[i].Settings = redactSettings(data.Alerts[i].Settings)
+				data.Alerts[i].Settings = redactByProvider(data.Alerts[i].Type, data.Alerts[i].Settings)
 			}
 		}
 		_ = json.NewEncoder(w).Encode(data) //nolint:errcheck
@@ -482,7 +502,7 @@ func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
 		fmt.Println("WARNING: Cluster mode active without TLS. Secrets transmitted in cleartext.")
 	}
 
-	handler := loggingMiddleware(securityHeadersMiddleware(mux))
+	handler := loggingMiddleware(cfg.TrustedProxies, securityHeadersMiddleware(mux))
 	if cfg.TLSCert != "" {
 		handler = hstsMiddleware(handler)
 	}
@@ -522,13 +542,13 @@ func (w *statusWriter) WriteHeader(code int) {
 	w.ResponseWriter.WriteHeader(code)
 }
 
-func loggingMiddleware(next http.Handler) http.Handler {
+func loggingMiddleware(trusted []*net.IPNet, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, code: 200}
 		next.ServeHTTP(sw, r)
 		path := strings.ReplaceAll(strings.ReplaceAll(r.URL.Path, "\n", ""), "\r", "")
-		log.Printf("%s %s %d %s %s", r.Method, path, sw.code, time.Since(start).Round(time.Millisecond), clientIP(r)) //nolint:gosec // path sanitized above
+		log.Printf("%s %s %d %s %s", r.Method, path, sw.code, time.Since(start).Round(time.Millisecond), clientIP(r, trusted)) //nolint:gosec // path sanitized above
 	})
 }
 

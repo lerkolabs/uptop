@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/smtp"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +17,22 @@ import (
 )
 
 var alertClient = &http.Client{Timeout: 10 * time.Second}
+
+// sanitizeError strips the request URL from transport errors before they are
+// stored or displayed. *url.Error embeds the full URL, which for several
+// providers carries the credential itself (Telegram bot token in the path,
+// webhook secrets in the URL). The operation and underlying cause — the useful
+// diagnostic — are preserved.
+func sanitizeError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return fmt.Errorf("%s request failed: %w", urlErr.Op, urlErr.Err)
+	}
+	return err
+}
 
 type Provider interface {
 	Send(ctx context.Context, title, message string) error
@@ -43,7 +61,7 @@ func (h *HTTPProvider) Send(ctx context.Context, title, message string) error {
 	}
 	resp, err := alertClient.Do(req)
 	if err != nil {
-		return err
+		return sanitizeError(err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
@@ -262,7 +280,7 @@ func (n *NtfyProvider) Send(ctx context.Context, title, message string) error {
 	}
 	resp, err := alertClient.Do(req)
 	if err != nil {
-		return err
+		return sanitizeError(err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {

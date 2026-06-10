@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -439,5 +440,44 @@ func TestPruneExpiredMaintenanceWindows(t *testing.T) {
 		if w.Title == "Old Window" {
 			t.Error("old window should have been pruned")
 		}
+	}
+}
+
+// ImportData must encrypt alert settings (like AddAlert/UpdateAlert) so a
+// restore with UPTOP_ENCRYPTION_KEY set never lands secrets in plaintext.
+func TestImportData_EncryptsAlertSettings(t *testing.T) {
+	s := newTestStore(t)
+	enc, err := NewEncryptor(strings.Repeat("ab", 32)) // 64 hex chars = 32 bytes
+	if err != nil {
+		t.Fatalf("NewEncryptor: %v", err)
+	}
+	s.SetEncryptor(enc)
+
+	backup := models.Backup{
+		Alerts: []models.AlertConfig{
+			{ID: 1, Name: "tg", Type: "telegram", Settings: map[string]string{"token": "123:SECRET", "chat_id": "42"}},
+		},
+	}
+	if err := s.ImportData(backup); err != nil {
+		t.Fatalf("ImportData: %v", err)
+	}
+
+	var raw string
+	if err := s.db.QueryRow("SELECT settings FROM alerts WHERE id = 1").Scan(&raw); err != nil {
+		t.Fatalf("query settings: %v", err)
+	}
+	if !strings.HasPrefix(raw, encryptedPrefix) {
+		t.Errorf("imported settings not encrypted: %q", raw)
+	}
+	if strings.Contains(raw, "SECRET") {
+		t.Errorf("plaintext secret found in stored column: %q", raw)
+	}
+
+	alerts, err := s.GetAllAlerts()
+	if err != nil {
+		t.Fatalf("GetAllAlerts: %v", err)
+	}
+	if len(alerts) != 1 || alerts[0].Settings["token"] != "123:SECRET" {
+		t.Errorf("decrypt round-trip failed: %+v", alerts)
 	}
 }

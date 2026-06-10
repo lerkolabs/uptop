@@ -3,8 +3,11 @@ package alert
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
@@ -296,5 +299,34 @@ func TestSanitizeHeader(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("sanitizeHeader(%q) = %q, want %q", tt.input, got, tt.want)
 		}
+	}
+}
+
+// sanitizeError must strip the credential-bearing URL from a *url.Error while
+// keeping the operation and underlying cause.
+func TestSanitizeError(t *testing.T) {
+	urlErr := &url.Error{
+		Op:  "Post",
+		URL: "https://api.telegram.org/bot123456:SECRET_TOKEN/sendMessage",
+		Err: errors.New("dial tcp: connection refused"),
+	}
+	got := sanitizeError(urlErr).Error()
+
+	for _, leak := range []string{"SECRET_TOKEN", "api.telegram.org", "sendMessage", "bot123456"} {
+		if strings.Contains(got, leak) {
+			t.Errorf("sanitized error leaked %q: %s", leak, got)
+		}
+	}
+	if !strings.Contains(got, "connection refused") {
+		t.Errorf("expected underlying cause preserved, got: %s", got)
+	}
+
+	// Non-url errors pass through unchanged.
+	plain := errors.New("plain failure")
+	if sanitizeError(plain).Error() != "plain failure" {
+		t.Errorf("non-url error altered: %s", sanitizeError(plain))
+	}
+	if sanitizeError(nil) != nil {
+		t.Error("nil should stay nil")
 	}
 }

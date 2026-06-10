@@ -138,8 +138,21 @@ Full reference in [docs/config-as-code.md](docs/config-as-code.md).
 | `UPTOP_INSECURE_SKIP_VERIFY` | `false` | Skip TLS verification for checks |
 | `UPTOP_ALLOW_PRIVATE_TARGETS` | `false` | Allow monitoring RFC1918/loopback addresses |
 | `UPTOP_ADMIN_KEY` | | SSH public key seeded as first admin on startup |
+| `UPTOP_TRUSTED_PROXIES` | | Comma-separated CIDRs/IPs whose `X-Forwarded-For` is trusted ([details](#running-behind-a-reverse-proxy)) |
 
 See [`.env.example`](.env.example) for all options including TLS, probes, and advanced settings.
+
+### Running behind a reverse proxy
+
+By default uptop ignores the `X-Forwarded-For` header and rate-limits by the direct connection address — so a client can't spoof the header to bypass limits. If uptop sits behind a reverse proxy (nginx, Caddy, Cloudflare, an ALB), set `UPTOP_TRUSTED_PROXIES` to the proxy's address(es) so the real client IP is used instead:
+
+    # single nginx/Caddy on the same host
+    UPTOP_TRUSTED_PROXIES=127.0.0.1
+
+    # a proxy subnet, or Cloudflare ranges
+    UPTOP_TRUSTED_PROXIES=10.0.0.0/8,172.16.0.0/12
+
+Only requests whose immediate peer is in this list have their `X-Forwarded-For` honored (right-most non-trusted hop wins). Bare IPs are treated as single hosts; invalid entries are warned about and skipped. Leave it unset if uptop is exposed directly.
 
 ### Encryption
 
