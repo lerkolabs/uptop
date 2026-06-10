@@ -144,6 +144,8 @@ type Model struct {
 	filterMode bool
 	filterText string
 
+	sparkTooltipIdx int // clicked sparkline data index, -1 = none
+
 	// demoMode renders a stable status dot instead of the animated pulse so
 	// screenshots/recordings don't capture the spinner mid-frame. Set via UPTOP_DEMO=1.
 	demoMode bool
@@ -170,19 +172,20 @@ func InitialModel(isAdmin bool, s store.Store, eng *monitor.Engine, version stri
 	applyTheme(theme)
 
 	return Model{
-		state:        stateDashboard,
-		logViewport:  vpLogs,
-		maxTableRows: 5,
-		isAdmin:      isAdmin,
-		store:        s,
-		engine:       eng,
-		zones:        z,
-		pulseSpring:  spring,
-		collapsed:    collapsed,
-		theme:        theme,
-		themeIndex:   themeIdx,
-		demoMode:     os.Getenv("UPTOP_DEMO") == "1",
-		version:      version,
+		state:           stateDashboard,
+		logViewport:     vpLogs,
+		maxTableRows:    5,
+		isAdmin:         isAdmin,
+		store:           s,
+		engine:          eng,
+		zones:           z,
+		pulseSpring:     spring,
+		collapsed:       collapsed,
+		theme:           theme,
+		themeIndex:      themeIdx,
+		demoMode:        os.Getenv("UPTOP_DEMO") == "1",
+		version:         version,
+		sparkTooltipIdx: -1,
 	}
 }
 

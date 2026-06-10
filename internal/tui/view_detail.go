@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/monitor"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -203,7 +205,7 @@ func (m Model) viewDetailPanel() string {
 	b.WriteString(m.divider() + "\n")
 	const sparkWidth = 40
 	if site.Type == "push" {
-		b.WriteString("  " + heartbeatSparkline(hist.Statuses, sparkWidth, ""))
+		b.WriteString("  " + m.zones.Mark("spark-heartbeat", heartbeatSparkline(hist.Statuses, sparkWidth, "")))
 		if len(hist.Statuses) > 0 {
 			up := 0
 			for _, s := range hist.Statuses {
@@ -216,7 +218,7 @@ func (m Model) viewDetailPanel() string {
 				up, len(hist.Statuses))
 		}
 	} else {
-		b.WriteString("  " + latencySparkline(hist.Latencies, hist.Statuses, sparkWidth, ""))
+		b.WriteString("  " + m.zones.Mark("spark-latency", latencySparkline(hist.Latencies, hist.Statuses, sparkWidth, "")))
 		var minL, maxL, total time.Duration
 		count := 0
 		for i, l := range hist.Latencies {
@@ -242,9 +244,53 @@ func (m Model) viewDetailPanel() string {
 		}
 	}
 
+	if m.sparkTooltipIdx >= 0 {
+		b.WriteString("\n" + m.renderSparkTooltip(site, hist, sparkWidth))
+	}
+
 	b.WriteString("\n")
 	b.WriteString(m.divider() + "\n")
-	b.WriteString(subtleStyle.Render("  [i/Esc] Back  [e] Edit  [h] History  [s] SLA  [q] Quit"))
+	b.WriteString(subtleStyle.Render("  [i/Esc] Back  [e] Edit  [h] History  [s] SLA  [click] Inspect  [q] Quit"))
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
+}
+
+func (m Model) renderSparkTooltip(site models.Site, hist monitor.SiteHistory, sparkWidth int) string {
+	idx := m.sparkTooltipIdx
+
+	var dataLen int
+	if site.Type == "push" {
+		dataLen = len(hist.Statuses)
+	} else {
+		dataLen = len(hist.Latencies)
+	}
+	if idx < 0 || idx >= dataLen {
+		return ""
+	}
+
+	var parts []string
+
+	checksAgo := dataLen - 1 - idx
+	approxSecs := checksAgo * site.Interval
+	if approxSecs == 0 {
+		parts = append(parts, "latest")
+	} else {
+		parts = append(parts, "~"+fmtDuration(time.Duration(approxSecs)*time.Second)+" ago")
+	}
+
+	if site.Type != "push" && idx < len(hist.Latencies) {
+		parts = append(parts, fmtLatency(hist.Latencies[idx]))
+	}
+
+	if idx < len(hist.Statuses) {
+		if hist.Statuses[idx] {
+			parts = append(parts, specialStyle.Render("UP"))
+		} else {
+			parts = append(parts, dangerStyle.Render("DOWN"))
+		}
+	}
+
+	sep := subtleStyle.Render(" | ")
+	pos := subtleStyle.Render(fmt.Sprintf("[%d/%d]", idx+1, dataLen))
+	return "  " + strings.Join(parts, sep) + "  " + pos
 }

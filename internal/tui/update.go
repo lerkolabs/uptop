@@ -162,6 +162,12 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
+	if m.state == stateDetail {
+		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+			return m.handleSparklineClick(msg)
+		}
+		return m, nil
+	}
 	if m.state != stateDashboard && m.state != stateLogs && m.state != stateUsers {
 		return m, nil
 	}
@@ -259,7 +265,15 @@ func (m *Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "i", "esc":
+	case "esc":
+		if m.sparkTooltipIdx >= 0 {
+			m.sparkTooltipIdx = -1
+			return m, nil
+		}
+		m.sparkTooltipIdx = -1
+		m.state = stateDashboard
+	case "i":
+		m.sparkTooltipIdx = -1
 		m.state = stateDashboard
 	case "e":
 		return m.handleEditItem()
@@ -283,6 +297,30 @@ func (m *Model) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q":
 		return m, tea.Quit
 	}
+	return m, nil
+}
+
+func (m *Model) handleSparklineClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if m.cursor >= len(m.sites) {
+		return m, nil
+	}
+	site := m.sites[m.cursor]
+	hist, _ := m.engine.GetHistory(site.ID)
+
+	const sparkWidth = 40
+
+	if zi := m.zones.Get("spark-latency"); zi != nil && !zi.IsZero() && zi.InBounds(msg) {
+		x, _ := zi.Pos(msg)
+		m.sparkTooltipIdx = resolveSparklineIndex(x, sparkWidth, len(hist.Latencies))
+		return m, nil
+	}
+	if zi := m.zones.Get("spark-heartbeat"); zi != nil && !zi.IsZero() && zi.InBounds(msg) {
+		x, _ := zi.Pos(msg)
+		m.sparkTooltipIdx = resolveSparklineIndex(x, sparkWidth, len(hist.Statuses))
+		return m, nil
+	}
+
+	m.sparkTooltipIdx = -1
 	return m, nil
 }
 

@@ -95,7 +95,7 @@ func (m Model) View() string {
 		}
 		return ""
 	case stateDetail:
-		return m.viewDetailPanel()
+		return m.zones.Scan(m.viewDetailPanel())
 	case stateHistory:
 		return m.viewHistoryPanel()
 	case stateSLA:

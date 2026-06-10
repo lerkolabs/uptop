@@ -139,3 +139,34 @@ func TestHeartbeatSparkline_PaddedWidth(t *testing.T) {
 		t.Errorf("should have dot padding for width > data, got %q", got)
 	}
 }
+
+func TestResolveSparklineIndex(t *testing.T) {
+	tests := []struct {
+		name       string
+		x          int
+		sparkWidth int
+		dataLen    int
+		want       int
+	}{
+		{"exact fit first", 0, 5, 5, 0},
+		{"exact fit last", 4, 5, 5, 4},
+		{"padding returns -1", 0, 10, 5, -1},
+		{"padding boundary", 4, 10, 5, -1},
+		{"first data after padding", 5, 10, 5, 0},
+		{"last data after padding", 9, 10, 5, 4},
+		{"truncated first visible", 0, 5, 20, 15},
+		{"truncated last visible", 4, 5, 20, 19},
+		{"single data point", 9, 10, 1, 0},
+		{"single data point on padding", 0, 10, 1, -1},
+		{"zero data", 0, 10, 0, -1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := resolveSparklineIndex(tt.x, tt.sparkWidth, tt.dataLen)
+			if got != tt.want {
+				t.Errorf("resolveSparklineIndex(%d, %d, %d) = %d, want %d",
+					tt.x, tt.sparkWidth, tt.dataLen, got, tt.want)
+			}
+		})
+	}
+}

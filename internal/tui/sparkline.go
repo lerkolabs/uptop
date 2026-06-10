@@ -127,6 +127,22 @@ func heartbeatSparkline(statuses []bool, width int, bg lipgloss.Color) string {
 	return sb.String()
 }
 
+func resolveSparklineIndex(x, sparkWidth, dataLen int) int {
+	visible := dataLen
+	if visible > sparkWidth {
+		visible = sparkWidth
+	}
+	padding := sparkWidth - visible
+	if x < padding {
+		return -1
+	}
+	offset := 0
+	if dataLen > sparkWidth {
+		offset = dataLen - sparkWidth
+	}
+	return offset + (x - padding)
+}
+
 func (m Model) groupSparkline(groupID int, width int, bg lipgloss.Color) string {
 	allSites := m.engine.GetAllSites()
 	var childStatuses [][]bool
