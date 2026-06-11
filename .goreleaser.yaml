@@ -10,7 +10,7 @@ release:
     name: uptop
 
 builds:
-  - main: ./cmd/uptop/main.go
+  - main: ./cmd/uptop
     binary: uptop
     env:
       - CGO_ENABLED=1

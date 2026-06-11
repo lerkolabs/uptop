@@ -1,0 +1,6 @@
+ignore:
+  # CVE-2026-41589: SCP path traversal in charmbracelet/wish.
+  # We only import wish/bubbletea for the SSH TUI server — the vulnerable
+  # scp.Middleware / scp.NewFileSystemHandler symbols are never compiled in.
+  # No fix available for wish v1; v2 (charm.land/wish/v2) patched in 2.0.1.
+  - vulnerability: CVE-2026-41589

@@ -33,8 +33,8 @@ jobs:
 
       - name: Install git-cliff
         run: |
-          apk add --no-cache curl jq
-          VERSION=$(curl -sS https://api.github.com/repos/orhun/git-cliff/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+          apk add --no-cache curl
+          VERSION=2.13.1
           curl -sSL "https://github.com/orhun/git-cliff/releases/download/v${VERSION}/git-cliff-${VERSION}-x86_64-unknown-linux-musl.tar.gz" | tar xz -C /tmp
           mv /tmp/git-cliff-*/git-cliff /usr/local/bin/
           git-cliff --version
