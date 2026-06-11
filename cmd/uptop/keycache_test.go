@@ -9,22 +9,21 @@ import (
 	"time"
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
-	"gitea.lerkolabs.com/lerkolabs/uptop/internal/store"
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/store/storetest"
 
 	"github.com/charmbracelet/ssh"
 	gossh "golang.org/x/crypto/ssh"
 )
 
-// kcMockStore implements only what keyCache and userInvalidatingStore touch;
-// any other Store method panics via the embedded nil interface.
+// kcMockStore embeds BaseMock for default no-ops; only GetAllUsers is
+// overridden because the tests mutate users/err between calls.
 type kcMockStore struct {
-	store.Store
+	storetest.BaseMock
 	users []models.User
 	err   error
 }
 
 func (m *kcMockStore) GetAllUsers(_ context.Context) ([]models.User, error) { return m.users, m.err }
-func (m *kcMockStore) DeleteUser(_ context.Context, _ int) error            { return nil }
 
 func testKey(t *testing.T) (string, ssh.PublicKey) {
 	t.Helper()

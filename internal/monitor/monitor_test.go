@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/store/storetest"
 )
 
 // --- Mock Store ---
@@ -19,6 +20,7 @@ type savedCheck struct {
 }
 
 type mockStore struct {
+	storetest.BaseMock
 	mu            sync.Mutex
 	sites         []models.Site
 	alerts        map[int]models.AlertConfig
@@ -38,42 +40,8 @@ func newMockStore() *mockStore {
 	}
 }
 
-func (m *mockStore) Init(context.Context) error                                        { return nil }
-func (m *mockStore) GetSites(context.Context) ([]models.Site, error)                   { return m.sites, nil }
-func (m *mockStore) AddSite(context.Context, models.Site) error                        { return nil }
-func (m *mockStore) UpdateSite(context.Context, models.Site) error                     { return nil }
-func (m *mockStore) UpdateSitePaused(context.Context, int, bool) error                 { return nil }
-func (m *mockStore) DeleteSite(context.Context, int) error                             { return nil }
-func (m *mockStore) AddAlert(context.Context, string, string, map[string]string) error { return nil }
-func (m *mockStore) UpdateAlert(context.Context, int, string, string, map[string]string) error {
-	return nil
-}
-func (m *mockStore) DeleteAlert(context.Context, int) error                        { return nil }
-func (m *mockStore) GetAllUsers(context.Context) ([]models.User, error)            { return nil, nil }
-func (m *mockStore) AddUser(context.Context, string, string, string) error         { return nil }
-func (m *mockStore) UpdateUser(context.Context, int, string, string, string) error { return nil }
-func (m *mockStore) DeleteUser(context.Context, int) error                         { return nil }
-func (m *mockStore) ExportData(context.Context) (models.Backup, error)             { return models.Backup{}, nil }
-func (m *mockStore) ImportData(context.Context, models.Backup) error               { return nil }
-func (m *mockStore) GetSiteByName(context.Context, string) (models.Site, error) {
-	return models.Site{}, nil
-}
-func (m *mockStore) AddSiteReturningID(context.Context, models.Site) (int, error) { return 0, nil }
-func (m *mockStore) AddAlertReturningID(context.Context, string, string, map[string]string) (int, error) {
-	return 0, nil
-}
-func (m *mockStore) SaveCheckFromNode(context.Context, int, string, int64, bool) error { return nil }
-func (m *mockStore) RegisterNode(context.Context, models.ProbeNode) error              { return nil }
-func (m *mockStore) GetNode(context.Context, string) (models.ProbeNode, error) {
-	return models.ProbeNode{}, nil
-}
-func (m *mockStore) GetAllNodes(context.Context) ([]models.ProbeNode, error) { return nil, nil }
-func (m *mockStore) UpdateNodeLastSeen(context.Context, string) error        { return nil }
-func (m *mockStore) DeleteNode(context.Context, string) error                { return nil }
-func (m *mockStore) LoadAlertHealth(context.Context) (map[int]models.AlertHealthRecord, error) {
-	return nil, nil
-}
-func (m *mockStore) SaveAlertHealth(context.Context, models.AlertHealthRecord) error { return nil }
+func (m *mockStore) GetSites(context.Context) ([]models.Site, error) { return m.sites, nil }
+
 func (m *mockStore) GetActiveMaintenanceWindows(context.Context) ([]models.MaintenanceWindow, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -83,25 +51,6 @@ func (m *mockStore) GetActiveMaintenanceWindows(context.Context) ([]models.Maint
 	}
 	return windows, nil
 }
-func (m *mockStore) GetAllMaintenanceWindows(context.Context, int) ([]models.MaintenanceWindow, error) {
-	return nil, nil
-}
-func (m *mockStore) AddMaintenanceWindow(context.Context, models.MaintenanceWindow) error { return nil }
-func (m *mockStore) EndMaintenanceWindow(context.Context, int) error                      { return nil }
-func (m *mockStore) DeleteMaintenanceWindow(context.Context, int) error                   { return nil }
-func (m *mockStore) PruneExpiredMaintenanceWindows(context.Context, time.Duration) (int64, error) {
-	return 0, nil
-}
-func (m *mockStore) GetPreference(context.Context, string) (string, error)              { return "", nil }
-func (m *mockStore) SetPreference(context.Context, string, string) error                { return nil }
-func (m *mockStore) SaveStateChange(context.Context, int, string, string, string) error { return nil }
-func (m *mockStore) GetStateChanges(context.Context, int, int) ([]models.StateChange, error) {
-	return nil, nil
-}
-func (m *mockStore) GetStateChangesSince(context.Context, int, time.Time) ([]models.StateChange, error) {
-	return nil, nil
-}
-func (m *mockStore) Close() error { return nil }
 
 func (m *mockStore) GetAllAlerts(context.Context) ([]models.AlertConfig, error) {
 	m.mu.Lock()
@@ -154,17 +103,13 @@ func (m *mockStore) SaveLog(_ context.Context, msg string) error {
 	return nil
 }
 
-func (m *mockStore) LoadLogs(_ context.Context, limit int) ([]string, error) {
+func (m *mockStore) LoadLogs(_ context.Context, _ int) ([]string, error) {
 	return m.logs, nil
 }
 
-func (m *mockStore) LoadAllHistory(_ context.Context, limit int) (map[int][]models.CheckRecord, error) {
+func (m *mockStore) LoadAllHistory(_ context.Context, _ int) (map[int][]models.CheckRecord, error) {
 	return m.history, nil
 }
-
-func (m *mockStore) PruneLogs(context.Context) error         { return nil }
-func (m *mockStore) PruneCheckHistory(context.Context) error { return nil }
-func (m *mockStore) PruneStateChanges(context.Context) error { return nil }
 
 // --- Helpers ---
 

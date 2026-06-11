@@ -8,6 +8,7 @@ import (
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/monitor"
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/store/storetest"
 	tea "github.com/charmbracelet/bubbletea"
 	zone "github.com/lrstanley/bubblezone"
 )
@@ -15,13 +16,14 @@ import (
 // --- minimal Store mock for TUI data-flow tests ---
 
 type tuiMockStore struct {
+	storetest.BaseMock
 	alerts           []models.AlertConfig
 	users            []models.User
 	nodes            []models.ProbeNode
 	maint            []models.MaintenanceWindow
 	stateChanges     []models.StateChange
-	stateChangeCalls int // counts GetStateChanges hits (to prove View does no IO)
-	deleteSiteCalls  int // counts DeleteSite hits (to prove writes run in Cmds)
+	stateChangeCalls int
+	deleteSiteCalls  int
 }
 
 func (m *tuiMockStore) GetAllAlerts(_ context.Context) ([]models.AlertConfig, error) {
@@ -38,94 +40,10 @@ func (m *tuiMockStore) GetStateChanges(_ context.Context, _ int, _ int) ([]model
 func (m *tuiMockStore) GetAllMaintenanceWindows(_ context.Context, _ int) ([]models.MaintenanceWindow, error) {
 	return m.maint, nil
 }
-
-func (m *tuiMockStore) Init(_ context.Context) error                            { return nil }
-func (m *tuiMockStore) GetSites(_ context.Context) ([]models.Site, error)       { return nil, nil }
-func (m *tuiMockStore) AddSite(_ context.Context, _ models.Site) error          { return nil }
-func (m *tuiMockStore) UpdateSite(_ context.Context, _ models.Site) error       { return nil }
-func (m *tuiMockStore) UpdateSitePaused(_ context.Context, _ int, _ bool) error { return nil }
 func (m *tuiMockStore) DeleteSite(_ context.Context, _ int) error {
 	m.deleteSiteCalls++
 	return nil
 }
-func (m *tuiMockStore) GetAlert(_ context.Context, _ int) (models.AlertConfig, error) {
-	return models.AlertConfig{}, nil
-}
-func (m *tuiMockStore) AddAlert(_ context.Context, _ string, _ string, _ map[string]string) error {
-	return nil
-}
-func (m *tuiMockStore) UpdateAlert(_ context.Context, _ int, _ string, _ string, _ map[string]string) error {
-	return nil
-}
-func (m *tuiMockStore) DeleteAlert(_ context.Context, _ int) error { return nil }
-func (m *tuiMockStore) GetSiteByName(_ context.Context, _ string) (models.Site, error) {
-	return models.Site{}, nil
-}
-func (m *tuiMockStore) GetAlertByName(_ context.Context, _ string) (models.AlertConfig, error) {
-	return models.AlertConfig{}, nil
-}
-func (m *tuiMockStore) AddSiteReturningID(_ context.Context, _ models.Site) (int, error) {
-	return 0, nil
-}
-func (m *tuiMockStore) AddAlertReturningID(_ context.Context, _ string, _ string, _ map[string]string) (int, error) {
-	return 0, nil
-}
-func (m *tuiMockStore) AddUser(_ context.Context, _ string, _ string, _ string) error { return nil }
-func (m *tuiMockStore) UpdateUser(_ context.Context, _ int, _ string, _ string, _ string) error {
-	return nil
-}
-func (m *tuiMockStore) DeleteUser(_ context.Context, _ int) error                 { return nil }
-func (m *tuiMockStore) SaveCheck(_ context.Context, _ int, _ int64, _ bool) error { return nil }
-func (m *tuiMockStore) SaveCheckFromNode(_ context.Context, _ int, _ string, _ int64, _ bool) error {
-	return nil
-}
-func (m *tuiMockStore) LoadAllHistory(_ context.Context, _ int) (map[int][]models.CheckRecord, error) {
-	return nil, nil
-}
-func (m *tuiMockStore) PruneCheckHistory(_ context.Context) error { return nil }
-func (m *tuiMockStore) SaveStateChange(_ context.Context, _ int, _ string, _ string, _ string) error {
-	return nil
-}
-func (m *tuiMockStore) GetStateChangesSince(_ context.Context, _ int, _ time.Time) ([]models.StateChange, error) {
-	return nil, nil
-}
-func (m *tuiMockStore) PruneStateChanges(_ context.Context) error                { return nil }
-func (m *tuiMockStore) RegisterNode(_ context.Context, _ models.ProbeNode) error { return nil }
-func (m *tuiMockStore) GetNode(_ context.Context, _ string) (models.ProbeNode, error) {
-	return models.ProbeNode{}, nil
-}
-func (m *tuiMockStore) UpdateNodeLastSeen(_ context.Context, _ string) error { return nil }
-func (m *tuiMockStore) DeleteNode(_ context.Context, _ string) error         { return nil }
-func (m *tuiMockStore) LoadAlertHealth(_ context.Context) (map[int]models.AlertHealthRecord, error) {
-	return nil, nil
-}
-func (m *tuiMockStore) SaveAlertHealth(_ context.Context, _ models.AlertHealthRecord) error {
-	return nil
-}
-func (m *tuiMockStore) SaveLog(_ context.Context, _ string) error           { return nil }
-func (m *tuiMockStore) LoadLogs(_ context.Context, _ int) ([]string, error) { return nil, nil }
-func (m *tuiMockStore) PruneLogs(_ context.Context) error                   { return nil }
-func (m *tuiMockStore) GetActiveMaintenanceWindows(_ context.Context) ([]models.MaintenanceWindow, error) {
-	return nil, nil
-}
-func (m *tuiMockStore) AddMaintenanceWindow(_ context.Context, _ models.MaintenanceWindow) error {
-	return nil
-}
-func (m *tuiMockStore) EndMaintenanceWindow(_ context.Context, _ int) error    { return nil }
-func (m *tuiMockStore) DeleteMaintenanceWindow(_ context.Context, _ int) error { return nil }
-func (m *tuiMockStore) PruneExpiredMaintenanceWindows(_ context.Context, _ time.Duration) (int64, error) {
-	return 0, nil
-}
-func (m *tuiMockStore) IsMonitorInMaintenance(_ context.Context, _ int) (bool, error) {
-	return false, nil
-}
-func (m *tuiMockStore) GetPreference(_ context.Context, _ string) (string, error) { return "", nil }
-func (m *tuiMockStore) SetPreference(_ context.Context, _ string, _ string) error { return nil }
-func (m *tuiMockStore) ExportData(_ context.Context) (models.Backup, error) {
-	return models.Backup{}, nil
-}
-func (m *tuiMockStore) ImportData(_ context.Context, _ models.Backup) error { return nil }
-func (m *tuiMockStore) Close() error                                        { return nil }
 
 func newTestModel(ms *tuiMockStore) Model {
 	return Model{
