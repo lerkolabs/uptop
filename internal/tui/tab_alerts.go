@@ -2,8 +2,11 @@ package tui
 
 import (
 	"fmt"
+	neturl "net/url"
+	"sort"
 	"strings"
 
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/monitor"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
@@ -100,15 +103,17 @@ func (m Model) fmtAlertConfig(alert struct {
 		return m.st.subtleStyle.Render("—")
 	case "pagerduty":
 		if key := alert.Settings["routing_key"]; key != "" {
-			return limitStr(key, 34)
+			return limitStr(maskSecret(key), 34)
 		}
 		return m.st.subtleStyle.Render("—")
 	case "pushover":
 		if user := alert.Settings["user"]; user != "" {
-			return limitStr(fmt.Sprintf("user:%s", user), 34)
+			return limitStr(fmt.Sprintf("user:%s", maskSecret(user)), 34)
 		}
 		return m.st.subtleStyle.Render("—")
 	case "gotify":
+		// The gotify server URL identifies the target; the token is the
+		// secret and is never shown here.
 		if url := alert.Settings["url"]; url != "" {
 			return limitStr(url, 34)
 		}
@@ -116,10 +121,7 @@ func (m Model) fmtAlertConfig(alert struct {
 	case "opsgenie":
 		key := alert.Settings["api_key"]
 		if key != "" {
-			masked := key
-			if len(masked) > 8 {
-				masked = masked[:4] + "…" + masked[len(masked)-4:]
-			}
+			masked := maskSecret(key)
 			if alert.Settings["eu"] == "true" {
 				return limitStr(fmt.Sprintf("EU %s", masked), 34)
 			}
@@ -127,11 +129,31 @@ func (m Model) fmtAlertConfig(alert struct {
 		}
 		return m.st.subtleStyle.Render("—")
 	default:
-		if val, ok := alert.Settings["url"]; ok {
-			return limitStr(val, 34)
+		// discord/slack/webhook: the URL path IS the credential — show only
+		// enough to identify the target.
+		if val, ok := alert.Settings["url"]; ok && val != "" {
+			return limitStr(maskWebhookURL(val), 34)
 		}
 		return m.st.subtleStyle.Render("—")
 	}
+}
+
+// maskSecret keeps just enough of a credential to identify it.
+func maskSecret(s string) string {
+	if len(s) > 8 {
+		return s[:4] + "…" + s[len(s)-4:]
+	}
+	return "●●●●●●●●"
+}
+
+// maskWebhookURL shows scheme and host only. For discord, slack, and generic
+// webhooks the URL path carries the token, so the path is never rendered.
+func maskWebhookURL(raw string) string {
+	u, err := neturl.Parse(raw)
+	if err != nil || u.Host == "" {
+		return "●●●●●●●●"
+	}
+	return u.Scheme + "://" + u.Host + "/…"
 }
 
 func (m Model) fmtAlertHealth(h monitor.AlertHealth) string {
@@ -229,7 +251,21 @@ func (m Model) viewAlertDetailPanel() string {
 
 	b.WriteString(m.divider() + "\n")
 	b.WriteString(m.st.subtleStyle.Render("  CONFIGURATION") + "\n")
-	for k, v := range a.Settings {
+	// Render through the same allowlist the backup export uses — this panel
+	// ends up in screen shares and asciinema recordings. Keys are sorted so
+	// rows don't reshuffle every render.
+	redacted := models.RedactAlertSettings(a.Type, a.Settings)
+	keys := make([]string, 0, len(redacted))
+	for k := range redacted {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		v := redacted[k]
+		if v == "***REDACTED***" {
+			row(k, m.st.subtleStyle.Render("●●●●●●●●"))
+			continue
+		}
 		row(k, v)
 	}
 
