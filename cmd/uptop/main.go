@@ -376,7 +376,8 @@ func runServe(args []string) {
 		fmt.Println("WARNING: No UPTOP_ENCRYPTION_KEY set. Alert credentials stored unencrypted.")
 	}
 
-	var s store.Store = ss
+	kc := newKeyCache(ss)
+	var s store.Store = &userInvalidatingStore{Store: ss, kc: kc}
 	if err := s.Init(); err != nil {
 		fmt.Fprintf(os.Stderr, "database init error: %v\n", err)
 		os.Exit(1)
@@ -430,6 +431,10 @@ func runServe(args []string) {
 	tlsCert := os.Getenv("UPTOP_TLS_CERT")
 	tlsKey := os.Getenv("UPTOP_TLS_KEY")
 
+	// When the local TUI owns the terminal, per-request HTTP logs to stderr
+	// would scribble over the alt screen.
+	localTUI := isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
+
 	httpSrv := server.Start(server.ServerConfig{
 		Port:           httpPort,
 		EnableStatus:   enableStatus,
@@ -441,6 +446,7 @@ func runServe(args []string) {
 		MetricsPublic:  os.Getenv("UPTOP_METRICS_PUBLIC") == "true",
 		CORSOrigin:     os.Getenv("UPTOP_CORS_ORIGIN"),
 		TrustedProxies: parseTrustedProxies(os.Getenv("UPTOP_TRUSTED_PROXIES")),
+		QuietHTTPLog:   localTUI,
 	}, s, eng)
 
 	cluster.Start(ctx, cluster.Config{
@@ -449,10 +455,9 @@ func runServe(args []string) {
 		SharedKey: clusterKey,
 	}, eng)
 
-	kc := newKeyCache(s)
 	sshSrv := startSSHServer(*port, s, eng, kc)
 
-	if isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd()) {
+	if localTUI {
 		p := tea.NewProgram(tui.InitialModel(true, s, eng, version), tea.WithAltScreen(), tea.WithMouseCellMotion())
 		if _, err := p.Run(); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -573,6 +578,10 @@ func newKeyCache(db store.Store) *keyCache {
 func (c *keyCache) refresh() {
 	users, err := c.db.GetAllUsers()
 	if err != nil {
+		// Keep the previous key set: a transient DB error must not lock every
+		// admin out. Revocation still fails closed because Invalidate clears
+		// the set immediately.
+		log.Printf("SSH key cache refresh failed: %v", err)
 		return
 	}
 	keys := make([]ssh.PublicKey, 0, len(users))
@@ -589,8 +598,13 @@ func (c *keyCache) refresh() {
 	c.mu.Unlock()
 }
 
+// Invalidate clears the cached key set, not just the timestamp. If the
+// refresh that follows a user revocation fails, auth fails closed (everyone
+// re-authenticates after the next successful refresh) instead of the revoked
+// key silently continuing to work off the stale cache.
 func (c *keyCache) Invalidate() {
 	c.mu.Lock()
+	c.keys = nil
 	c.updated = time.Time{}
 	c.mu.Unlock()
 }
@@ -612,6 +626,39 @@ func (c *keyCache) IsAllowed(incomingKey ssh.PublicKey) bool {
 		}
 	}
 	return false
+}
+
+// userInvalidatingStore drops the SSH key cache whenever the user table
+// changes, so a revocation takes effect on the next connection attempt
+// instead of after the cache TTL — and fails closed if the DB is unreachable
+// when that next attempt re-reads the table.
+type userInvalidatingStore struct {
+	store.Store
+	kc *keyCache
+}
+
+func (s *userInvalidatingStore) AddUser(username, publicKey, role string) error {
+	err := s.Store.AddUser(username, publicKey, role)
+	s.kc.Invalidate()
+	return err
+}
+
+func (s *userInvalidatingStore) UpdateUser(id int, username, publicKey, role string) error {
+	err := s.Store.UpdateUser(id, username, publicKey, role)
+	s.kc.Invalidate()
+	return err
+}
+
+func (s *userInvalidatingStore) DeleteUser(id int) error {
+	err := s.Store.DeleteUser(id)
+	s.kc.Invalidate()
+	return err
+}
+
+func (s *userInvalidatingStore) ImportData(data models.Backup) error {
+	err := s.Store.ImportData(data)
+	s.kc.Invalidate()
+	return err
 }
 
 func seedKeysFromEnv(s store.Store) {
