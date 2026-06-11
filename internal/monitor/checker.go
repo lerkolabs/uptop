@@ -63,7 +63,7 @@ func RunCheck(ctx context.Context, site models.SiteConfig, strict, insecure *htt
 	case "port":
 		return runPortCheck(ctx, site)
 	case "dns":
-		return runDNSCheck(ctx, site)
+		return runDNSCheck(ctx, site, private)
 	default:
 		return CheckResult{SiteID: site.ID, Status: string(models.StatusDown), ErrorReason: "unsupported monitor type: " + site.Type}
 	}
@@ -180,7 +180,7 @@ func runPortCheck(_ context.Context, site models.SiteConfig) CheckResult {
 	return CheckResult{SiteID: site.ID, Status: string(models.StatusUp), LatencyNs: latency.Nanoseconds()}
 }
 
-func runDNSCheck(_ context.Context, site models.SiteConfig) CheckResult {
+func runDNSCheck(_ context.Context, site models.SiteConfig, allowPrivate bool) CheckResult {
 	host := site.Hostname
 	if host == "" {
 		host = site.URL
@@ -190,9 +190,24 @@ func runDNSCheck(_ context.Context, site models.SiteConfig) CheckResult {
 	if server == "" {
 		server = defaultDNSServer
 	}
-	if _, _, err := net.SplitHostPort(server); err != nil {
-		server = net.JoinHostPort(server, defaultDNSPort)
+	serverHost, serverPort, err := net.SplitHostPort(server)
+	if err != nil {
+		serverHost = server
+		serverPort = defaultDNSPort
 	}
+	if !allowPrivate {
+		if serverPort != defaultDNSPort {
+			return CheckResult{SiteID: site.ID, Status: string(models.StatusDown), ErrorReason: "DNS server port must be 53"}
+		}
+		if ips, err := net.LookupIP(serverHost); err == nil {
+			for _, ip := range ips {
+				if isPrivateIP(ip) {
+					return CheckResult{SiteID: site.ID, Status: string(models.StatusDown), ErrorReason: "DNS server resolves to private address"}
+				}
+			}
+		}
+	}
+	server = net.JoinHostPort(serverHost, serverPort)
 
 	qtype := dns.TypeA
 	switch site.DNSResolveType {

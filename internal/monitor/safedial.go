@@ -11,9 +11,11 @@ var privateRanges []*net.IPNet
 
 func init() {
 	cidrs := []string{
+		"0.0.0.0/8",
 		"127.0.0.0/8",
 		"::1/128",
 		"10.0.0.0/8",
+		"100.64.0.0/10",
 		"172.16.0.0/12",
 		"192.168.0.0/16",
 		"169.254.0.0/16",
@@ -27,6 +29,9 @@ func init() {
 }
 
 func isPrivateIP(ip net.IP) bool {
+	if ip.IsUnspecified() || ip.IsMulticast() || ip.IsLoopback() {
+		return true
+	}
 	for _, network := range privateRanges {
 		if network.Contains(ip) {
 			return true

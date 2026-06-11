@@ -354,8 +354,8 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if !s.cfg.MetricsPublic && s.cfg.ClusterKey != "" {
-		if !checkSecret(r.Header.Get("X-Upkeep-Secret"), s.cfg.ClusterKey) {
+	if !s.cfg.MetricsPublic {
+		if !s.requireAuth(r) {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
