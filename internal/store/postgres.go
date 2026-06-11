@@ -42,20 +42,20 @@ func (d *PostgresDialect) CreateTablesSQL() []string {
 		`CREATE TABLE IF NOT EXISTS check_history (
 			id SERIAL PRIMARY KEY,
 			site_id INTEGER NOT NULL, latency_ns BIGINT,
-			is_up BOOLEAN, checked_at TIMESTAMP DEFAULT NOW()
+			is_up BOOLEAN, checked_at TIMESTAMPTZ DEFAULT NOW()
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_check_history_site ON check_history(site_id, checked_at DESC)`,
 		`CREATE TABLE IF NOT EXISTS nodes (
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL,
 			region TEXT DEFAULT '',
-			last_seen TIMESTAMP DEFAULT NOW(),
+			last_seen TIMESTAMPTZ DEFAULT NOW(),
 			version TEXT DEFAULT ''
 		)`,
 		`CREATE TABLE IF NOT EXISTS logs (
 			id SERIAL PRIMARY KEY,
 			message TEXT NOT NULL,
-			created_at TIMESTAMP DEFAULT NOW()
+			created_at TIMESTAMPTZ DEFAULT NOW()
 		)`,
 		`CREATE TABLE IF NOT EXISTS maintenance_windows (
 			id SERIAL PRIMARY KEY,
@@ -63,10 +63,10 @@ func (d *PostgresDialect) CreateTablesSQL() []string {
 			title TEXT NOT NULL,
 			description TEXT DEFAULT '',
 			type TEXT DEFAULT 'maintenance',
-			start_time TIMESTAMP NOT NULL,
-			end_time TIMESTAMP,
+			start_time TIMESTAMPTZ NOT NULL,
+			end_time TIMESTAMPTZ,
 			created_by TEXT DEFAULT '',
-			created_at TIMESTAMP DEFAULT NOW()
+			created_at TIMESTAMPTZ DEFAULT NOW()
 		)`,
 		`CREATE TABLE IF NOT EXISTS preferences (
 			key TEXT PRIMARY KEY,
@@ -78,12 +78,12 @@ func (d *PostgresDialect) CreateTablesSQL() []string {
 			from_status TEXT NOT NULL,
 			to_status TEXT NOT NULL,
 			error_reason TEXT DEFAULT '',
-			changed_at TIMESTAMP DEFAULT NOW()
+			changed_at TIMESTAMPTZ DEFAULT NOW()
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_state_changes_site ON state_changes(site_id, changed_at DESC)`,
 		`CREATE TABLE IF NOT EXISTS alert_health (
 			alert_id INTEGER PRIMARY KEY,
-			last_send_at TIMESTAMP,
+			last_send_at TIMESTAMPTZ,
 			last_send_ok BOOLEAN DEFAULT FALSE,
 			last_error TEXT DEFAULT '',
 			send_count INTEGER DEFAULT 0,
@@ -107,6 +107,14 @@ func (d *PostgresDialect) MigrationsSQL() []string {
 		"ALTER TABLE sites ADD COLUMN IF NOT EXISTS paused BOOLEAN DEFAULT FALSE",
 		"ALTER TABLE check_history ADD COLUMN IF NOT EXISTS node_id TEXT DEFAULT ''",
 		"ALTER TABLE sites ADD COLUMN IF NOT EXISTS regions TEXT DEFAULT ''",
+		"ALTER TABLE check_history ALTER COLUMN checked_at TYPE TIMESTAMPTZ USING checked_at AT TIME ZONE 'UTC'",
+		"ALTER TABLE nodes ALTER COLUMN last_seen TYPE TIMESTAMPTZ USING last_seen AT TIME ZONE 'UTC'",
+		"ALTER TABLE logs ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC'",
+		"ALTER TABLE maintenance_windows ALTER COLUMN start_time TYPE TIMESTAMPTZ USING start_time AT TIME ZONE 'UTC'",
+		"ALTER TABLE maintenance_windows ALTER COLUMN end_time TYPE TIMESTAMPTZ USING end_time AT TIME ZONE 'UTC'",
+		"ALTER TABLE maintenance_windows ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC'",
+		"ALTER TABLE state_changes ALTER COLUMN changed_at TYPE TIMESTAMPTZ USING changed_at AT TIME ZONE 'UTC'",
+		"ALTER TABLE alert_health ALTER COLUMN last_send_at TYPE TIMESTAMPTZ USING last_send_at AT TIME ZONE 'UTC'",
 	}
 }
 
