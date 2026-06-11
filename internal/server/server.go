@@ -21,6 +21,388 @@ import (
 
 const maxRequestBody = 1 << 20
 
+type ServerConfig struct {
+	Port           int
+	EnableStatus   bool
+	Title          string
+	ClusterKey     string
+	TLSCert        string
+	TLSKey         string
+	ClusterMode    string
+	MetricsPublic  bool
+	CORSOrigin     string
+	TrustedProxies []*net.IPNet
+	QuietHTTPLog   bool
+}
+
+type Server struct {
+	cfg      ServerConfig
+	store    store.Store
+	eng      *monitor.Engine
+	pushRL   *RateLimiter
+	probeRL  *RateLimiter
+	backupRL *RateLimiter
+	statusRL *RateLimiter
+}
+
+func NewServer(cfg ServerConfig, s store.Store, eng *monitor.Engine) *Server {
+	return &Server{
+		cfg:      cfg,
+		store:    s,
+		eng:      eng,
+		pushRL:   NewRateLimiter(60, cfg.TrustedProxies),
+		probeRL:  NewRateLimiter(30, cfg.TrustedProxies),
+		backupRL: NewRateLimiter(10, cfg.TrustedProxies),
+		statusRL: NewRateLimiter(120, cfg.TrustedProxies),
+	}
+}
+
+func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
+	srv := NewServer(cfg, s, eng)
+	return srv.Start()
+}
+
+func (s *Server) Start() *http.Server {
+	if s.cfg.ClusterKey == "" {
+		fmt.Println("WARNING: No UPTOP_CLUSTER_SECRET set. Cluster API endpoints are unauthenticated.")
+	}
+
+	if s.cfg.ClusterMode != "" && s.cfg.ClusterMode != "leader" && s.cfg.TLSCert == "" {
+		fmt.Println("WARNING: Cluster mode active without TLS. Secrets transmitted in cleartext.")
+	}
+
+	handler := s.routes()
+
+	addr := fmt.Sprintf(":%d", s.cfg.Port)
+	httpSrv := &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	go func() {
+		if s.cfg.TLSCert != "" && s.cfg.TLSKey != "" {
+			fmt.Printf("HTTPS Server listening on %s\n", addr)
+			if err := httpSrv.ListenAndServeTLS(s.cfg.TLSCert, s.cfg.TLSKey); err != nil && err != http.ErrServerClosed {
+				log.Printf("HTTPS server error: %v", err)
+			}
+		} else {
+			fmt.Printf("HTTP Server listening on %s\n", addr)
+			if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Printf("HTTP server error: %v", err)
+			}
+		}
+	}()
+	return httpSrv
+}
+
+func (s *Server) routes() http.Handler {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/api/push", RateLimit(s.pushRL, s.handlePush))
+	mux.HandleFunc("/api/health", s.handleHealth)
+	mux.HandleFunc("/api/backup/export", RateLimit(s.backupRL, s.handleExport))
+	mux.HandleFunc("/api/backup/import", RateLimit(s.backupRL, s.handleImport))
+	mux.HandleFunc("/api/import/kuma", RateLimit(s.backupRL, s.handleKumaImport))
+	mux.HandleFunc("/api/probe/register", RateLimit(s.probeRL, s.handleProbeRegister))
+	mux.HandleFunc("/api/probe/assignments", RateLimit(s.probeRL, s.handleProbeAssignments))
+	mux.HandleFunc("/api/probe/results", RateLimit(s.probeRL, s.handleProbeResults))
+	mux.HandleFunc("/metrics", s.handleMetrics)
+
+	if s.cfg.EnableStatus {
+		mux.HandleFunc("/status", RateLimit(s.statusRL, s.handleStatus))
+		mux.HandleFunc("/status/json", RateLimit(s.statusRL, s.handleStatusJSON))
+	}
+
+	handler := securityHeadersMiddleware(mux)
+	if !s.cfg.QuietHTTPLog {
+		handler = loggingMiddleware(s.cfg.TrustedProxies, handler)
+	}
+	if s.cfg.TLSCert != "" {
+		handler = hstsMiddleware(handler)
+	}
+	return handler
+}
+
+func (s *Server) requireAuth(r *http.Request) bool {
+	return s.cfg.ClusterKey != "" && checkSecret(r.Header.Get("X-Upkeep-Secret"), s.cfg.ClusterKey)
+}
+
+func (s *Server) handlePush(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	token := extractBearerToken(r)
+	if token == "" {
+		if qt := r.URL.Query().Get("token"); qt != "" {
+			token = qt
+			log.Printf("DEPRECATED: push token in query string — use Authorization: Bearer header instead")
+		}
+	}
+	if token == "" {
+		http.Error(w, "Missing token", http.StatusBadRequest)
+		return
+	}
+	if s.eng.RecordHeartbeat(token) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("OK"))
+	} else {
+		http.Error(w, "Invalid Token", http.StatusNotFound)
+	}
+}
+
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.cfg.ClusterKey != "" && !checkSecret(r.Header.Get("X-Upkeep-Secret"), s.cfg.ClusterKey) {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("OK"))
+}
+
+func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAuth(r) {
+		http.Error(w, "Unauthorized: UPTOP_CLUSTER_SECRET required", http.StatusUnauthorized)
+		return
+	}
+	data, err := s.store.ExportData(r.Context())
+	if err != nil {
+		log.Printf("Export failed: %v", err)
+		http.Error(w, "Export failed", http.StatusInternalServerError)
+		return
+	}
+	if r.URL.Query().Get("redact_secrets") != "false" {
+		for i := range data.Alerts {
+			data.Alerts[i].Settings = models.RedactAlertSettings(data.Alerts[i].Type, data.Alerts[i].Settings)
+		}
+	}
+	_ = json.NewEncoder(w).Encode(data) //nolint:errcheck
+}
+
+func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	if !s.requireAuth(r) {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
+	var data models.Backup
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if err := s.store.ImportData(r.Context(), data); err != nil {
+		log.Printf("Import failed: %v", err)
+		http.Error(w, "Import failed", http.StatusInternalServerError)
+		return
+	}
+	_, _ = w.Write([]byte("Import Successful"))
+}
+
+func (s *Server) handleKumaImport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	if !s.requireAuth(r) {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
+	var kb importer.KumaBackup
+	if err := json.NewDecoder(r.Body).Decode(&kb); err != nil {
+		log.Printf("Invalid Kuma JSON: %v", err)
+		http.Error(w, "Invalid Kuma JSON", http.StatusBadRequest)
+		return
+	}
+	backup := importer.ConvertKuma(&kb)
+	if err := s.store.ImportData(r.Context(), backup); err != nil {
+		log.Printf("Kuma import failed: %v", err)
+		http.Error(w, "Import failed", http.StatusInternalServerError)
+		return
+	}
+	fmt.Fprintf(w, "Imported %d monitors, %d alerts from Kuma v%s", len(backup.Sites), len(backup.Alerts), kb.Version)
+}
+
+func (s *Server) handleProbeRegister(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	if !s.requireAuth(r) {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
+	var req struct {
+		ID      string `json:"id"`
+		Name    string `json:"name"`
+		Region  string `json:"region"`
+		Version string `json:"version"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if req.ID == "" {
+		http.Error(w, "id is required", http.StatusBadRequest)
+		return
+	}
+	if err := s.store.RegisterNode(r.Context(), models.ProbeNode{
+		ID: req.ID, Name: req.Name, Region: req.Region, Version: req.Version,
+	}); err != nil {
+		log.Printf("Probe register failed: %v", err)
+		http.Error(w, "Registration failed", http.StatusInternalServerError)
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true}) //nolint:errcheck
+}
+
+func (s *Server) handleProbeAssignments(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !s.requireAuth(r) {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	nodeID := r.URL.Query().Get("node_id")
+	var nodeRegion string
+	if nodeID != "" {
+		if node, err := s.store.GetNode(r.Context(), nodeID); err == nil {
+			nodeRegion = node.Region
+		}
+	}
+	sites := s.eng.GetAllSites()
+	var assigned []models.Site
+	for _, site := range sites {
+		if site.Paused || site.Type == "push" || site.Type == "group" {
+			continue
+		}
+		if site.Regions != "" && nodeRegion != "" {
+			matched := false
+			for _, reg := range strings.Split(site.Regions, ",") {
+				if strings.TrimSpace(reg) == nodeRegion {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
+		assigned = append(assigned, site)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string][]models.Site{"sites": assigned}) //nolint:errcheck
+}
+
+func (s *Server) handleProbeResults(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	if !s.requireAuth(r) {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
+	var req struct {
+		NodeID  string `json:"node_id"`
+		Results []struct {
+			SiteID      int    `json:"site_id"`
+			LatencyNs   int64  `json:"latency_ns"`
+			IsUp        bool   `json:"is_up"`
+			ErrorReason string `json:"error_reason"`
+		} `json:"results"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if req.NodeID == "" {
+		http.Error(w, "node_id is required", http.StatusBadRequest)
+		return
+	}
+	for _, result := range req.Results {
+		s.eng.EnqueueProbeCheck(result.SiteID, req.NodeID, result.LatencyNs, result.IsUp)
+		s.eng.IngestProbeResult(req.NodeID, result.SiteID, result.LatencyNs, result.IsUp, result.ErrorReason)
+	}
+	if err := s.store.UpdateNodeLastSeen(r.Context(), req.NodeID); err != nil {
+		log.Printf("Failed to update node last seen: %v", err)
+	}
+	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true}) //nolint:errcheck
+}
+
+func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !s.cfg.MetricsPublic && s.cfg.ClusterKey != "" {
+		if !checkSecret(r.Header.Get("X-Upkeep-Secret"), s.cfg.ClusterKey) {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+	}
+	metrics.Handler(s.eng)(w, r)
+}
+
+func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
+	renderStatusPage(w, s.cfg.Title, s.eng)
+}
+
+func (s *Server) handleStatusJSON(w http.ResponseWriter, r *http.Request) {
+	state := s.eng.GetLiveState()
+	activeWindows, _ := s.store.GetActiveMaintenanceWindows(r.Context())
+	maintSet := make(map[int]bool)
+	allInMaint := false
+	for _, mw := range activeWindows {
+		if mw.Type != "maintenance" {
+			continue
+		}
+		if mw.MonitorID == 0 {
+			allInMaint = true
+		} else {
+			maintSet[mw.MonitorID] = true
+		}
+	}
+	public := make(map[int]statusSite, len(state))
+	for id, site := range state {
+		displayStatus := string(site.Status)
+		if allInMaint || maintSet[site.ID] || (site.ParentID > 0 && maintSet[site.ParentID]) {
+			displayStatus = "MAINT"
+		}
+		public[id] = statusSite{
+			Name:      site.Name,
+			Type:      site.Type,
+			URL:       site.URL,
+			Status:    displayStatus,
+			Paused:    site.Paused,
+			LastCheck: site.LastCheck,
+			Latency:   site.Latency,
+		}
+	}
+	if s.cfg.CORSOrigin != "" {
+		w.Header().Set("Access-Control-Allow-Origin", s.cfg.CORSOrigin)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(public) //nolint:errcheck
+}
+
+// --- Helpers ---
+
 func checkSecret(got, want string) bool {
 	return subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
 }
@@ -33,8 +415,79 @@ func extractBearerToken(r *http.Request) string {
 	return ""
 }
 
-// Alert-settings redaction policy lives in models.RedactAlertSettings so the
-// TUI detail panel and this export path share one allowlist.
+// statusSite is the public DTO for /status/json.
+type statusSite struct {
+	Name      string
+	Type      string
+	URL       string
+	Status    string
+	Paused    bool
+	LastCheck time.Time
+	Latency   time.Duration
+}
+
+// --- Middleware ---
+
+type statusWriter struct {
+	http.ResponseWriter
+	code int
+}
+
+func (w *statusWriter) WriteHeader(code int) {
+	w.code = code
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func loggingMiddleware(trusted []*net.IPNet, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		sw := &statusWriter{ResponseWriter: w, code: 200}
+		next.ServeHTTP(sw, r)
+		path := strings.ReplaceAll(strings.ReplaceAll(r.URL.Path, "\n", ""), "\r", "")
+		log.Printf("%s %s %d %s %s", r.Method, path, sw.code, time.Since(start).Round(time.Millisecond), clientIP(r, trusted)) //nolint:gosec // path sanitized above
+	})
+}
+
+func securityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func hstsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func renderStatusPage(w http.ResponseWriter, title string, eng *monitor.Engine) {
+	sites := eng.GetAllSites()
+
+	sort.Slice(sites, func(i, j int) bool {
+		if sites[i].Status != sites[j].Status {
+			if sites[i].Status == models.StatusDown {
+				return true
+			}
+			if sites[j].Status == models.StatusDown {
+				return false
+			}
+		}
+		return sites[i].Name < sites[j].Name
+	})
+
+	data := struct {
+		Title string
+		Sites []models.Site
+	}{Title: title, Sites: sites}
+	if err := statusTpl.Execute(w, data); err != nil {
+		log.Printf("Failed to render status page: %v", err)
+	}
+}
 
 var statusTpl = template.Must(template.New("status").Parse(`
 <!DOCTYPE html>
@@ -167,423 +620,3 @@ var statusTpl = template.Must(template.New("status").Parse(`
 	</script>
 </body>
 </html>`))
-
-type ServerConfig struct {
-	Port           int
-	EnableStatus   bool
-	Title          string
-	ClusterKey     string
-	TLSCert        string
-	TLSKey         string
-	ClusterMode    string
-	MetricsPublic  bool
-	CORSOrigin     string
-	TrustedProxies []*net.IPNet
-	// QuietHTTPLog disables per-request stderr logging. Set when the local
-	// TUI owns the terminal — request logs would scribble over the alt screen.
-	QuietHTTPLog bool
-}
-
-// statusSite is the public DTO for /status/json. models.Site must never be
-// serialized raw here: it carries internal fields (LastError, Hostname, Port,
-// DNSServer, AlertID, Token, ...) and every field added to it would become
-// public by default. Field names match what the status page JS reads.
-type statusSite struct {
-	Name      string
-	Type      string
-	URL       string
-	Status    string
-	Paused    bool
-	LastCheck time.Time
-	Latency   time.Duration
-}
-
-func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
-	if cfg.ClusterKey == "" {
-		fmt.Println("WARNING: No UPTOP_CLUSTER_SECRET set. Cluster API endpoints are unauthenticated.")
-	}
-
-	pushRL := NewRateLimiter(60, cfg.TrustedProxies)
-	probeRL := NewRateLimiter(30, cfg.TrustedProxies)
-	backupRL := NewRateLimiter(10, cfg.TrustedProxies)
-	statusRL := NewRateLimiter(120, cfg.TrustedProxies)
-
-	mux := http.NewServeMux()
-
-	// 1. Push Heartbeat
-	mux.HandleFunc("/api/push", RateLimit(pushRL, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		token := extractBearerToken(r)
-		if token == "" {
-			if qt := r.URL.Query().Get("token"); qt != "" {
-				token = qt
-				log.Printf("DEPRECATED: push token in query string — use Authorization: Bearer header instead")
-			}
-		}
-		if token == "" {
-			http.Error(w, "Missing token", http.StatusBadRequest)
-			return
-		}
-		if eng.RecordHeartbeat(token) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte("OK"))
-		} else {
-			http.Error(w, "Invalid Token", http.StatusNotFound)
-		}
-	}))
-
-	// 2. Health Check (For Cluster Follower)
-	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		if cfg.ClusterKey != "" && !checkSecret(r.Header.Get("X-Upkeep-Secret"), cfg.ClusterKey) {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("OK"))
-	})
-
-	// 3. Config Export
-	mux.HandleFunc("/api/backup/export", RateLimit(backupRL, func(w http.ResponseWriter, r *http.Request) {
-		if cfg.ClusterKey == "" || !checkSecret(r.Header.Get("X-Upkeep-Secret"), cfg.ClusterKey) {
-			http.Error(w, "Unauthorized: UPTOP_CLUSTER_SECRET required", http.StatusUnauthorized)
-			return
-		}
-		data, err := s.ExportData(r.Context())
-		if err != nil {
-			log.Printf("Export failed: %v", err)
-			http.Error(w, "Export failed", http.StatusInternalServerError)
-			return
-		}
-		if r.URL.Query().Get("redact_secrets") != "false" {
-			for i := range data.Alerts {
-				data.Alerts[i].Settings = models.RedactAlertSettings(data.Alerts[i].Type, data.Alerts[i].Settings)
-			}
-		}
-		_ = json.NewEncoder(w).Encode(data) //nolint:errcheck
-	}))
-
-	// 4. Config Import
-	mux.HandleFunc("/api/backup/import", RateLimit(backupRL, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			http.Error(w, "POST required", http.StatusMethodNotAllowed)
-			return
-		}
-		if cfg.ClusterKey == "" || !checkSecret(r.Header.Get("X-Upkeep-Secret"), cfg.ClusterKey) {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
-		var data models.Backup
-		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-			http.Error(w, "Invalid JSON", http.StatusBadRequest)
-			return
-		}
-		if err := s.ImportData(r.Context(), data); err != nil {
-			log.Printf("Import failed: %v", err)
-			http.Error(w, "Import failed", http.StatusInternalServerError)
-			return
-		}
-		_, _ = w.Write([]byte("Import Successful"))
-	}))
-
-	// 5. Kuma Import
-	mux.HandleFunc("/api/import/kuma", RateLimit(backupRL, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			http.Error(w, "POST required", http.StatusMethodNotAllowed)
-			return
-		}
-		if cfg.ClusterKey == "" || !checkSecret(r.Header.Get("X-Upkeep-Secret"), cfg.ClusterKey) {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
-		var kb importer.KumaBackup
-		if err := json.NewDecoder(r.Body).Decode(&kb); err != nil {
-			log.Printf("Invalid Kuma JSON: %v", err)
-			http.Error(w, "Invalid Kuma JSON", http.StatusBadRequest)
-			return
-		}
-		backup := importer.ConvertKuma(&kb)
-		if err := s.ImportData(r.Context(), backup); err != nil {
-			log.Printf("Kuma import failed: %v", err)
-			http.Error(w, "Import failed", http.StatusInternalServerError)
-			return
-		}
-		fmt.Fprintf(w, "Imported %d monitors, %d alerts from Kuma v%s", len(backup.Sites), len(backup.Alerts), kb.Version)
-	}))
-
-	// 6. Probe Registration
-	mux.HandleFunc("/api/probe/register", RateLimit(probeRL, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			http.Error(w, "POST required", http.StatusMethodNotAllowed)
-			return
-		}
-		if cfg.ClusterKey == "" || !checkSecret(r.Header.Get("X-Upkeep-Secret"), cfg.ClusterKey) {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
-		var req struct {
-			ID      string `json:"id"`
-			Name    string `json:"name"`
-			Region  string `json:"region"`
-			Version string `json:"version"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid JSON", http.StatusBadRequest)
-			return
-		}
-		if req.ID == "" {
-			http.Error(w, "id is required", http.StatusBadRequest)
-			return
-		}
-		if err := s.RegisterNode(r.Context(), models.ProbeNode{
-			ID: req.ID, Name: req.Name, Region: req.Region, Version: req.Version,
-		}); err != nil {
-			log.Printf("Probe register failed: %v", err)
-			http.Error(w, "Registration failed", http.StatusInternalServerError)
-			return
-		}
-		_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true}) //nolint:errcheck
-	}))
-
-	// 7. Probe Assignment Fetch
-	mux.HandleFunc("/api/probe/assignments", RateLimit(probeRL, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		if cfg.ClusterKey == "" || !checkSecret(r.Header.Get("X-Upkeep-Secret"), cfg.ClusterKey) {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		nodeID := r.URL.Query().Get("node_id")
-		var nodeRegion string
-		if nodeID != "" {
-			if node, err := s.GetNode(r.Context(), nodeID); err == nil {
-				nodeRegion = node.Region
-			}
-		}
-		sites := eng.GetAllSites()
-		var assigned []models.Site
-		for _, site := range sites {
-			if site.Paused || site.Type == "push" || site.Type == "group" {
-				continue
-			}
-			if site.Regions != "" && nodeRegion != "" {
-				matched := false
-				for _, r := range strings.Split(site.Regions, ",") {
-					if strings.TrimSpace(r) == nodeRegion {
-						matched = true
-						break
-					}
-				}
-				if !matched {
-					continue
-				}
-			}
-			assigned = append(assigned, site)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string][]models.Site{"sites": assigned}) //nolint:errcheck
-	}))
-
-	// 8. Probe Result Submission
-	mux.HandleFunc("/api/probe/results", RateLimit(probeRL, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			http.Error(w, "POST required", http.StatusMethodNotAllowed)
-			return
-		}
-		if cfg.ClusterKey == "" || !checkSecret(r.Header.Get("X-Upkeep-Secret"), cfg.ClusterKey) {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
-		var req struct {
-			NodeID  string `json:"node_id"`
-			Results []struct {
-				SiteID      int    `json:"site_id"`
-				LatencyNs   int64  `json:"latency_ns"`
-				IsUp        bool   `json:"is_up"`
-				ErrorReason string `json:"error_reason"`
-			} `json:"results"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid JSON", http.StatusBadRequest)
-			return
-		}
-		if req.NodeID == "" {
-			http.Error(w, "node_id is required", http.StatusBadRequest)
-			return
-		}
-		for _, result := range req.Results {
-			eng.EnqueueProbeCheck(result.SiteID, req.NodeID, result.LatencyNs, result.IsUp)
-			eng.IngestProbeResult(req.NodeID, result.SiteID, result.LatencyNs, result.IsUp, result.ErrorReason)
-		}
-		if err := s.UpdateNodeLastSeen(r.Context(), req.NodeID); err != nil {
-			log.Printf("Failed to update node last seen: %v", err)
-		}
-		_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true}) //nolint:errcheck
-	}))
-
-	// 9. Prometheus Metrics
-	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		if !cfg.MetricsPublic && cfg.ClusterKey != "" {
-			if !checkSecret(r.Header.Get("X-Upkeep-Secret"), cfg.ClusterKey) {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				return
-			}
-		}
-		metrics.Handler(eng)(w, r)
-	})
-
-	// 10. Status Page
-	if cfg.EnableStatus {
-		mux.HandleFunc("/status", RateLimit(statusRL, func(w http.ResponseWriter, r *http.Request) { renderStatusPage(w, cfg.Title, eng) }))
-		mux.HandleFunc("/status/json", RateLimit(statusRL, func(w http.ResponseWriter, r *http.Request) {
-			state := eng.GetLiveState()
-			activeWindows, _ := s.GetActiveMaintenanceWindows(r.Context())
-			maintSet := make(map[int]bool)
-			allInMaint := false
-			for _, mw := range activeWindows {
-				if mw.Type != "maintenance" {
-					continue
-				}
-				if mw.MonitorID == 0 {
-					allInMaint = true
-				} else {
-					maintSet[mw.MonitorID] = true
-				}
-			}
-			public := make(map[int]statusSite, len(state))
-			for id, site := range state {
-				displayStatus := string(site.Status)
-				if allInMaint || maintSet[site.ID] || (site.ParentID > 0 && maintSet[site.ParentID]) {
-					displayStatus = "MAINT"
-				}
-				public[id] = statusSite{
-					Name:      site.Name,
-					Type:      site.Type,
-					URL:       site.URL,
-					Status:    displayStatus,
-					Paused:    site.Paused,
-					LastCheck: site.LastCheck,
-					Latency:   site.Latency,
-				}
-			}
-			if cfg.CORSOrigin != "" {
-				w.Header().Set("Access-Control-Allow-Origin", cfg.CORSOrigin)
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(public) //nolint:errcheck
-		}))
-	}
-
-	if cfg.ClusterMode != "" && cfg.ClusterMode != "leader" && cfg.TLSCert == "" {
-		fmt.Println("WARNING: Cluster mode active without TLS. Secrets transmitted in cleartext.")
-	}
-
-	handler := securityHeadersMiddleware(mux)
-	if !cfg.QuietHTTPLog {
-		handler = loggingMiddleware(cfg.TrustedProxies, handler)
-	}
-	if cfg.TLSCert != "" {
-		handler = hstsMiddleware(handler)
-	}
-
-	addr := fmt.Sprintf(":%d", cfg.Port)
-	srv := &http.Server{
-		Addr:              addr,
-		Handler:           handler,
-		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      60 * time.Second,
-		IdleTimeout:       120 * time.Second,
-	}
-	go func() {
-		if cfg.TLSCert != "" && cfg.TLSKey != "" {
-			fmt.Printf("HTTPS Server listening on %s\n", addr)
-			if err := srv.ListenAndServeTLS(cfg.TLSCert, cfg.TLSKey); err != nil && err != http.ErrServerClosed {
-				log.Printf("HTTPS server error: %v", err)
-			}
-		} else {
-			fmt.Printf("HTTP Server listening on %s\n", addr)
-			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Printf("HTTP server error: %v", err)
-			}
-		}
-	}()
-	return srv
-}
-
-type statusWriter struct {
-	http.ResponseWriter
-	code int
-}
-
-func (w *statusWriter) WriteHeader(code int) {
-	w.code = code
-	w.ResponseWriter.WriteHeader(code)
-}
-
-func loggingMiddleware(trusted []*net.IPNet, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		sw := &statusWriter{ResponseWriter: w, code: 200}
-		next.ServeHTTP(sw, r)
-		path := strings.ReplaceAll(strings.ReplaceAll(r.URL.Path, "\n", ""), "\r", "")
-		log.Printf("%s %s %d %s %s", r.Method, path, sw.code, time.Since(start).Round(time.Millisecond), clientIP(r, trusted)) //nolint:gosec // path sanitized above
-	})
-}
-
-func securityHeadersMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("X-Frame-Options", "DENY")
-		w.Header().Set("Referrer-Policy", "no-referrer")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'")
-		next.ServeHTTP(w, r)
-	})
-}
-
-func hstsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
-		next.ServeHTTP(w, r)
-	})
-}
-
-func renderStatusPage(w http.ResponseWriter, title string, eng *monitor.Engine) {
-	sites := eng.GetAllSites()
-
-	sort.Slice(sites, func(i, j int) bool {
-		if sites[i].Status != sites[j].Status {
-			if sites[i].Status == models.StatusDown {
-				return true
-			}
-			if sites[j].Status == models.StatusDown {
-				return false
-			}
-		}
-		return sites[i].Name < sites[j].Name
-	})
-
-	data := struct {
-		Title string
-		Sites []models.Site
-	}{Title: title, Sites: sites}
-	if err := statusTpl.Execute(w, data); err != nil {
-		log.Printf("Failed to render status page: %v", err)
-	}
-}
