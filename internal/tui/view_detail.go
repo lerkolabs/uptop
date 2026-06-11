@@ -24,26 +24,26 @@ func (m Model) viewDetailPanel() string {
 	if site.ParentID > 0 {
 		for _, s := range m.sites {
 			if s.ID == site.ParentID {
-				breadcrumb = subtleStyle.Render("  Sites > "+s.Name+" > ") + titleStyle.Render(site.Name)
+				breadcrumb = m.st.subtleStyle.Render("  Sites > "+s.Name+" > ") + m.st.titleStyle.Render(site.Name)
 				break
 			}
 		}
 	}
 	if breadcrumb == "" {
-		breadcrumb = subtleStyle.Render("  Sites > ") + titleStyle.Render(site.Name)
+		breadcrumb = m.st.subtleStyle.Render("  Sites > ") + m.st.titleStyle.Render(site.Name)
 	}
 	b.WriteString(breadcrumb + "\n")
 	b.WriteString(m.divider() + "\n")
 
 	row := func(label, value string) {
-		fmt.Fprintf(&b, "  %-16s %s\n", subtleStyle.Render(label), value)
+		fmt.Fprintf(&b, "  %-16s %s\n", m.st.subtleStyle.Render(label), value)
 	}
 
 	section := func(label string) {
-		b.WriteString("\n" + subtleStyle.Render("  "+label) + "\n")
+		b.WriteString("\n" + m.st.subtleStyle.Render("  "+label) + "\n")
 	}
 
-	row("Status", fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)))
+	row("Status", m.fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)))
 
 	if (site.Status == "DOWN" || site.Status == "SSL EXP" || site.Status == "LATE" || site.Status == "STALE") && site.LastError != "" {
 		errWidth := m.termWidth - chromePadH - 19
@@ -51,7 +51,7 @@ func (m Model) viewDetailPanel() string {
 			errWidth = 30
 		}
 		wrapped := lipgloss.NewStyle().Width(errWidth).Render(site.LastError)
-		row("Error", dangerStyle.Render(wrapped))
+		row("Error", m.st.dangerStyle.Render(wrapped))
 	}
 
 	if site.Type == "http" && site.StatusCode > 0 {
@@ -66,19 +66,19 @@ func (m Model) viewDetailPanel() string {
 				var icon string
 				switch step.Status {
 				case stepPassed:
-					icon = specialStyle.Render("✓")
+					icon = m.st.specialStyle.Render("✓")
 				case stepFailed:
-					icon = dangerStyle.Render("✗")
+					icon = m.st.dangerStyle.Render("✗")
 				case stepSkipped:
-					icon = subtleStyle.Render("·")
+					icon = m.st.subtleStyle.Render("·")
 				}
 				line := fmt.Sprintf("  %s %-16s", icon, step.Name)
 				if step.Detail != "" {
 					switch step.Status {
 					case stepFailed:
-						line += " " + dangerStyle.Render(step.Detail)
+						line += " " + m.st.dangerStyle.Render(step.Detail)
 					case stepSkipped:
-						line += " " + subtleStyle.Render(step.Detail)
+						line += " " + m.st.subtleStyle.Render(step.Detail)
 					}
 				}
 				b.WriteString(line + "\n")
@@ -99,7 +99,7 @@ func (m Model) viewDetailPanel() string {
 	if m.isMonitorInMaintenance(site.ID) {
 		for _, mw := range m.maintenanceWindows {
 			if mw.Type == "maintenance" && (mw.MonitorID == 0 || mw.MonitorID == site.ID || mw.MonitorID == site.ParentID) {
-				row("Maintenance", maintStyle.Render(mw.Title))
+				row("Maintenance", m.st.maintStyle.Render(mw.Title))
 				break
 			}
 		}
@@ -126,10 +126,10 @@ func (m Model) viewDetailPanel() string {
 	if site.Timeout > 0 {
 		row("Timeout", fmt.Sprintf("%ds", site.Timeout))
 	}
-	row("Latency", fmtLatency(site.Latency))
-	row("Uptime", fmtUptime(hist.Statuses))
+	row("Latency", m.fmtLatency(site.Latency))
+	row("Uptime", m.fmtUptime(hist.Statuses))
 	if !site.LastCheck.IsZero() {
-		row("Last Check", fmtTimeAgo(site.LastCheck))
+		row("Last Check", m.fmtTimeAgo(site.LastCheck))
 	}
 
 	if site.Type == "http" {
@@ -142,16 +142,16 @@ func (m Model) viewDetailPanel() string {
 			codes = "200-299"
 		}
 		row("Codes", codes)
-		row("SSL", fmtSSL(site))
+		row("SSL", m.fmtSSL(site))
 		if site.IgnoreTLS {
-			row("TLS Verify", dangerStyle.Render("disabled"))
+			row("TLS Verify", m.st.dangerStyle.Render("disabled"))
 		}
 	}
 
 	if site.MaxRetries > 0 || site.Regions != "" || site.Description != "" {
 		section("CONFIG")
 		if site.MaxRetries > 0 {
-			row("Retries", fmtRetries(site))
+			row("Retries", m.fmtRetries(site))
 		}
 		if site.Regions != "" {
 			row("Regions", site.Regions)
@@ -163,17 +163,17 @@ func (m Model) viewDetailPanel() string {
 
 	probeResults := m.engine.GetProbeResults(site.ID)
 	if len(probeResults) > 0 {
-		b.WriteString("\n" + subtleStyle.Render("  PROBE RESULTS") + "\n")
+		b.WriteString("\n" + m.st.subtleStyle.Render("  PROBE RESULTS") + "\n")
 		for nodeID, result := range probeResults {
-			status := specialStyle.Render("UP")
+			status := m.st.specialStyle.Render("UP")
 			if !result.IsUp {
-				status = dangerStyle.Render("DN")
+				status = m.st.dangerStyle.Render("DN")
 			}
 			latency := time.Duration(result.LatencyNs).Milliseconds()
 			ago := time.Since(result.CheckedAt).Truncate(time.Second)
 			line := fmt.Sprintf("  %-14s %s  %dms  %s ago", nodeID, status, latency, ago)
 			if !result.IsUp && result.ErrorReason != "" {
-				line += "  " + dangerStyle.Render(result.ErrorReason)
+				line += "  " + m.st.dangerStyle.Render(result.ErrorReason)
 			}
 			b.WriteString(line + "\n")
 		}
@@ -185,31 +185,31 @@ func (m Model) viewDetailPanel() string {
 		stateChanges = m.detailChanges
 	}
 	if len(stateChanges) > 0 {
-		b.WriteString("\n" + subtleStyle.Render("  STATE CHANGES") + "\n")
+		b.WriteString("\n" + m.st.subtleStyle.Render("  STATE CHANGES") + "\n")
 		for i, sc := range stateChanges {
 			ago := fmtDuration(time.Since(sc.ChangedAt))
-			arrow := subtleStyle.Render(sc.FromStatus) + " → "
+			arrow := m.st.subtleStyle.Render(sc.FromStatus) + " → "
 			if sc.ToStatus == "UP" {
-				arrow += specialStyle.Render(sc.ToStatus)
+				arrow += m.st.specialStyle.Render(sc.ToStatus)
 			} else {
-				arrow += dangerStyle.Render(sc.ToStatus)
+				arrow += m.st.dangerStyle.Render(sc.ToStatus)
 			}
-			line := fmt.Sprintf("  %s  %s", arrow, subtleStyle.Render(ago+" ago"))
+			line := fmt.Sprintf("  %s  %s", arrow, m.st.subtleStyle.Render(ago+" ago"))
 			if dur := computeOutageDuration(stateChanges, i); dur > 0 {
-				line += "  " + warnStyle.Render("outage "+fmtDuration(dur))
+				line += "  " + m.st.warnStyle.Render("outage "+fmtDuration(dur))
 			}
 			if sc.ErrorReason != "" && sc.ToStatus != "UP" {
-				line += "  " + dangerStyle.Render(sc.ErrorReason)
+				line += "  " + m.st.dangerStyle.Render(sc.ErrorReason)
 			}
 			b.WriteString(line + "\n")
 		}
-		b.WriteString("  " + subtleStyle.Render("[h] History") + "\n")
+		b.WriteString("  " + m.st.subtleStyle.Render("[h] History") + "\n")
 	}
 
 	b.WriteString(m.divider() + "\n")
 	const sparkWidth = 40
 	if site.Type == "push" {
-		b.WriteString("  " + m.zones.Mark("spark-heartbeat", heartbeatSparkline(hist.Statuses, sparkWidth, "")))
+		b.WriteString("  " + m.zones.Mark("spark-heartbeat", m.heartbeatSparkline(hist.Statuses, sparkWidth, "")))
 		if len(hist.Statuses) > 0 {
 			up := 0
 			for _, s := range hist.Statuses {
@@ -218,11 +218,11 @@ func (m Model) viewDetailPanel() string {
 				}
 			}
 			fmt.Fprintf(&b, "\n  %s %d/%d checks up",
-				subtleStyle.Render("Heartbeats"),
+				m.st.subtleStyle.Render("Heartbeats"),
 				up, len(hist.Statuses))
 		}
 	} else {
-		b.WriteString("  " + m.zones.Mark("spark-latency", latencySparkline(hist.Latencies, hist.Statuses, sparkWidth, "")))
+		b.WriteString("  " + m.zones.Mark("spark-latency", m.latencySparkline(hist.Latencies, hist.Statuses, sparkWidth, "")))
 		var minL, maxL, total time.Duration
 		count := 0
 		for i, l := range hist.Latencies {
@@ -242,9 +242,9 @@ func (m Model) viewDetailPanel() string {
 		if count > 0 {
 			avg := total / time.Duration(count)
 			fmt.Fprintf(&b, "\n  %s %dms  %s %dms  %s %dms",
-				subtleStyle.Render("Min"), minL.Milliseconds(),
-				subtleStyle.Render("Avg"), avg.Milliseconds(),
-				subtleStyle.Render("Max"), maxL.Milliseconds())
+				m.st.subtleStyle.Render("Min"), minL.Milliseconds(),
+				m.st.subtleStyle.Render("Avg"), avg.Milliseconds(),
+				m.st.subtleStyle.Render("Max"), maxL.Milliseconds())
 		}
 	}
 
@@ -254,7 +254,7 @@ func (m Model) viewDetailPanel() string {
 
 	b.WriteString("\n")
 	b.WriteString(m.divider() + "\n")
-	b.WriteString(subtleStyle.Render("  [i/Esc] Back  [e] Edit  [h] History  [s] SLA  [click] Inspect  [q] Quit"))
+	b.WriteString(m.st.subtleStyle.Render("  [i/Esc] Back  [e] Edit  [h] History  [s] SLA  [click] Inspect  [q] Quit"))
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }
@@ -283,18 +283,18 @@ func (m Model) renderSparkTooltip(site models.Site, hist monitor.SiteHistory, sp
 	}
 
 	if site.Type != "push" && idx < len(hist.Latencies) {
-		parts = append(parts, fmtLatency(hist.Latencies[idx]))
+		parts = append(parts, m.fmtLatency(hist.Latencies[idx]))
 	}
 
 	if idx < len(hist.Statuses) {
 		if hist.Statuses[idx] {
-			parts = append(parts, specialStyle.Render("UP"))
+			parts = append(parts, m.st.specialStyle.Render("UP"))
 		} else {
-			parts = append(parts, dangerStyle.Render("DOWN"))
+			parts = append(parts, m.st.dangerStyle.Render("DOWN"))
 		}
 	}
 
-	sep := subtleStyle.Render(" | ")
-	pos := subtleStyle.Render(fmt.Sprintf("[%d/%d]", idx+1, dataLen))
+	sep := m.st.subtleStyle.Render(" | ")
+	pos := m.st.subtleStyle.Render(fmt.Sprintf("[%d/%d]", idx+1, dataLen))
 	return "  " + strings.Join(parts, sep) + "  " + pos
 }

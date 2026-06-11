@@ -34,18 +34,18 @@ func withBg(s lipgloss.Style, bg lipgloss.Color) lipgloss.Style {
 	return s
 }
 
-func latencyStyle(ms int64, bg lipgloss.Color) lipgloss.Style {
+func (m Model) latencyStyle(ms int64, bg lipgloss.Color) lipgloss.Style {
 	var hex string
 	var t float64
 	switch {
 	case ms < 200:
-		hex = sparkSuccess
+		hex = m.st.sparkSuccess
 		t = float64(ms) / 200
 	case ms < 500:
-		hex = sparkWarning
+		hex = m.st.sparkWarning
 		t = float64(ms-200) / 300
 	default:
-		hex = sparkDanger
+		hex = m.st.sparkDanger
 		t = float64(ms-500) / 1500
 		if t > 1 {
 			t = 1
@@ -55,9 +55,9 @@ func latencyStyle(ms int64, bg lipgloss.Color) lipgloss.Style {
 	return withBg(s, bg)
 }
 
-func latencySparkline(latencies []time.Duration, statuses []bool, width int, bg lipgloss.Color) string {
+func (m Model) latencySparkline(latencies []time.Duration, statuses []bool, width int, bg lipgloss.Color) string {
 	if len(latencies) == 0 {
-		return withBg(subtleStyle, bg).Render(strings.Repeat("·", width))
+		return withBg(m.st.subtleStyle, bg).Render(strings.Repeat("·", width))
 	}
 
 	samples := latencies
@@ -82,7 +82,7 @@ func latencySparkline(latencies []time.Duration, statuses []bool, width int, bg 
 
 	var sb strings.Builder
 	if remaining := width - len(samples); remaining > 0 {
-		sb.WriteString(withBg(subtleStyle, bg).Render(strings.Repeat("·", remaining)))
+		sb.WriteString(withBg(m.st.subtleStyle, bg).Render(strings.Repeat("·", remaining)))
 	}
 	for i, l := range samples {
 		idx := 0
@@ -95,17 +95,17 @@ func latencySparkline(latencies []time.Duration, statuses []bool, width int, bg 
 		ch := string(sparkChars[idx])
 		isDown := i < len(sampledStatuses) && !sampledStatuses[i]
 		if isDown {
-			sb.WriteString(withBg(dangerStyle, bg).Render(ch))
+			sb.WriteString(withBg(m.st.dangerStyle, bg).Render(ch))
 		} else {
-			sb.WriteString(latencyStyle(l.Milliseconds(), bg).Render(ch))
+			sb.WriteString(m.latencyStyle(l.Milliseconds(), bg).Render(ch))
 		}
 	}
 	return sb.String()
 }
 
-func heartbeatSparkline(statuses []bool, width int, bg lipgloss.Color) string {
+func (m Model) heartbeatSparkline(statuses []bool, width int, bg lipgloss.Color) string {
 	if len(statuses) == 0 {
-		return withBg(subtleStyle, bg).Render(strings.Repeat("·", width))
+		return withBg(m.st.subtleStyle, bg).Render(strings.Repeat("·", width))
 	}
 
 	samples := statuses
@@ -115,13 +115,13 @@ func heartbeatSparkline(statuses []bool, width int, bg lipgloss.Color) string {
 
 	var sb strings.Builder
 	if remaining := width - len(samples); remaining > 0 {
-		sb.WriteString(withBg(subtleStyle, bg).Render(strings.Repeat("·", remaining)))
+		sb.WriteString(withBg(m.st.subtleStyle, bg).Render(strings.Repeat("·", remaining)))
 	}
 	for _, up := range samples {
 		if up {
-			sb.WriteString(withBg(specialStyle, bg).Render("▁"))
+			sb.WriteString(withBg(m.st.specialStyle, bg).Render("▁"))
 		} else {
-			sb.WriteString(withBg(dangerStyle, bg).Render("█"))
+			sb.WriteString(withBg(m.st.dangerStyle, bg).Render("█"))
 		}
 	}
 	return sb.String()
@@ -156,7 +156,7 @@ func (m Model) groupSparkline(groupID int, width int, bg lipgloss.Color) string 
 	}
 
 	if len(childStatuses) == 0 {
-		return withBg(subtleStyle, bg).Render(strings.Repeat("·", width))
+		return withBg(m.st.subtleStyle, bg).Render(strings.Repeat("·", width))
 	}
 
 	maxLen := 0
@@ -184,13 +184,13 @@ func (m Model) groupSparkline(groupID int, width int, bg lipgloss.Color) string 
 
 	var sb strings.Builder
 	if remaining := width - len(aggregated); remaining > 0 {
-		sb.WriteString(withBg(subtleStyle, bg).Render(strings.Repeat("·", remaining)))
+		sb.WriteString(withBg(m.st.subtleStyle, bg).Render(strings.Repeat("·", remaining)))
 	}
 	for _, up := range aggregated {
 		if up {
-			sb.WriteString(withBg(subtleStyle, bg).Render("·"))
+			sb.WriteString(withBg(m.st.subtleStyle, bg).Render("·"))
 		} else {
-			sb.WriteString(withBg(dangerStyle, bg).Render("•"))
+			sb.WriteString(withBg(m.st.dangerStyle, bg).Render("•"))
 		}
 	}
 	return sb.String()
@@ -208,7 +208,7 @@ func (m Model) groupUptime(groupID int) string {
 		}
 	}
 	if len(allStatuses) == 0 {
-		return subtleStyle.Render("—")
+		return m.st.subtleStyle.Render("—")
 	}
 	total, up := 0, 0
 	for _, statuses := range allStatuses {
@@ -219,7 +219,7 @@ func (m Model) groupUptime(groupID int) string {
 			}
 		}
 	}
-	return fmtUptime(func() []bool {
+	return m.fmtUptime(func() []bool {
 		out := make([]bool, total)
 		idx := 0
 		for _, statuses := range allStatuses {

@@ -33,14 +33,14 @@ func (m Model) viewNodesTab() string {
 				}
 				region := node.Region
 				if region == "" {
-					region = subtleStyle.Render("—")
+					region = m.st.subtleStyle.Render("—")
 				}
-				lastSeen := fmtNodeLastSeen(node.LastSeen)
+				lastSeen := m.fmtNodeLastSeen(node.LastSeen)
 				version := node.Version
 				if version == "" {
-					version = subtleStyle.Render("—")
+					version = m.st.subtleStyle.Render("—")
 				}
-				status := fmtNodeStatus(node.LastSeen)
+				status := m.fmtNodeStatus(node.LastSeen)
 				rows = append(rows, []string{name, region, lastSeen, version, status})
 			}
 			return rows
@@ -50,20 +50,20 @@ func (m Model) viewNodesTab() string {
 	)
 }
 
-func fmtNodeStatus(lastSeen time.Time) string {
+func (m Model) fmtNodeStatus(lastSeen time.Time) string {
 	if lastSeen.IsZero() {
-		return subtleStyle.Render("UNKNOWN")
+		return m.st.subtleStyle.Render("UNKNOWN")
 	}
 	ago := time.Since(lastSeen)
 	if ago < 60*time.Second {
-		return specialStyle.Render("ONLINE")
+		return m.st.specialStyle.Render("ONLINE")
 	}
 	if ago < 5*time.Minute {
-		return warnStyle.Render("STALE")
+		return m.st.warnStyle.Render("STALE")
 	}
-	return dangerStyle.Render("OFFLINE")
+	return m.st.dangerStyle.Render("OFFLINE")
 }
 
-func fmtNodeLastSeen(t time.Time) string {
-	return fmtTimeAgo(t)
+func (m Model) fmtNodeLastSeen(t time.Time) string {
+	return m.fmtTimeAgo(t)
 }

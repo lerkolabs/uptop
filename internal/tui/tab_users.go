@@ -13,9 +13,9 @@ type userFormData struct {
 	Role      string
 }
 
-func fmtRole(role string) string {
+func (m Model) fmtRole(role string) string {
 	if role == "admin" {
-		return specialStyle.Render(role)
+		return m.st.specialStyle.Render(role)
 	}
 	return role
 }
@@ -53,7 +53,7 @@ func (m Model) viewUsersTab() string {
 				rows = append(rows, []string{
 					fmt.Sprintf("%d", i+1),
 					m.zones.Mark(fmt.Sprintf("user-%d", i), limitStr(u.Username, userW-2)),
-					fmtRole(u.Role),
+					m.fmtRole(u.Role),
 					fmtKey(u.PublicKey),
 				})
 			}

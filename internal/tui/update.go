@@ -542,7 +542,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "T":
 		m.themeIndex = (m.themeIndex + 1) % len(themes)
 		m.theme = themes[m.themeIndex]
-		applyTheme(m.theme)
+		m.st = newStyles(m.theme)
 		_ = m.store.SetPreference("theme", m.theme.Name)
 	case "d", "backspace":
 		return m.handleDeleteItem()

@@ -71,7 +71,7 @@ func fmtAlertType(t string) string {
 	}
 }
 
-func fmtAlertConfig(alert struct {
+func (m Model) fmtAlertConfig(alert struct {
 	Type     string
 	Settings map[string]string
 }) string {
@@ -85,34 +85,34 @@ func fmtAlertConfig(alert struct {
 		if host != "" {
 			return limitStr(host, 34)
 		}
-		return subtleStyle.Render("—")
+		return m.st.subtleStyle.Render("—")
 	case "ntfy":
 		topic := alert.Settings["topic"]
 		url := alert.Settings["url"]
 		if url != "" && topic != "" {
 			return limitStr(fmt.Sprintf("%s/%s", url, topic), 34)
 		}
-		return subtleStyle.Render("—")
+		return m.st.subtleStyle.Render("—")
 	case "telegram":
 		if id := alert.Settings["chat_id"]; id != "" {
 			return limitStr(fmt.Sprintf("chat:%s", id), 34)
 		}
-		return subtleStyle.Render("—")
+		return m.st.subtleStyle.Render("—")
 	case "pagerduty":
 		if key := alert.Settings["routing_key"]; key != "" {
 			return limitStr(key, 34)
 		}
-		return subtleStyle.Render("—")
+		return m.st.subtleStyle.Render("—")
 	case "pushover":
 		if user := alert.Settings["user"]; user != "" {
 			return limitStr(fmt.Sprintf("user:%s", user), 34)
 		}
-		return subtleStyle.Render("—")
+		return m.st.subtleStyle.Render("—")
 	case "gotify":
 		if url := alert.Settings["url"]; url != "" {
 			return limitStr(url, 34)
 		}
-		return subtleStyle.Render("—")
+		return m.st.subtleStyle.Render("—")
 	case "opsgenie":
 		key := alert.Settings["api_key"]
 		if key != "" {
@@ -125,27 +125,27 @@ func fmtAlertConfig(alert struct {
 			}
 			return limitStr(masked, 34)
 		}
-		return subtleStyle.Render("—")
+		return m.st.subtleStyle.Render("—")
 	default:
 		if val, ok := alert.Settings["url"]; ok {
 			return limitStr(val, 34)
 		}
-		return subtleStyle.Render("—")
+		return m.st.subtleStyle.Render("—")
 	}
 }
 
-func fmtAlertHealth(h monitor.AlertHealth) string {
+func (m Model) fmtAlertHealth(h monitor.AlertHealth) string {
 	if h.LastSendAt.IsZero() {
-		return subtleStyle.Render("●")
+		return m.st.subtleStyle.Render("●")
 	}
 	if h.LastSendOK {
-		return specialStyle.Render("●")
+		return m.st.specialStyle.Render("●")
 	}
-	return dangerStyle.Render("●")
+	return m.st.dangerStyle.Render("●")
 }
 
-func fmtAlertLastSent(h monitor.AlertHealth) string {
-	return fmtTimeAgo(h.LastSendAt)
+func (m Model) fmtAlertLastSent(h monitor.AlertHealth) string {
+	return m.fmtTimeAgo(h.LastSendAt)
 }
 
 func (m Model) viewAlertsTab() string {
@@ -175,14 +175,14 @@ func (m Model) viewAlertsTab() string {
 				h := m.engine.GetAlertHealth(a.ID)
 				rows = append(rows, []string{
 					fmt.Sprintf("%d", i+1),
-					fmtAlertHealth(h),
+					m.fmtAlertHealth(h),
 					m.zones.Mark(fmt.Sprintf("alert-%d", i), limitStr(a.Name, nameW-2)),
 					fmtAlertType(a.Type),
-					limitStr(fmtAlertConfig(struct {
+					limitStr(m.fmtAlertConfig(struct {
 						Type     string
 						Settings map[string]string
 					}{a.Type, a.Settings}), cfgW-2),
-					fmtAlertLastSent(h),
+					m.fmtAlertLastSent(h),
 				})
 			}
 			return rows
@@ -200,41 +200,41 @@ func (m Model) viewAlertDetailPanel() string {
 
 	var b strings.Builder
 
-	b.WriteString(subtleStyle.Render("  Alerts > ") + titleStyle.Render(a.Name) + "\n")
+	b.WriteString(m.st.subtleStyle.Render("  Alerts > ") + m.st.titleStyle.Render(a.Name) + "\n")
 	b.WriteString(m.divider() + "\n")
 
 	row := func(label, value string) {
-		fmt.Fprintf(&b, "  %-16s %s\n", subtleStyle.Render(label), value)
+		fmt.Fprintf(&b, "  %-16s %s\n", m.st.subtleStyle.Render(label), value)
 	}
 
 	row("Type", fmtAlertType(a.Type))
 
 	if h.LastSendAt.IsZero() {
-		row("Health", subtleStyle.Render("never sent"))
+		row("Health", m.st.subtleStyle.Render("never sent"))
 	} else if h.LastSendOK {
-		row("Health", specialStyle.Render("OK"))
+		row("Health", m.st.specialStyle.Render("OK"))
 	} else {
-		row("Health", dangerStyle.Render("FAILED"))
+		row("Health", m.st.dangerStyle.Render("FAILED"))
 	}
 
 	if !h.LastSendAt.IsZero() {
-		row("Last Sent", h.LastSendAt.Format("2006-01-02 15:04:05")+" ("+fmtAlertLastSent(h)+")")
+		row("Last Sent", h.LastSendAt.Format("2006-01-02 15:04:05")+" ("+m.fmtAlertLastSent(h)+")")
 	}
 	if h.SendCount > 0 {
 		row("Sends", fmt.Sprintf("%d sent, %d failed", h.SendCount, h.FailCount))
 	}
 	if h.LastError != "" {
-		row("Last Error", dangerStyle.Render(limitStr(h.LastError, 60)))
+		row("Last Error", m.st.dangerStyle.Render(limitStr(h.LastError, 60)))
 	}
 
 	b.WriteString(m.divider() + "\n")
-	b.WriteString(subtleStyle.Render("  CONFIGURATION") + "\n")
+	b.WriteString(m.st.subtleStyle.Render("  CONFIGURATION") + "\n")
 	for k, v := range a.Settings {
 		row(k, v)
 	}
 
 	b.WriteString(m.divider() + "\n")
-	b.WriteString(subtleStyle.Render("  [i/Esc] Back  [e] Edit  [t] Test  [q] Quit"))
+	b.WriteString(m.st.subtleStyle.Render("  [i/Esc] Back  [e] Edit  [t] Test  [q] Quit"))
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }

@@ -99,6 +99,8 @@ func newTestModel(ms *tuiMockStore) Model {
 		isAdmin:             true,
 		zones:               zone.New(),
 		detailChangesSiteID: -1,
+		theme:               themeFlexokiDark,
+		st:                  newStyles(themeFlexokiDark),
 	}
 }
 

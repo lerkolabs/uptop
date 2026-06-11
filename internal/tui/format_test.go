@@ -7,9 +7,8 @@ import (
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 )
 
-func init() {
-	applyTheme(themeFlexokiDark)
-}
+// styledModel carries a default-theme styles instance for render-helper tests.
+var styledModel = Model{st: newStyles(themeFlexokiDark)}
 
 func TestLimitStr(t *testing.T) {
 	tests := []struct {
@@ -72,7 +71,7 @@ func TestFmtStatus(t *testing.T) {
 		{"DOWN", false, true, "◼ MAINT"},
 	}
 	for _, tt := range tests {
-		got := fmtStatus(tt.status, tt.paused, tt.inMaint)
+		got := styledModel.fmtStatus(tt.status, tt.paused, tt.inMaint)
 		if !containsPlain(got, tt.wantSub) {
 			t.Errorf("fmtStatus(%q, paused=%v, maint=%v): %q missing %q",
 				tt.status, tt.paused, tt.inMaint, got, tt.wantSub)
@@ -136,7 +135,7 @@ func TestFmtUptime(t *testing.T) {
 		{"all down", []bool{false, false}, "0.0%"},
 	}
 	for _, tt := range tests {
-		got := fmtUptime(tt.statuses)
+		got := styledModel.fmtUptime(tt.statuses)
 		if !containsPlain(got, tt.wantSub) {
 			t.Errorf("fmtUptime(%s): %q missing %q", tt.name, got, tt.wantSub)
 		}
@@ -154,7 +153,7 @@ func TestFmtLatency(t *testing.T) {
 		{1500 * time.Millisecond, "1.5s"},
 	}
 	for _, tt := range tests {
-		got := fmtLatency(tt.d)
+		got := styledModel.fmtLatency(tt.d)
 		if !containsPlain(got, tt.wantSub) {
 			t.Errorf("fmtLatency(%v): %q missing %q", tt.d, got, tt.wantSub)
 		}

@@ -48,30 +48,30 @@ func isImportantLog(sev logSeverity) bool {
 	return sev == severityDown || sev == severityUp || sev == severitySystem
 }
 
-func renderLogTag(sev logSeverity) string {
+func (m Model) renderLogTag(sev logSeverity) string {
 	switch sev {
 	case severityDown:
-		return dangerStyle.Render(" DOWN ")
+		return m.st.dangerStyle.Render(" DOWN ")
 	case severityUp:
-		return specialStyle.Render("  UP  ")
+		return m.st.specialStyle.Render("  UP  ")
 	case severityWarn:
-		return warnStyle.Render(" WARN ")
+		return m.st.warnStyle.Render(" WARN ")
 	case severitySystem:
-		return titleStyle.Render(" SYS  ")
+		return m.st.titleStyle.Render(" SYS  ")
 	default:
-		return subtleStyle.Render(" info ")
+		return m.st.subtleStyle.Render(" info ")
 	}
 }
 
-func renderLogLine(line string) string {
+func (m Model) renderLogLine(line string) string {
 	sev := classifyLog(line)
-	tag := renderLogTag(sev)
+	tag := m.renderLogTag(sev)
 
 	ts := ""
 	msg := line
 	if len(line) > 10 && line[0] == '[' {
 		if idx := strings.Index(line, "]"); idx > 0 && idx < 12 {
-			ts = subtleStyle.Render(line[1:idx])
+			ts = m.st.subtleStyle.Render(line[1:idx])
 			msg = strings.TrimSpace(line[idx+1:])
 		}
 	}
@@ -103,7 +103,7 @@ func (m Model) viewLogsTab() string {
 			continue
 		}
 		shown++
-		rendered = append(rendered, renderLogLine(line))
+		rendered = append(rendered, m.renderLogLine(line))
 	}
 
 	filterLabel := "All"
@@ -111,11 +111,11 @@ func (m Model) viewLogsTab() string {
 		filterLabel = "Important"
 	}
 
-	header := subtleStyle.Render(fmt.Sprintf(
+	header := m.st.subtleStyle.Render(fmt.Sprintf(
 		"  %d entries  Filter: %s", shown, filterLabel))
 
 	if m.logFilterImportant && shown < total {
-		header += subtleStyle.Render(fmt.Sprintf("  (%d hidden)", total-shown))
+		header += m.st.subtleStyle.Render(fmt.Sprintf("  (%d hidden)", total-shown))
 	}
 
 	m.logViewport.SetContent(strings.Join(rendered, "\n"))

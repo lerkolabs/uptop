@@ -5,14 +5,6 @@ import (
 	"github.com/charmbracelet/lipgloss/table"
 )
 
-var (
-	tableHeaderStyle   lipgloss.Style
-	tableCellStyle     lipgloss.Style
-	tableSelectedStyle lipgloss.Style
-	tableBorderStyle   lipgloss.Style
-	tableZebraStyle    lipgloss.Style
-)
-
 type StyleOverride func(row, col int) *lipgloss.Style
 
 const (
@@ -53,13 +45,13 @@ func (m Model) renderTable(headers []string, items int, buildRows func(start, en
 
 	t := table.New().
 		Border(lipgloss.RoundedBorder()).
-		BorderStyle(tableBorderStyle).
+		BorderStyle(m.st.tableBorderStyle).
 		Width(tableWidth).
 		Headers(headers...).
 		Rows(rows...).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			if row == table.HeaderRow {
-				h := tableHeaderStyle
+				h := m.st.tableHeaderStyle
 				if col < len(colWidths) && colWidths[col] > 0 {
 					h = h.Width(colWidths[col]).MaxWidth(colWidths[col])
 				}
@@ -70,10 +62,10 @@ func (m Model) renderTable(headers []string, items int, buildRows func(start, en
 				if s := styleOverride(row, col); s != nil {
 					style := *s
 					if row%2 == 1 {
-						style = style.Background(tableZebraStyle.GetBackground())
+						style = style.Background(m.st.tableZebraStyle.GetBackground())
 					}
 					if isSelected {
-						style = tableSelectedStyle.Foreground(s.GetForeground())
+						style = m.st.tableSelectedStyle.Foreground(s.GetForeground())
 					}
 					if col < len(colWidths) && colWidths[col] > 0 {
 						style = style.Width(colWidths[col]).MaxWidth(colWidths[col])
@@ -81,12 +73,12 @@ func (m Model) renderTable(headers []string, items int, buildRows func(start, en
 					return style
 				}
 			}
-			base := tableCellStyle
+			base := m.st.tableCellStyle
 			if row%2 == 1 {
-				base = tableZebraStyle
+				base = m.st.tableZebraStyle
 			}
 			if isSelected {
-				base = tableSelectedStyle
+				base = m.st.tableSelectedStyle
 			}
 			if col < len(colWidths) && colWidths[col] > 0 {
 				base = base.Width(colWidths[col]).MaxWidth(colWidths[col])

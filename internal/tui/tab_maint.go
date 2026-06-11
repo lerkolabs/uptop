@@ -9,10 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/lipgloss"
 )
-
-var maintStyle lipgloss.Style
 
 type maintFormData struct {
 	Title       string
@@ -23,22 +20,22 @@ type maintFormData struct {
 	CustomHours string
 }
 
-func fmtMaintStatus(mw models.MaintenanceWindow) string {
+func (m Model) fmtMaintStatus(mw models.MaintenanceWindow) string {
 	now := time.Now()
 	if mw.StartTime.After(now) {
-		return warnStyle.Render("SCHEDULED")
+		return m.st.warnStyle.Render("SCHEDULED")
 	}
 	if !mw.EndTime.IsZero() && mw.EndTime.Before(now) {
-		return subtleStyle.Render("ENDED")
+		return m.st.subtleStyle.Render("ENDED")
 	}
-	return specialStyle.Render("ACTIVE")
+	return m.st.specialStyle.Render("ACTIVE")
 }
 
-func fmtMaintType(t string) string {
+func (m Model) fmtMaintType(t string) string {
 	if t == "incident" {
-		return dangerStyle.Render("incident")
+		return m.st.dangerStyle.Render("incident")
 	}
-	return maintStyle.Render("maintenance")
+	return m.st.maintStyle.Render("maintenance")
 }
 
 func fmtMaintMonitorW(monitorID int, sites []models.Site, maxW int) string {
@@ -53,9 +50,9 @@ func fmtMaintMonitorW(monitorID int, sites []models.Site, maxW int) string {
 	return fmt.Sprintf("#%d", monitorID)
 }
 
-func fmtMaintTime(t time.Time, colW int) string {
+func (m Model) fmtMaintTime(t time.Time, colW int) string {
 	if t.IsZero() {
-		return subtleStyle.Render("—")
+		return m.st.subtleStyle.Render("—")
 	}
 	now := time.Now()
 	if t.Year() == now.Year() && t.YearDay() == now.YearDay() {
@@ -120,11 +117,11 @@ func (m Model) viewMaintTab() string {
 				rows = append(rows, []string{
 					strconv.Itoa(i + 1),
 					m.zones.Mark(fmt.Sprintf("maint-%d", i), limitStr(mw.Title, titleW-2)),
-					fmtMaintType(mw.Type),
+					m.fmtMaintType(mw.Type),
 					fmtMaintMonitorW(mw.MonitorID, allSites, monW-2),
-					fmtMaintStatus(mw),
-					fmtMaintTime(mw.StartTime, timeW),
-					fmtMaintTime(mw.EndTime, timeW),
+					m.fmtMaintStatus(mw),
+					m.fmtMaintTime(mw.StartTime, timeW),
+					m.fmtMaintTime(mw.EndTime, timeW),
 				})
 			}
 			return rows

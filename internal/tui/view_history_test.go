@@ -134,14 +134,14 @@ func TestComputeHistoryStats_Empty(t *testing.T) {
 
 func TestStateChangeSparkline(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
-		if got := stateChangeSparkline(nil, 20); got != "" {
+		if got := styledModel.stateChangeSparkline(nil, 20); got != "" {
 			t.Errorf("expected empty for nil, got %q", got)
 		}
 	})
 
 	t.Run("single event", func(t *testing.T) {
 		changes := []models.StateChange{{ChangedAt: time.Now()}}
-		if got := stateChangeSparkline(changes, 20); got != "" {
+		if got := styledModel.stateChangeSparkline(changes, 20); got != "" {
 			t.Errorf("expected empty for single event, got %q", got)
 		}
 	})
@@ -152,7 +152,7 @@ func TestStateChangeSparkline(t *testing.T) {
 			{ChangedAt: now},
 			{ChangedAt: now.Add(-1 * time.Hour)},
 		}
-		got := stateChangeSparkline(changes, 20)
+		got := styledModel.stateChangeSparkline(changes, 20)
 		if got == "" {
 			t.Error("expected non-empty sparkline for two events")
 		}
@@ -164,7 +164,7 @@ func TestStateChangeSparkline(t *testing.T) {
 			{ChangedAt: now},
 			{ChangedAt: now.Add(-1 * time.Hour)},
 		}
-		if got := stateChangeSparkline(changes, 3); got != "" {
+		if got := styledModel.stateChangeSparkline(changes, 3); got != "" {
 			t.Errorf("expected empty for width 3, got %q", got)
 		}
 	})

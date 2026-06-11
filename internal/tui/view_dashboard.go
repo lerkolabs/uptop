@@ -54,8 +54,8 @@ func (m Model) View() string {
 		case 5:
 			kind = "user"
 		}
-		msg := dangerStyle.Render(fmt.Sprintf("Delete %s \"%s\"?", kind, m.deleteName))
-		hint := subtleStyle.Render("[y] Confirm  [n] Cancel")
+		msg := m.st.dangerStyle.Render(fmt.Sprintf("Delete %s \"%s\"?", kind, m.deleteName))
+		hint := m.st.subtleStyle.Render("[y] Confirm  [n] Cancel")
 		box := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(m.theme.Danger).
@@ -89,8 +89,8 @@ func (m Model) View() string {
 				formHeight = 5
 			}
 			m.huhForm.WithHeight(formHeight)
-			header := titleStyle.Render(title)
-			footer := subtleStyle.Render("\n[Esc] Cancel")
+			header := m.st.titleStyle.Render(title)
+			footer := m.st.subtleStyle.Render("\n[Esc] Cancel")
 			return lipgloss.NewStyle().Padding(1, 2).Render(header + "\n\n" + m.huhForm.View() + "\n" + footer)
 		}
 		return ""
@@ -216,16 +216,16 @@ func (m Model) renderTabBar(stats dashboardStats) string {
 		if t.count > 0 {
 			badge := countStyle.Render(fmt.Sprintf(" %d", t.count))
 			if t.warn > 0 {
-				badge = dangerStyle.Render(fmt.Sprintf(" %d", t.warn))
+				badge = m.st.dangerStyle.Render(fmt.Sprintf(" %d", t.warn))
 			}
 			label += badge
 		}
 
 		var rendered string
 		if i == m.currentTab {
-			rendered = activeTab.Render(label)
+			rendered = m.st.activeTab.Render(label)
 		} else {
-			rendered = inactiveTab.Render(label)
+			rendered = m.st.inactiveTab.Render(label)
 		}
 		renderedTabs = append(renderedTabs, m.zones.Mark(fmt.Sprintf("tab-%d", i), rendered))
 	}
@@ -235,21 +235,21 @@ func (m Model) renderTabBar(stats dashboardStats) string {
 func (m Model) renderFooter(stats dashboardStats) string {
 	if m.filterMode {
 		cursor := lipgloss.NewStyle().Foreground(m.theme.Accent).Render("│")
-		return "\n" + titleStyle.Render("/") + " " + m.filterText + cursor + "  " + subtleStyle.Render("[Enter]Apply [Esc]Clear")
+		return "\n" + m.st.titleStyle.Render("/") + " " + m.filterText + cursor + "  " + m.st.subtleStyle.Render("[Enter]Apply [Esc]Clear")
 	}
 
 	upCount := stats.totalMonitors - stats.downCount - stats.lateCount
 	var upStr string
 	if stats.downCount > 0 {
-		upStr = dangerStyle.Render(fmt.Sprintf("%d/%d UP", upCount, stats.totalMonitors))
+		upStr = m.st.dangerStyle.Render(fmt.Sprintf("%d/%d UP", upCount, stats.totalMonitors))
 	} else if stats.lateCount > 0 {
-		upStr = warnStyle.Render(fmt.Sprintf("%d/%d UP", upCount, stats.totalMonitors))
+		upStr = m.st.warnStyle.Render(fmt.Sprintf("%d/%d UP", upCount, stats.totalMonitors))
 	} else {
-		upStr = specialStyle.Render(fmt.Sprintf("%d/%d UP", upCount, stats.totalMonitors))
+		upStr = m.st.specialStyle.Render(fmt.Sprintf("%d/%d UP", upCount, stats.totalMonitors))
 	}
 	statusParts := []string{upStr}
 	if stats.lateCount > 0 {
-		statusParts = append(statusParts, warnStyle.Render(fmt.Sprintf("%d LATE", stats.lateCount)))
+		statusParts = append(statusParts, m.st.warnStyle.Render(fmt.Sprintf("%d LATE", stats.lateCount)))
 	}
 	if len(m.nodes) > 0 {
 		online := 0
@@ -264,7 +264,7 @@ func (m Model) renderFooter(stats dashboardStats) string {
 		}
 		statusParts = append(statusParts, fmt.Sprintf("%d %s", online, probeLabel))
 	}
-	statusLine := strings.Join(statusParts, subtleStyle.Render(" · "))
+	statusLine := strings.Join(statusParts, m.st.subtleStyle.Render(" · "))
 
 	var keys string
 	switch m.currentTab {
@@ -282,10 +282,10 @@ func (m Model) renderFooter(stats dashboardStats) string {
 		keys = "[T]Theme [Tab]Switch [q]Quit"
 	}
 
-	ver := subtleStyle.Render("v" + m.version)
-	footer := statusLine + "  " + subtleStyle.Render(keys) + "  " + ver
+	ver := m.st.subtleStyle.Render("v" + m.version)
+	footer := statusLine + "  " + m.st.subtleStyle.Render(keys) + "  " + ver
 	if m.filterText != "" && m.currentTab == 0 {
-		footer = subtleStyle.Render(fmt.Sprintf("filter: %s", m.filterText)) + "  " + statusLine + "  " + subtleStyle.Render(keys) + "  " + ver
+		footer = m.st.subtleStyle.Render(fmt.Sprintf("filter: %s", m.filterText)) + "  " + statusLine + "  " + m.st.subtleStyle.Render(keys) + "  " + ver
 	}
 	return footer
 }

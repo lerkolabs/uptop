@@ -16,7 +16,10 @@ import (
 	zone "github.com/lrstanley/bubblezone"
 )
 
-var (
+// styles holds every theme-derived lipgloss style. Each Model owns its own
+// instance (built by newStyles), so concurrent SSH sessions can run different
+// themes without racing on shared package state. Never mutate after creation.
+type styles struct {
 	subtleStyle  lipgloss.Style
 	specialStyle lipgloss.Style
 	warnStyle    lipgloss.Style
@@ -29,31 +32,41 @@ var (
 	sparkSuccess string
 	sparkWarning string
 	sparkDanger  string
-)
 
-func applyTheme(t Theme) {
-	subtleStyle = lipgloss.NewStyle().Foreground(t.Subtle)
-	specialStyle = lipgloss.NewStyle().Foreground(t.Success)
-	warnStyle = lipgloss.NewStyle().Foreground(t.Warning)
-	staleStyle = lipgloss.NewStyle().Foreground(t.Stale)
-	dangerStyle = lipgloss.NewStyle().Foreground(t.Danger)
+	tableHeaderStyle   lipgloss.Style
+	tableCellStyle     lipgloss.Style
+	tableSelectedStyle lipgloss.Style
+	tableBorderStyle   lipgloss.Style
+	tableZebraStyle    lipgloss.Style
 
-	sparkSuccess = string(t.Success)
-	sparkWarning = string(t.Warning)
-	sparkDanger = string(t.Danger)
+	siteGroupStyle lipgloss.Style
+	maintStyle     lipgloss.Style
+}
 
-	titleStyle = lipgloss.NewStyle().Foreground(t.Accent).Bold(true)
-	activeTab = lipgloss.NewStyle().Background(t.Surface).Foreground(t.Accent).Bold(true).Padding(0, 1)
-	inactiveTab = lipgloss.NewStyle().Padding(0, 1).Foreground(t.Muted)
+func newStyles(t Theme) *styles {
+	return &styles{
+		subtleStyle:  lipgloss.NewStyle().Foreground(t.Subtle),
+		specialStyle: lipgloss.NewStyle().Foreground(t.Success),
+		warnStyle:    lipgloss.NewStyle().Foreground(t.Warning),
+		staleStyle:   lipgloss.NewStyle().Foreground(t.Stale),
+		dangerStyle:  lipgloss.NewStyle().Foreground(t.Danger),
+		titleStyle:   lipgloss.NewStyle().Foreground(t.Accent).Bold(true),
+		activeTab:    lipgloss.NewStyle().Background(t.Surface).Foreground(t.Accent).Bold(true).Padding(0, 1),
+		inactiveTab:  lipgloss.NewStyle().Padding(0, 1).Foreground(t.Muted),
 
-	tableHeaderStyle = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Padding(0, 1)
-	tableCellStyle = lipgloss.NewStyle().Padding(0, 1)
-	tableSelectedStyle = lipgloss.NewStyle().Padding(0, 1).Bold(true).Foreground(t.SelectedFg).Background(t.SelectedBg)
-	tableBorderStyle = lipgloss.NewStyle().Foreground(t.Border)
-	tableZebraStyle = lipgloss.NewStyle().Padding(0, 1).Background(t.ZebraBg)
+		sparkSuccess: string(t.Success),
+		sparkWarning: string(t.Warning),
+		sparkDanger:  string(t.Danger),
 
-	siteGroupStyle = lipgloss.NewStyle().Padding(0, 1).Bold(true).Foreground(t.Accent)
-	maintStyle = lipgloss.NewStyle().Foreground(t.Purple)
+		tableHeaderStyle:   lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Padding(0, 1),
+		tableCellStyle:     lipgloss.NewStyle().Padding(0, 1),
+		tableSelectedStyle: lipgloss.NewStyle().Padding(0, 1).Bold(true).Foreground(t.SelectedFg).Background(t.SelectedBg),
+		tableBorderStyle:   lipgloss.NewStyle().Foreground(t.Border),
+		tableZebraStyle:    lipgloss.NewStyle().Padding(0, 1).Background(t.ZebraBg),
+
+		siteGroupStyle: lipgloss.NewStyle().Padding(0, 1).Bold(true).Foreground(t.Accent),
+		maintStyle:     lipgloss.NewStyle().Foreground(t.Purple),
+	}
 }
 
 var pulseFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
@@ -128,6 +141,7 @@ type Model struct {
 	engine     *monitor.Engine
 	theme      Theme
 	themeIndex int
+	st         *styles
 
 	// harmonica animation state
 	pulseSpring harmonica.Spring
@@ -174,8 +188,6 @@ func InitialModel(isAdmin bool, s store.Store, eng *monitor.Engine, version stri
 		}
 	}
 
-	applyTheme(theme)
-
 	return Model{
 		state:           stateDashboard,
 		logViewport:     vpLogs,
@@ -188,6 +200,7 @@ func InitialModel(isAdmin bool, s store.Store, eng *monitor.Engine, version stri
 		collapsed:       collapsed,
 		theme:           theme,
 		themeIndex:      themeIdx,
+		st:              newStyles(theme),
 		demoMode:        os.Getenv("UPTOP_DEMO") == "1",
 		version:         version,
 		sparkTooltipIdx: -1,

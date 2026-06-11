@@ -49,7 +49,7 @@ func computeHistoryStats(changes []models.StateChange) historyStats {
 
 var stateChangeChars = []rune{'▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
 
-func stateChangeSparkline(changes []models.StateChange, width int) string {
+func (m Model) stateChangeSparkline(changes []models.StateChange, width int) string {
 	if len(changes) < 2 || width < 4 {
 		return ""
 	}
@@ -96,11 +96,11 @@ func stateChangeSparkline(changes []models.StateChange, width int) string {
 		ch := string(stateChangeChars[idx])
 		switch {
 		case v >= 3:
-			sb.WriteString(dangerStyle.Render(ch))
+			sb.WriteString(m.st.dangerStyle.Render(ch))
 		case v >= 2:
-			sb.WriteString(warnStyle.Render(ch))
+			sb.WriteString(m.st.warnStyle.Render(ch))
 		default:
-			sb.WriteString(subtleStyle.Render(ch))
+			sb.WriteString(m.st.subtleStyle.Render(ch))
 		}
 	}
 	return sb.String()
@@ -120,26 +120,26 @@ func (m Model) buildHistoryContent() string {
 	for i, sc := range m.historyChanges {
 		ts := sc.ChangedAt.Format("2006-01-02 15:04")
 
-		arrow := subtleStyle.Render(sc.FromStatus) + " → "
+		arrow := m.st.subtleStyle.Render(sc.FromStatus) + " → "
 		switch sc.ToStatus {
 		case "UP":
-			arrow += specialStyle.Render(sc.ToStatus)
+			arrow += m.st.specialStyle.Render(sc.ToStatus)
 		case "LATE":
-			arrow += warnStyle.Render(sc.ToStatus)
+			arrow += m.st.warnStyle.Render(sc.ToStatus)
 		case "STALE":
-			arrow += staleStyle.Render(sc.ToStatus)
+			arrow += m.st.staleStyle.Render(sc.ToStatus)
 		default:
-			arrow += dangerStyle.Render(sc.ToStatus)
+			arrow += m.st.dangerStyle.Render(sc.ToStatus)
 		}
 
 		durStr := ""
 		if dur := computeOutageDuration(m.historyChanges, i); dur > 0 {
-			durStr = warnStyle.Render("outage " + fmtDuration(dur))
+			durStr = m.st.warnStyle.Render("outage " + fmtDuration(dur))
 		}
 
 		reason := ""
 		if sc.ErrorReason != "" && sc.ToStatus != "UP" {
-			reason = dangerStyle.Render(limitStr(sc.ErrorReason, reasonWidth))
+			reason = m.st.dangerStyle.Render(limitStr(sc.ErrorReason, reasonWidth))
 		}
 
 		fmt.Fprintf(&b, "  %-18s %s  %-12s %s\n", ts, arrow, durStr, reason)
@@ -151,27 +151,27 @@ func (m Model) buildHistoryContent() string {
 func (m Model) viewHistoryPanel() string {
 	var b strings.Builder
 
-	header := "  " + titleStyle.Render("STATE HISTORY: "+m.historySiteName)
-	header += "  " + subtleStyle.Render("[q] Back")
+	header := "  " + m.st.titleStyle.Render("STATE HISTORY: "+m.historySiteName)
+	header += "  " + m.st.subtleStyle.Render("[q] Back")
 	b.WriteString(header + "\n")
 
 	divWidth := m.dividerWidth()
 	b.WriteString(m.divider() + "\n")
 
-	sparkline := stateChangeSparkline(m.historyChanges, divWidth)
+	sparkline := m.stateChangeSparkline(m.historyChanges, divWidth)
 	if sparkline != "" {
 		b.WriteString("  " + sparkline + "\n")
 		b.WriteString(m.divider() + "\n")
 	}
 
 	fmt.Fprintf(&b, "  %-18s %-17s %-12s %s\n",
-		subtleStyle.Render("TIME"),
-		subtleStyle.Render("TRANSITION"),
-		subtleStyle.Render("DURATION"),
-		subtleStyle.Render("REASON"))
+		m.st.subtleStyle.Render("TIME"),
+		m.st.subtleStyle.Render("TRANSITION"),
+		m.st.subtleStyle.Render("DURATION"),
+		m.st.subtleStyle.Render("REASON"))
 
 	if len(m.historyChanges) == 0 {
-		b.WriteString("\n  " + subtleStyle.Render("No state changes recorded") + "\n")
+		b.WriteString("\n  " + m.st.subtleStyle.Render("No state changes recorded") + "\n")
 	} else {
 		b.WriteString(m.historyViewport.View())
 	}
@@ -185,8 +185,8 @@ func (m Model) viewHistoryPanel() string {
 		avg := stats.totalDowntime / time.Duration(stats.outageCount)
 		parts = append(parts, "avg outage "+fmtDuration(avg))
 	}
-	b.WriteString("  " + subtleStyle.Render(strings.Join(parts, " │ ")) + "\n")
-	b.WriteString("  " + subtleStyle.Render("[j/k/↑/↓] Scroll  [q/Esc] Back"))
+	b.WriteString("  " + m.st.subtleStyle.Render(strings.Join(parts, " │ ")) + "\n")
+	b.WriteString("  " + m.st.subtleStyle.Render("[j/k/↑/↓] Scroll  [q/Esc] Back"))
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }

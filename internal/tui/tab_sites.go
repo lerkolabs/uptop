@@ -11,8 +11,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-var siteGroupStyle lipgloss.Style
-
 type siteFormData struct {
 	Name          string
 	SiteType      string
@@ -182,7 +180,7 @@ func pickCols(active []colKey, allCells map[colKey]string) []string {
 func (m Model) viewSitesTab() string {
 
 	if len(m.sites) == 0 {
-		return m.emptyState(titleStyle.Render("uptop")+"\n\nNo monitors configured yet.", "[n] Add your first monitor")
+		return m.emptyState(m.st.titleStyle.Render("uptop")+"\n\nNo monitors configured yet.", "[n] Add your first monitor")
 	}
 
 	layout := m.computeLayout()
@@ -219,12 +217,12 @@ func (m Model) viewSitesTab() string {
 						colNum:     strconv.Itoa(i + 1),
 						colName:    m.zones.Mark(fmt.Sprintf("site-%d", i), icon+" "+limitStr(site.Name, nameW-4)),
 						colType:    "group",
-						colStatus:  fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)),
-						colLatency: subtleStyle.Render("—"),
+						colStatus:  m.fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)),
+						colLatency: m.st.subtleStyle.Render("—"),
 						colUptime:  m.groupUptime(site.ID),
 						colHistory: m.groupSparkline(site.ID, sparkWidth, rowBg),
-						colSSL:     subtleStyle.Render("-"),
-						colRetries: subtleStyle.Render("—"),
+						colSSL:     m.st.subtleStyle.Render("-"),
+						colRetries: m.st.subtleStyle.Render("—"),
 					}
 					rows = append(rows, pickCols(layout.active, cells))
 					continue
@@ -251,28 +249,28 @@ func (m Model) viewSitesTab() string {
 						if tag != "" {
 							errText = tag + " " + errText
 						}
-						name = name + " " + subtleStyle.Render(limitStr(errText, errSpace))
+						name = name + " " + m.st.subtleStyle.Render(limitStr(errText, errSpace))
 					}
 				}
 
 				hist, _ := m.engine.GetHistory(site.ID)
 				var spark string
 				if site.Type == "push" {
-					spark = heartbeatSparkline(hist.Statuses, sparkWidth, rowBg)
+					spark = m.heartbeatSparkline(hist.Statuses, sparkWidth, rowBg)
 				} else {
-					spark = latencySparkline(hist.Latencies, hist.Statuses, sparkWidth, rowBg)
+					spark = m.latencySparkline(hist.Latencies, hist.Statuses, sparkWidth, rowBg)
 				}
 
 				cells := map[colKey]string{
 					colNum:     strconv.Itoa(i + 1),
 					colName:    m.zones.Mark(fmt.Sprintf("site-%d", i), name),
 					colType:    typeIcon(site.Type, false) + " " + site.Type,
-					colStatus:  fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)),
-					colLatency: fmtLatency(site.Latency),
-					colUptime:  fmtUptime(hist.Statuses),
+					colStatus:  m.fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)),
+					colLatency: m.fmtLatency(site.Latency),
+					colUptime:  m.fmtUptime(hist.Statuses),
 					colHistory: spark,
-					colSSL:     fmtSSL(site),
-					colRetries: fmtRetries(site),
+					colSSL:     m.fmtSSL(site),
+					colRetries: m.fmtRetries(site),
 				}
 				rows = append(rows, pickCols(layout.active, cells))
 			}
@@ -281,7 +279,7 @@ func (m Model) viewSitesTab() string {
 		layout.colWidths,
 		func(row, col int) *lipgloss.Style {
 			if groupRows[row] {
-				s := siteGroupStyle
+				s := m.st.siteGroupStyle
 				return &s
 			}
 			return nil

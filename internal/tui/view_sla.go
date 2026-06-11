@@ -24,13 +24,13 @@ var slaPeriods = []struct {
 func (m Model) viewSLAPanel() string {
 	var b strings.Builder
 
-	header := "  " + titleStyle.Render("SLA REPORT: "+m.slaSiteName)
-	header += "  " + subtleStyle.Render("[q] Back")
+	header := "  " + m.st.titleStyle.Render("SLA REPORT: "+m.slaSiteName)
+	header += "  " + m.st.subtleStyle.Render("[q] Back")
 	b.WriteString(header + "\n")
 	b.WriteString(m.divider() + "\n")
 
 	period := slaPeriods[m.slaPeriodIdx]
-	b.WriteString("  " + subtleStyle.Render("Period: Last "+period.label) + "\n\n")
+	b.WriteString("  " + m.st.subtleStyle.Render("Period: Last "+period.label) + "\n\n")
 
 	r := m.slaReport
 
@@ -38,22 +38,22 @@ func (m Model) viewSLAPanel() string {
 	if barWidth < 10 {
 		barWidth = 10
 	}
-	bar := uptimeBar(r.UptimePct, barWidth)
-	uptimeColor := specialStyle
+	bar := m.uptimeBar(r.UptimePct, barWidth)
+	uptimeColor := m.st.specialStyle
 	if r.UptimePct < 99.9 {
-		uptimeColor = warnStyle
+		uptimeColor = m.st.warnStyle
 	}
 	if r.UptimePct < 99.0 {
-		uptimeColor = dangerStyle
+		uptimeColor = m.st.dangerStyle
 	}
-	fmt.Fprintf(&b, "  %-16s %s  %s\n", subtleStyle.Render("Uptime"), uptimeColor.Render(fmt.Sprintf("%s%%", fmtPct(r.UptimePct))), bar)
-	fmt.Fprintf(&b, "  %-16s %s\n", subtleStyle.Render("Downtime"), fmtDuration(r.Downtime))
-	fmt.Fprintf(&b, "  %-16s %d\n", subtleStyle.Render("Outages"), r.OutageCount)
+	fmt.Fprintf(&b, "  %-16s %s  %s\n", m.st.subtleStyle.Render("Uptime"), uptimeColor.Render(fmt.Sprintf("%s%%", fmtPct(r.UptimePct))), bar)
+	fmt.Fprintf(&b, "  %-16s %s\n", m.st.subtleStyle.Render("Downtime"), fmtDuration(r.Downtime))
+	fmt.Fprintf(&b, "  %-16s %d\n", m.st.subtleStyle.Render("Outages"), r.OutageCount)
 
 	if r.OutageCount > 0 {
-		fmt.Fprintf(&b, "  %-16s %s\n", subtleStyle.Render("Longest"), fmtDuration(r.LongestOut))
-		fmt.Fprintf(&b, "  %-16s %s\n", subtleStyle.Render("MTTR"), fmtDuration(r.MTTR))
-		fmt.Fprintf(&b, "  %-16s %s\n", subtleStyle.Render("MTBF"), fmtDuration(r.MTBF))
+		fmt.Fprintf(&b, "  %-16s %s\n", m.st.subtleStyle.Render("Longest"), fmtDuration(r.LongestOut))
+		fmt.Fprintf(&b, "  %-16s %s\n", m.st.subtleStyle.Render("MTTR"), fmtDuration(r.MTTR))
+		fmt.Fprintf(&b, "  %-16s %s\n", m.st.subtleStyle.Render("MTBF"), fmtDuration(r.MTBF))
 	}
 
 	b.WriteString("\n" + m.divider() + "\n")
@@ -68,13 +68,13 @@ func (m Model) viewSLAPanel() string {
 	for i, p := range slaPeriods {
 		label := fmt.Sprintf("[%s] %s", p.key, p.label)
 		if i == m.slaPeriodIdx {
-			keys = append(keys, titleStyle.Render(label))
+			keys = append(keys, m.st.titleStyle.Render(label))
 		} else {
-			keys = append(keys, subtleStyle.Render(label))
+			keys = append(keys, m.st.subtleStyle.Render(label))
 		}
 	}
 	b.WriteString("  " + strings.Join(keys, "  "))
-	b.WriteString("  " + subtleStyle.Render("[j/k/↑/↓] Scroll  [q/Esc] Back"))
+	b.WriteString("  " + m.st.subtleStyle.Render("[j/k/↑/↓] Scroll  [q/Esc] Back"))
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }
@@ -87,27 +87,27 @@ func (m Model) buildSLADailyContent() string {
 		barWidth = 10
 	}
 
-	b.WriteString("  " + subtleStyle.Render("DAILY BREAKDOWN") + "\n")
+	b.WriteString("  " + m.st.subtleStyle.Render("DAILY BREAKDOWN") + "\n")
 	for _, day := range m.slaDailyBreakdown {
 		dateStr := day.Date.Format("Jan 02")
-		bar := uptimeBar(day.UptimePct, barWidth)
+		bar := m.uptimeBar(day.UptimePct, barWidth)
 		pctStr := fmtPct(day.UptimePct) + "%"
 
-		color := specialStyle
+		color := m.st.specialStyle
 		if day.UptimePct < 99.9 {
-			color = warnStyle
+			color = m.st.warnStyle
 		}
 		if day.UptimePct < 99.0 {
-			color = dangerStyle
+			color = m.st.dangerStyle
 		}
 
-		fmt.Fprintf(&b, "  %-8s %s  %s\n", subtleStyle.Render(dateStr), bar, color.Render(pctStr))
+		fmt.Fprintf(&b, "  %-8s %s  %s\n", m.st.subtleStyle.Render(dateStr), bar, color.Render(pctStr))
 	}
 
 	return b.String()
 }
 
-func uptimeBar(pct float64, width int) string {
+func (m Model) uptimeBar(pct float64, width int) string {
 	filled := int(math.Round(pct / 100 * float64(width)))
 	if filled > width {
 		filled = width
@@ -117,9 +117,9 @@ func uptimeBar(pct float64, width int) string {
 	}
 	empty := width - filled
 
-	bar := specialStyle.Render(strings.Repeat("█", filled))
+	bar := m.st.specialStyle.Render(strings.Repeat("█", filled))
 	if empty > 0 {
-		bar += subtleStyle.Render(strings.Repeat("░", empty))
+		bar += m.st.subtleStyle.Render(strings.Repeat("░", empty))
 	}
 	return bar
 }

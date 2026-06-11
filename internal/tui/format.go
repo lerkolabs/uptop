@@ -18,13 +18,13 @@ func (m Model) dividerWidth() int {
 }
 
 func (m Model) divider() string {
-	return "  " + subtleStyle.Render(strings.Repeat("─", m.dividerWidth()))
+	return "  " + m.st.subtleStyle.Render(strings.Repeat("─", m.dividerWidth()))
 }
 
 func (m Model) emptyState(message, hint string) string {
 	content := message
 	if hint != "" {
-		content += "\n\n" + subtleStyle.Render(hint)
+		content += "\n\n" + m.st.subtleStyle.Render(hint)
 	}
 	return "\n" + lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -81,10 +81,10 @@ func typeIcon(siteType string, collapsed bool) string {
 	}
 }
 
-func fmtLatency(d time.Duration) string {
+func (m Model) fmtLatency(d time.Duration) string {
 	ms := d.Milliseconds()
 	if ms == 0 {
-		return subtleStyle.Render("—")
+		return m.st.subtleStyle.Render("—")
 	}
 	var s string
 	if ms < 1000 {
@@ -93,17 +93,17 @@ func fmtLatency(d time.Duration) string {
 		s = fmt.Sprintf("%.1fs", float64(ms)/1000)
 	}
 	if ms < 200 {
-		return specialStyle.Render(s)
+		return m.st.specialStyle.Render(s)
 	}
 	if ms < 500 {
-		return warnStyle.Render(s)
+		return m.st.warnStyle.Render(s)
 	}
-	return dangerStyle.Render(s)
+	return m.st.dangerStyle.Render(s)
 }
 
-func fmtUptime(statuses []bool) string {
+func (m Model) fmtUptime(statuses []bool) string {
 	if len(statuses) == 0 {
-		return subtleStyle.Render("—")
+		return m.st.subtleStyle.Render("—")
 	}
 	up := 0
 	for _, s := range statuses {
@@ -114,70 +114,70 @@ func fmtUptime(statuses []bool) string {
 	pct := float64(up) / float64(len(statuses)) * 100
 	s := fmt.Sprintf("%.1f%%", pct)
 	if pct >= 99 {
-		return specialStyle.Render(s)
+		return m.st.specialStyle.Render(s)
 	}
 	if pct >= 95 {
-		return warnStyle.Render(s)
+		return m.st.warnStyle.Render(s)
 	}
-	return dangerStyle.Render(s)
+	return m.st.dangerStyle.Render(s)
 }
 
-func fmtSSL(site models.Site) string {
+func (m Model) fmtSSL(site models.Site) string {
 	if site.Type != "http" || !site.CheckSSL || !site.HasSSL {
-		return subtleStyle.Render("-")
+		return m.st.subtleStyle.Render("-")
 	}
 	days := int(time.Until(site.CertExpiry).Hours() / 24)
 	s := fmt.Sprintf("%dd", days)
 	if days <= 0 {
-		return dangerStyle.Render("EXPIRED")
+		return m.st.dangerStyle.Render("EXPIRED")
 	}
 	if days <= site.ExpiryThreshold {
-		return warnStyle.Render(s)
+		return m.st.warnStyle.Render(s)
 	}
-	return specialStyle.Render(s)
+	return m.st.specialStyle.Render(s)
 }
 
-func fmtRetries(site models.Site) string {
+func (m Model) fmtRetries(site models.Site) string {
 	dispCount := site.FailureCount
 	if dispCount > site.MaxRetries {
 		dispCount = site.MaxRetries
 	}
 	s := fmt.Sprintf("%d/%d", dispCount, site.MaxRetries)
 	if site.Status == "DOWN" {
-		return dangerStyle.Render(s)
+		return m.st.dangerStyle.Render(s)
 	}
 	if site.Status == "UP" && site.FailureCount > 0 {
-		return warnStyle.Render(s)
+		return m.st.warnStyle.Render(s)
 	}
 	return s
 }
 
-func fmtStatus(status string, paused bool, inMaint bool) string {
+func (m Model) fmtStatus(status string, paused bool, inMaint bool) string {
 	if paused {
-		return warnStyle.Render("◇ PAUSED")
+		return m.st.warnStyle.Render("◇ PAUSED")
 	}
 	if inMaint {
-		return maintStyle.Render("◼ MAINT")
+		return m.st.maintStyle.Render("◼ MAINT")
 	}
 	switch status {
 	case "DOWN":
-		return dangerStyle.Render("▼ DOWN")
+		return m.st.dangerStyle.Render("▼ DOWN")
 	case "SSL EXP":
-		return dangerStyle.Render("▼ SSL EXP")
+		return m.st.dangerStyle.Render("▼ SSL EXP")
 	case "LATE":
-		return warnStyle.Render("◆ LATE")
+		return m.st.warnStyle.Render("◆ LATE")
 	case "STALE":
-		return staleStyle.Render("◆ STALE")
+		return m.st.staleStyle.Render("◆ STALE")
 	case "PENDING":
-		return subtleStyle.Render("○ PENDING")
+		return m.st.subtleStyle.Render("○ PENDING")
 	default:
-		return specialStyle.Render("▲ " + status)
+		return m.st.specialStyle.Render("▲ " + status)
 	}
 }
 
-func fmtTimeAgo(t time.Time) string {
+func (m Model) fmtTimeAgo(t time.Time) string {
 	if t.IsZero() {
-		return subtleStyle.Render("never")
+		return m.st.subtleStyle.Render("never")
 	}
 	d := time.Since(t)
 	if d < time.Minute {

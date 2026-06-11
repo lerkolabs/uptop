@@ -8,7 +8,7 @@ import (
 )
 
 func TestLatencySparkline_Empty(t *testing.T) {
-	got := latencySparkline(nil, nil, 10, "")
+	got := styledModel.latencySparkline(nil, nil, 10, "")
 	if !strings.Contains(got, "··········") {
 		t.Errorf("empty sparkline should be dots, got %q", got)
 	}
@@ -17,7 +17,7 @@ func TestLatencySparkline_Empty(t *testing.T) {
 func TestLatencySparkline_SingleValue(t *testing.T) {
 	latencies := []time.Duration{100 * time.Millisecond}
 	statuses := []bool{true}
-	got := latencySparkline(latencies, statuses, 5, "")
+	got := styledModel.latencySparkline(latencies, statuses, 5, "")
 	if len(got) == 0 {
 		t.Error("sparkline should not be empty")
 	}
@@ -33,7 +33,7 @@ func TestLatencySparkline_WidthTruncation(t *testing.T) {
 		latencies[i] = time.Duration(i*50) * time.Millisecond
 		statuses[i] = true
 	}
-	got := latencySparkline(latencies, statuses, 5, "")
+	got := styledModel.latencySparkline(latencies, statuses, 5, "")
 	if len(got) == 0 {
 		t.Error("sparkline should not be empty")
 	}
@@ -45,7 +45,7 @@ func TestLatencySparkline_WidthTruncation(t *testing.T) {
 func TestLatencySparkline_RelativeHeight(t *testing.T) {
 	latencies := []time.Duration{10 * time.Millisecond, 50 * time.Millisecond, 10 * time.Millisecond}
 	statuses := []bool{true, true, true}
-	out := stripANSI(latencySparkline(latencies, statuses, 3, ""))
+	out := stripANSI(styledModel.latencySparkline(latencies, statuses, 3, ""))
 	runes := []rune(out)
 	if len(runes) < 3 {
 		t.Fatalf("expected 3 runes, got %d", len(runes))
@@ -56,18 +56,15 @@ func TestLatencySparkline_RelativeHeight(t *testing.T) {
 }
 
 func TestLatencyStyle_BandsProduceDifferentColors(t *testing.T) {
-	sparkSuccess = "#00ff00"
-	sparkWarning = "#ffff00"
-	sparkDanger = "#ff0000"
-	defer func() {
-		sparkSuccess = ""
-		sparkWarning = ""
-		sparkDanger = ""
-	}()
+	st := newStyles(themeFlexokiDark)
+	st.sparkSuccess = "#00ff00"
+	st.sparkWarning = "#ffff00"
+	st.sparkDanger = "#ff0000"
+	m := Model{st: st}
 
-	green := latencyStyle(50, "")
-	yellow := latencyStyle(300, "")
-	red := latencyStyle(800, "")
+	green := m.latencyStyle(50, "")
+	yellow := m.latencyStyle(300, "")
+	red := m.latencyStyle(800, "")
 
 	gfg := green.GetForeground()
 	yfg := yellow.GetForeground()
@@ -79,11 +76,12 @@ func TestLatencyStyle_BandsProduceDifferentColors(t *testing.T) {
 }
 
 func TestLatencyStyle_BrightnessVariesWithinBand(t *testing.T) {
-	sparkSuccess = "#00ff00"
-	defer func() { sparkSuccess = "" }()
+	st := newStyles(themeFlexokiDark)
+	st.sparkSuccess = "#00ff00"
+	m := Model{st: st}
 
-	dim := latencyStyle(10, "")
-	bright := latencyStyle(190, "")
+	dim := m.latencyStyle(10, "")
+	bright := m.latencyStyle(190, "")
 
 	if dim.GetForeground() == bright.GetForeground() {
 		t.Error("10ms and 190ms should have different brightness within green band")
@@ -93,7 +91,7 @@ func TestLatencyStyle_BrightnessVariesWithinBand(t *testing.T) {
 func TestLatencySparkline_OutputWidth(t *testing.T) {
 	latencies := []time.Duration{100 * time.Millisecond, 200 * time.Millisecond, 300 * time.Millisecond}
 	statuses := []bool{true, true, true}
-	got := latencySparkline(latencies, statuses, 5, "")
+	got := styledModel.latencySparkline(latencies, statuses, 5, "")
 	count := utf8.RuneCountInString(stripANSI(got))
 	if count != 5 {
 		t.Errorf("expected 5 rune-width output, got %d from %q", count, got)
@@ -118,7 +116,7 @@ func stripANSI(s string) string {
 }
 
 func TestHeartbeatSparkline_Empty(t *testing.T) {
-	got := heartbeatSparkline(nil, 10, "")
+	got := styledModel.heartbeatSparkline(nil, 10, "")
 	if !strings.Contains(got, "··········") {
 		t.Errorf("empty heartbeat should be dots, got %q", got)
 	}
@@ -126,7 +124,7 @@ func TestHeartbeatSparkline_Empty(t *testing.T) {
 
 func TestHeartbeatSparkline_Mixed(t *testing.T) {
 	statuses := []bool{true, false, true, true, false}
-	got := heartbeatSparkline(statuses, 5, "")
+	got := styledModel.heartbeatSparkline(statuses, 5, "")
 	if len(got) == 0 {
 		t.Error("heartbeat sparkline should not be empty")
 	}
@@ -134,7 +132,7 @@ func TestHeartbeatSparkline_Mixed(t *testing.T) {
 
 func TestHeartbeatSparkline_PaddedWidth(t *testing.T) {
 	statuses := []bool{true, true}
-	got := heartbeatSparkline(statuses, 5, "")
+	got := styledModel.heartbeatSparkline(statuses, 5, "")
 	if !strings.Contains(got, "···") {
 		t.Errorf("should have dot padding for width > data, got %q", got)
 	}
