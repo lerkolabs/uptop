@@ -45,7 +45,7 @@ func (m Model) viewDetailPanel() string {
 
 	row("Status", m.fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)))
 
-	if (site.Status == "DOWN" || site.Status == "SSL EXP" || site.Status == "LATE" || site.Status == "STALE") && site.LastError != "" {
+	if (site.Status == models.StatusDown || site.Status == models.StatusSSLExp || site.Status == models.StatusLate || site.Status == models.StatusStale) && site.LastError != "" {
 		errWidth := m.termWidth - chromePadH - 19
 		if errWidth < 30 {
 			errWidth = 30
@@ -58,7 +58,7 @@ func (m Model) viewDetailPanel() string {
 		row("HTTP Code", strconv.Itoa(site.StatusCode))
 	}
 
-	if (site.Status == "DOWN" || site.Status == "SSL EXP") && site.LastError != "" {
+	if (site.Status == models.StatusDown || site.Status == models.StatusSSLExp) && site.LastError != "" {
 		chain := connectionChain(site.LastError, site.Type, site.StatusCode, strings.HasPrefix(site.URL, "https"))
 		if len(chain) > 0 {
 			b.WriteString("\n")
@@ -189,7 +189,7 @@ func (m Model) viewDetailPanel() string {
 		for i, sc := range stateChanges {
 			ago := fmtDuration(time.Since(sc.ChangedAt))
 			arrow := m.st.subtleStyle.Render(sc.FromStatus) + " → "
-			if sc.ToStatus == "UP" {
+			if sc.ToStatus == string(models.StatusUp) {
 				arrow += m.st.specialStyle.Render(sc.ToStatus)
 			} else {
 				arrow += m.st.dangerStyle.Render(sc.ToStatus)
@@ -198,7 +198,7 @@ func (m Model) viewDetailPanel() string {
 			if dur := computeOutageDuration(stateChanges, i); dur > 0 {
 				line += "  " + m.st.warnStyle.Render("outage "+fmtDuration(dur))
 			}
-			if sc.ErrorReason != "" && sc.ToStatus != "UP" {
+			if sc.ErrorReason != "" && sc.ToStatus != string(models.StatusUp) {
 				line += "  " + m.st.dangerStyle.Render(sc.ErrorReason)
 			}
 			b.WriteString(line + "\n")

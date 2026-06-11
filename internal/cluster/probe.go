@@ -157,7 +157,7 @@ loop:
 			results = append(results, probeResultItem{
 				SiteID:      s.ID,
 				LatencyNs:   cr.LatencyNs,
-				IsUp:        cr.Status == "UP",
+				IsUp:        cr.Status == string(models.StatusUp),
 				ErrorReason: cr.ErrorReason,
 			})
 			mu.Unlock()

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -16,7 +17,7 @@ func sinApprox(x float64) float64 {
 func (m Model) pulseIndicator() string {
 	hasDown := false
 	for _, s := range m.sites {
-		if !s.Paused && !m.isMonitorInMaintenance(s.ID) && (s.Status == "DOWN" || s.Status == "SSL EXP") {
+		if !s.Paused && !m.isMonitorInMaintenance(s.ID) && (s.Status == models.StatusDown || s.Status == models.StatusSSLExp) {
 			hasDown = true
 			break
 		}
@@ -127,9 +128,9 @@ func (m Model) computeStats() dashboardStats {
 			continue
 		}
 		switch site.Status {
-		case "DOWN", "SSL EXP":
+		case models.StatusDown, models.StatusSSLExp:
 			s.downCount++
-		case "LATE":
+		case models.StatusLate:
 			s.lateCount++
 		}
 	}

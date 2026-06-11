@@ -56,19 +56,19 @@ func TestSiteOrder(t *testing.T) {
 
 func TestFmtStatus(t *testing.T) {
 	tests := []struct {
-		status  string
+		status  models.Status
 		paused  bool
 		inMaint bool
 		wantSub string
 	}{
-		{"DOWN", false, false, "▼ DOWN"},
-		{"UP", false, false, "▲ UP"},
-		{"SSL EXP", false, false, "▼ SSL EXP"},
-		{"LATE", false, false, "◆ LATE"},
-		{"STALE", false, false, "◆ STALE"},
-		{"PENDING", false, false, "○ PENDING"},
-		{"DOWN", true, false, "◇ PAUSED"},
-		{"DOWN", false, true, "◼ MAINT"},
+		{models.StatusDown, false, false, "▼ DOWN"},
+		{models.StatusUp, false, false, "▲ UP"},
+		{models.StatusSSLExp, false, false, "▼ SSL EXP"},
+		{models.StatusLate, false, false, "◆ LATE"},
+		{models.StatusStale, false, false, "◆ STALE"},
+		{models.StatusPending, false, false, "○ PENDING"},
+		{models.StatusDown, true, false, "◇ PAUSED"},
+		{models.StatusDown, false, true, "◼ MAINT"},
 	}
 	for _, tt := range tests {
 		got := styledModel.fmtStatus(tt.status, tt.paused, tt.inMaint)

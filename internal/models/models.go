@@ -28,7 +28,7 @@ type Site struct {
 	Regions        string
 
 	FailureCount    int
-	Status          string
+	Status          Status
 	StatusCode      int
 	Latency         time.Duration
 	CertExpiry      time.Time

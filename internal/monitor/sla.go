@@ -16,14 +16,14 @@ type SLAReport struct {
 	MTBF        time.Duration
 }
 
-func ComputeSLA(changes []models.StateChange, currentStatus string, window time.Duration) SLAReport {
+func ComputeSLA(changes []models.StateChange, currentStatus models.Status, window time.Duration) SLAReport {
 	now := time.Now()
 	windowStart := now.Add(-window)
 
 	report := SLAReport{Window: window}
 
 	if len(changes) == 0 {
-		if isDown(currentStatus) {
+		if models.Status(currentStatus).IsBroken() {
 			report.UptimePct = 0
 			report.Downtime = window
 		} else {
@@ -40,7 +40,7 @@ func ComputeSLA(changes []models.StateChange, currentStatus string, window time.
 	}
 
 	// Determine status at window start: last transition before or at windowStart.
-	statusAtStart := "UP"
+	statusAtStart := string(models.StatusUp)
 	for i := len(sorted) - 1; i >= 0; i-- {
 		if !sorted[i].ChangedAt.After(windowStart) {
 			statusAtStart = sorted[i].ToStatus
@@ -51,7 +51,7 @@ func ComputeSLA(changes []models.StateChange, currentStatus string, window time.
 	var upTime, downTime time.Duration
 	var outages []time.Duration
 	cursor := windowStart
-	wasDown := isDown(statusAtStart)
+	wasDown := models.Status(statusAtStart).IsBroken()
 
 	if wasDown {
 		report.OutageCount = 1
@@ -77,7 +77,7 @@ func ComputeSLA(changes []models.StateChange, currentStatus string, window time.
 			upTime += seg
 		}
 
-		newDown := isDown(sc.ToStatus)
+		newDown := models.Status(sc.ToStatus).IsBroken()
 		if !wasDown && newDown {
 			report.OutageCount++
 			outageStart = sc.ChangedAt
@@ -127,7 +127,7 @@ func ComputeSLA(changes []models.StateChange, currentStatus string, window time.
 	return report
 }
 
-func ComputeDailyBreakdown(changes []models.StateChange, currentStatus string, days int, now time.Time) []DayReport {
+func ComputeDailyBreakdown(changes []models.StateChange, currentStatus models.Status, days int, now time.Time) []DayReport {
 	reports := make([]DayReport, days)
 
 	for i := 0; i < days; i++ {
@@ -159,10 +159,6 @@ type DayReport struct {
 	UptimePct float64
 }
 
-func isDown(status string) bool {
-	return status == "DOWN" || status == "SSL EXP"
-}
-
 func filterChangesForWindow(changes []models.StateChange, start, end time.Time) []models.StateChange {
 	var filtered []models.StateChange
 	for _, sc := range changes {
@@ -180,7 +176,7 @@ func inferStatusAt(changes []models.StateChange, at time.Time) string {
 			return sc.ToStatus
 		}
 	}
-	return "UP"
+	return string(models.StatusUp)
 }
 
 func computeSLAForWindow(changes []models.StateChange, statusAtStart string, start, end time.Time) float64 {
@@ -193,7 +189,7 @@ func computeSLAForWindow(changes []models.StateChange, statusAtStart string, sta
 
 	var upTime, downTime time.Duration
 	cursor := start
-	wasDown := isDown(statusAtStart)
+	wasDown := models.Status(statusAtStart).IsBroken()
 
 	for _, sc := range sorted {
 		if sc.ChangedAt.Before(start) || !sc.ChangedAt.Before(end) {
@@ -205,7 +201,7 @@ func computeSLAForWindow(changes []models.StateChange, statusAtStart string, sta
 		} else {
 			upTime += seg
 		}
-		wasDown = isDown(sc.ToStatus)
+		wasDown = models.Status(sc.ToStatus).IsBroken()
 		cursor = sc.ChangedAt
 	}
 

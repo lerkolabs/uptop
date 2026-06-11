@@ -334,7 +334,7 @@ func (e *Engine) RecordHeartbeat(token string) bool {
 	}
 
 	var (
-		prevStatus string
+		prevStatus models.Status
 		name       string
 		alertID    int
 		downSince  time.Time
@@ -346,12 +346,12 @@ func (e *Engine) RecordHeartbeat(token string) bool {
 		downSince = s.StatusChangedAt // captured before mutation = when it went down
 
 		s.LastCheck = time.Now()
-		s.Status = "UP"
+		s.Status = models.StatusUp
 		s.FailureCount = 0
 		s.Latency = 0
 		s.LastError = ""
 		s.LastSuccessAt = time.Now()
-		if prevStatus != "UP" {
+		if prevStatus != models.StatusUp {
 			s.StatusChangedAt = time.Now()
 		}
 	})
@@ -360,13 +360,13 @@ func (e *Engine) RecordHeartbeat(token string) bool {
 	}
 
 	switch prevStatus {
-	case "PENDING":
+	case models.StatusPending:
 		e.AddLog(fmt.Sprintf("Push Monitor '%s' received first heartbeat", name))
-	case "LATE":
+	case models.StatusLate:
 		e.AddLog(fmt.Sprintf("Push Monitor '%s' heartbeat arrived (was late)", name))
-	case "STALE":
+	case models.StatusStale:
 		e.AddLog(fmt.Sprintf("Push Monitor '%s' heartbeat arrived (was stale)", name))
-	case "DOWN":
+	case models.StatusDown:
 		downDur := ""
 		if !downSince.IsZero() {
 			downDur = fmt.Sprintf(" (was down %s)", fmtDurationShort(time.Since(downSince)))
@@ -375,8 +375,8 @@ func (e *Engine) RecordHeartbeat(token string) bool {
 		go e.triggerAlert(alertID, "✅ RECOVERY", fmt.Sprintf("Push Monitor '%s' is receiving heartbeats.%s", name, downDur))
 	}
 
-	if prevStatus != "UP" && prevStatus != "PENDING" {
-		e.enqueueWrite(writeStateChange{siteID: targetID, fromStatus: prevStatus, toStatus: "UP"})
+	if prevStatus != models.StatusUp && prevStatus != models.StatusPending {
+		e.enqueueWrite(writeStateChange{siteID: targetID, fromStatus: string(prevStatus), toStatus: string(models.StatusUp)})
 	}
 
 	return true
@@ -434,12 +434,12 @@ func (e *Engine) Start(ctx context.Context) {
 				e.mu.RUnlock()
 				if !exists {
 					e.mu.Lock()
-					s.Status = "PENDING"
+					s.Status = models.StatusPending
 					if h, ok := e.GetHistory(s.ID); ok && len(h.Statuses) > 0 {
 						if h.Statuses[len(h.Statuses)-1] {
-							s.Status = "UP"
+							s.Status = models.StatusUp
 						} else {
-							s.Status = "DOWN"
+							s.Status = models.StatusDown
 						}
 						if len(h.Latencies) > 0 {
 							s.Latency = h.Latencies[len(h.Latencies)-1]
@@ -686,7 +686,7 @@ func (e *Engine) checkByID(ctx context.Context, id int) {
 }
 
 func (e *Engine) checkPush(_ context.Context, site models.Site) {
-	if site.Status == "PENDING" {
+	if site.Status == models.StatusPending {
 		return
 	}
 
@@ -702,16 +702,16 @@ func (e *Engine) checkPush(_ context.Context, site models.Site) {
 	now := time.Now()
 
 	if now.After(graceEnd) {
-		if site.Status != "DOWN" {
-			e.handleStatusChange(site, "DOWN", 0, 0, "heartbeat missed")
+		if site.Status != models.StatusDown {
+			e.handleStatusChange(site, string(models.StatusDown), 0, 0, "heartbeat missed")
 		}
 	} else if now.After(staleMark) {
-		if site.Status != "STALE" {
-			e.handleStatusChange(site, "STALE", 0, 0, "heartbeat stale")
+		if site.Status != models.StatusStale {
+			e.handleStatusChange(site, string(models.StatusStale), 0, 0, "heartbeat stale")
 		}
 	} else if now.After(overdue) {
-		if site.Status != "LATE" {
-			e.handleStatusChange(site, "LATE", 0, 0, "heartbeat overdue")
+		if site.Status != models.StatusLate {
+			e.handleStatusChange(site, string(models.StatusLate), 0, 0, "heartbeat overdue")
 		}
 	}
 }
@@ -727,9 +727,10 @@ func (e *Engine) handleStatusChange(snap models.Site, rawStatus string, code int
 	}
 
 	inMaint := e.isInMaintenance(snap.ID)
+	status := models.Status(rawStatus)
 
 	var (
-		prev, next            string
+		prev, next            models.Status
 		name, typ             string
 		alertID               int
 		failCount, maxRetries int
@@ -745,7 +746,7 @@ func (e *Engine) handleStatusChange(snap models.Site, rawStatus string, code int
 	_, exists := e.applyState(snap.ID, func(s *models.Site) {
 		// A non-UP result computed from a stale snapshot must not override a
 		// heartbeat (or newer check) that landed while we were evaluating.
-		if rawStatus != "UP" && s.LastCheck.After(snap.LastCheck) {
+		if status != models.StatusUp && s.LastCheck.After(snap.LastCheck) {
 			skipped = true
 			return
 		}
@@ -764,24 +765,24 @@ func (e *Engine) handleStatusChange(snap models.Site, rawStatus string, code int
 		s.HasSSL = snap.HasSSL
 		s.CertExpiry = snap.CertExpiry
 		s.LastError = errorReason
-		if rawStatus == "UP" {
+		if status == models.StatusUp {
 			s.LastSuccessAt = time.Now()
 			s.LastError = ""
 		}
 
 		// Status + failure-count transition, based on the CURRENT live status.
-		if rawStatus == "UP" {
+		if status == models.StatusUp {
 			s.FailureCount = 0
-			s.Status = "UP"
+			s.Status = models.StatusUp
 		} else {
 			if s.FailureCount <= s.MaxRetries {
 				s.FailureCount++
 			}
 			if s.FailureCount > s.MaxRetries {
-				if s.Status != rawStatus {
+				if s.Status != status {
 					confirmedDown = true
 				}
-				s.Status = rawStatus
+				s.Status = status
 				s.FailureCount = s.MaxRetries + 1
 			} else {
 				failedCheck = true
@@ -789,16 +790,16 @@ func (e *Engine) handleStatusChange(snap models.Site, rawStatus string, code int
 		}
 		failCount = s.FailureCount
 
-		if s.Status != prev && prev != "PENDING" {
+		if s.Status != prev && prev != models.StatusPending {
 			s.StatusChangedAt = time.Now()
-		} else if s.StatusChangedAt.IsZero() && s.Status != "PENDING" {
+		} else if s.StatusChangedAt.IsZero() && s.Status != models.StatusPending {
 			s.StatusChangedAt = time.Now()
 		}
 
 		// SSL expiry warning (fresh HasSSL/CertExpiry + config threshold).
 		if typ == "http" && s.CheckSSL && s.HasSSL {
 			days := int(time.Until(s.CertExpiry).Hours() / 24)
-			if days <= s.ExpiryThreshold && !s.SentSSLWarning && rawStatus != "SSL EXP" {
+			if days <= s.ExpiryThreshold && !s.SentSSLWarning && status != models.StatusSSLExp {
 				sslWarnFire = true
 				sslDays = days
 				s.SentSSLWarning = true
@@ -815,7 +816,7 @@ func (e *Engine) handleStatusChange(snap models.Site, rawStatus string, code int
 		return
 	}
 
-	e.recordCheck(snap.ID, latency, rawStatus == "UP")
+	e.recordCheck(snap.ID, latency, status == models.StatusUp)
 
 	if confirmedDown {
 		if errorReason != "" {
@@ -827,8 +828,8 @@ func (e *Engine) handleStatusChange(snap models.Site, rawStatus string, code int
 		e.AddLog(fmt.Sprintf("Monitor '%s' failed check %d/%d", name, failCount, maxRetries))
 	}
 
-	if changed && prev != "PENDING" {
-		e.enqueueWrite(writeStateChange{siteID: snap.ID, fromStatus: prev, toStatus: next, reason: errorReason})
+	if changed && prev != models.StatusPending {
+		e.enqueueWrite(writeStateChange{siteID: snap.ID, fromStatus: string(prev), toStatus: string(next), reason: errorReason})
 	}
 
 	if sslWarnFire {
@@ -839,13 +840,11 @@ func (e *Engine) handleStatusChange(snap models.Site, rawStatus string, code int
 		}
 	}
 
-	isBroken := func(s string) bool { return s == "DOWN" || s == "SSL EXP" }
-
-	if prev == "UP" && next == "LATE" {
+	if prev == models.StatusUp && next == models.StatusLate {
 		e.AddLog(fmt.Sprintf("Monitor '%s' heartbeat overdue", name))
 	}
 
-	if !isBroken(prev) && isBroken(next) && next != "PENDING" {
+	if !prev.IsBroken() && next.IsBroken() && next != models.StatusPending {
 		if inMaint {
 			e.AddLog(fmt.Sprintf("Monitor '%s' is DOWN (alerts suppressed — maintenance)", name))
 		} else {
@@ -859,7 +858,7 @@ func (e *Engine) handleStatusChange(snap models.Site, rawStatus string, code int
 			e.triggerAlert(alertID, "🚨 ALERT", msg)
 		}
 	}
-	if isBroken(prev) && next == "UP" {
+	if prev.IsBroken() && next == models.StatusUp {
 		downDur := ""
 		if !downSince.IsZero() {
 			downDur = fmt.Sprintf(" (was down %s)", fmtDurationShort(time.Since(downSince)))
@@ -869,7 +868,7 @@ func (e *Engine) handleStatusChange(snap models.Site, rawStatus string, code int
 			e.triggerAlert(alertID, "✅ RECOVERY", fmt.Sprintf("Monitor '%s' is UP%s", name, downDur))
 		}
 	}
-	if prev == "LATE" && next == "UP" && !isBroken(prev) {
+	if prev == models.StatusLate && next == models.StatusUp && !prev.IsBroken() {
 		e.AddLog(fmt.Sprintf("Monitor '%s' heartbeat arrived (was late)", name))
 	}
 }
@@ -991,12 +990,12 @@ func (e *Engine) GetDisplayStatus(site models.Site) string {
 	if e.isInMaintenance(site.ID) {
 		return "MAINT"
 	}
-	return site.Status
+	return string(site.Status)
 }
 
 func (e *Engine) checkGroup(_ context.Context, site models.Site) {
 	e.mu.RLock()
-	status := "UP"
+	status := models.StatusUp
 	hasChildren := false
 	for _, child := range e.liveState {
 		if child.ParentID != site.ID || child.Type == "group" {
@@ -1006,20 +1005,20 @@ func (e *Engine) checkGroup(_ context.Context, site models.Site) {
 		if child.Paused || e.isInMaintenance(child.ID) {
 			continue
 		}
-		if child.Status == "DOWN" || child.Status == "SSL EXP" {
-			status = "DOWN"
-		} else if child.Status == "STALE" && status != "DOWN" {
-			status = "STALE"
-		} else if child.Status == "LATE" && status != "DOWN" && status != "STALE" {
-			status = "LATE"
-		} else if child.Status == "PENDING" && status != "DOWN" && status != "STALE" && status != "LATE" {
-			status = "PENDING"
+		if child.Status == models.StatusDown || child.Status == models.StatusSSLExp {
+			status = models.StatusDown
+		} else if child.Status == models.StatusStale && status != models.StatusDown {
+			status = models.StatusStale
+		} else if child.Status == models.StatusLate && status != models.StatusDown && status != models.StatusStale {
+			status = models.StatusLate
+		} else if child.Status == models.StatusPending && status != models.StatusDown && status != models.StatusStale && status != models.StatusLate {
+			status = models.StatusPending
 		}
 	}
 	e.mu.RUnlock()
 
 	if !hasChildren {
-		status = "PENDING"
+		status = models.StatusPending
 	}
 
 	e.applyState(site.ID, func(s *models.Site) {
@@ -1072,15 +1071,15 @@ func (e *Engine) IngestProbeResult(nodeID string, siteID int, latencyNs int64, i
 
 	aggUp, avgLatency := AggregateStatus(results, e.aggStrategy)
 
-	rawStatus := "UP"
+	probeStatus := models.StatusUp
 	if !aggUp {
-		rawStatus = "DOWN"
+		probeStatus = models.StatusDown
 	}
 
 	updatedSite := site
 	updatedSite.Latency = time.Duration(avgLatency)
 	updatedSite.LastCheck = time.Now()
-	e.handleStatusChange(updatedSite, rawStatus, 0, time.Duration(avgLatency), errorReason)
+	e.handleStatusChange(updatedSite, string(probeStatus), 0, time.Duration(avgLatency), errorReason)
 }
 
 func (e *Engine) GetProbeResults(siteID int) map[string]NodeResult {

@@ -47,7 +47,7 @@ func RunCheck(ctx context.Context, site models.Site, strict, insecure *http.Clie
 			if ips, err := net.LookupIP(host); err == nil {
 				for _, ip := range ips {
 					if isPrivateIP(ip) {
-						return CheckResult{SiteID: site.ID, Status: "DOWN", ErrorReason: "target resolves to private IP"}
+						return CheckResult{SiteID: site.ID, Status: string(models.StatusDown), ErrorReason: "target resolves to private IP"}
 					}
 				}
 			}
@@ -64,7 +64,7 @@ func RunCheck(ctx context.Context, site models.Site, strict, insecure *http.Clie
 	case "dns":
 		return runDNSCheck(ctx, site)
 	default:
-		return CheckResult{SiteID: site.ID, Status: "DOWN", ErrorReason: "unsupported monitor type: " + site.Type}
+		return CheckResult{SiteID: site.ID, Status: string(models.StatusDown), ErrorReason: "unsupported monitor type: " + site.Type}
 	}
 }
 
@@ -80,7 +80,7 @@ func runHTTPCheck(ctx context.Context, site models.Site, strict, insecure *http.
 
 	req, err := http.NewRequestWithContext(ctx, method, site.URL, nil)
 	if err != nil {
-		return CheckResult{SiteID: site.ID, Status: "DOWN", ErrorReason: "invalid request: " + err.Error()}
+		return CheckResult{SiteID: site.ID, Status: string(models.StatusDown), ErrorReason: "invalid request: " + err.Error()}
 	}
 
 	client := strict
@@ -94,12 +94,12 @@ func runHTTPCheck(ctx context.Context, site models.Site, strict, insecure *http.
 
 	result := CheckResult{
 		SiteID:    site.ID,
-		Status:    "UP",
+		Status:    string(models.StatusUp),
 		LatencyNs: latency.Nanoseconds(),
 	}
 
 	if err != nil {
-		result.Status = "DOWN"
+		result.Status = string(models.StatusDown)
 		result.ErrorReason = truncateError(err.Error(), maxErrorLength)
 		return result
 	}
@@ -107,7 +107,7 @@ func runHTTPCheck(ctx context.Context, site models.Site, strict, insecure *http.
 
 	result.StatusCode = resp.StatusCode
 	if !isCodeAccepted(resp.StatusCode, site.AcceptedCodes) {
-		result.Status = "DOWN"
+		result.Status = string(models.StatusDown)
 		expected := site.AcceptedCodes
 		if expected == "" {
 			expected = defaultAcceptedCodes
@@ -120,7 +120,7 @@ func runHTTPCheck(ctx context.Context, site models.Site, strict, insecure *http.
 		cert := resp.TLS.PeerCertificates[0]
 		result.CertExpiry = cert.NotAfter
 		if time.Now().After(cert.NotAfter) {
-			result.Status = "SSL EXP"
+			result.Status = string(models.StatusSSLExp)
 			result.ErrorReason = "SSL certificate expired"
 		}
 	}
@@ -136,7 +136,7 @@ func runPingCheck(_ context.Context, site models.Site) CheckResult {
 
 	pinger, err := probing.NewPinger(host)
 	if err != nil {
-		return CheckResult{SiteID: site.ID, Status: "DOWN", ErrorReason: "ping setup: " + err.Error()}
+		return CheckResult{SiteID: site.ID, Status: string(models.StatusDown), ErrorReason: "ping setup: " + err.Error()}
 	}
 	pinger.Count = 1
 	pinger.Timeout = siteTimeout(site)
@@ -147,14 +147,14 @@ func runPingCheck(_ context.Context, site models.Site) CheckResult {
 	latency := time.Since(start)
 
 	if err != nil {
-		return CheckResult{SiteID: site.ID, Status: "DOWN", LatencyNs: latency.Nanoseconds(), ErrorReason: "ping failed: " + err.Error()}
+		return CheckResult{SiteID: site.ID, Status: string(models.StatusDown), LatencyNs: latency.Nanoseconds(), ErrorReason: "ping failed: " + err.Error()}
 	}
 	if pinger.Statistics().PacketsRecv == 0 {
-		return CheckResult{SiteID: site.ID, Status: "DOWN", LatencyNs: latency.Nanoseconds(), ErrorReason: "no ICMP response"}
+		return CheckResult{SiteID: site.ID, Status: string(models.StatusDown), LatencyNs: latency.Nanoseconds(), ErrorReason: "no ICMP response"}
 	}
 
 	stats := pinger.Statistics()
-	return CheckResult{SiteID: site.ID, Status: "UP", LatencyNs: stats.AvgRtt.Nanoseconds()}
+	return CheckResult{SiteID: site.ID, Status: string(models.StatusUp), LatencyNs: stats.AvgRtt.Nanoseconds()}
 }
 
 func runPortCheck(_ context.Context, site models.Site) CheckResult {
@@ -170,10 +170,10 @@ func runPortCheck(_ context.Context, site models.Site) CheckResult {
 	latency := time.Since(start)
 
 	if err != nil {
-		return CheckResult{SiteID: site.ID, Status: "DOWN", LatencyNs: latency.Nanoseconds(), ErrorReason: truncateError(err.Error(), maxErrorLength)}
+		return CheckResult{SiteID: site.ID, Status: string(models.StatusDown), LatencyNs: latency.Nanoseconds(), ErrorReason: truncateError(err.Error(), maxErrorLength)}
 	}
 	_ = conn.Close()
-	return CheckResult{SiteID: site.ID, Status: "UP", LatencyNs: latency.Nanoseconds()}
+	return CheckResult{SiteID: site.ID, Status: string(models.StatusUp), LatencyNs: latency.Nanoseconds()}
 }
 
 func runDNSCheck(_ context.Context, site models.Site) CheckResult {
@@ -221,12 +221,12 @@ func runDNSCheck(_ context.Context, site models.Site) CheckResult {
 	latency := time.Since(start)
 
 	if err != nil {
-		return CheckResult{SiteID: site.ID, Status: "DOWN", LatencyNs: latency.Nanoseconds(), ErrorReason: "DNS query failed: " + err.Error()}
+		return CheckResult{SiteID: site.ID, Status: string(models.StatusDown), LatencyNs: latency.Nanoseconds(), ErrorReason: "DNS query failed: " + err.Error()}
 	}
 	if r.Rcode != dns.RcodeSuccess {
-		return CheckResult{SiteID: site.ID, Status: "DOWN", StatusCode: r.Rcode, LatencyNs: latency.Nanoseconds(), ErrorReason: "DNS RCODE: " + dns.RcodeToString[r.Rcode]}
+		return CheckResult{SiteID: site.ID, Status: string(models.StatusDown), StatusCode: r.Rcode, LatencyNs: latency.Nanoseconds(), ErrorReason: "DNS RCODE: " + dns.RcodeToString[r.Rcode]}
 	}
-	return CheckResult{SiteID: site.ID, Status: "UP", LatencyNs: latency.Nanoseconds()}
+	return CheckResult{SiteID: site.ID, Status: string(models.StatusUp), LatencyNs: latency.Nanoseconds()}
 }
 
 func siteTimeout(site models.Site) time.Duration {

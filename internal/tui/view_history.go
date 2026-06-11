@@ -17,14 +17,14 @@ type historyStats struct {
 
 func computeOutageDuration(changes []models.StateChange, idx int) time.Duration {
 	sc := changes[idx]
-	if sc.ToStatus != "UP" {
+	if sc.ToStatus != string(models.StatusUp) {
 		return 0
 	}
 	if idx+1 >= len(changes) {
 		return 0
 	}
 	prev := changes[idx+1]
-	if prev.ToStatus == "UP" {
+	if prev.ToStatus == string(models.StatusUp) {
 		return 0
 	}
 	dur := sc.ChangedAt.Sub(prev.ChangedAt)
@@ -122,11 +122,11 @@ func (m Model) buildHistoryContent() string {
 
 		arrow := m.st.subtleStyle.Render(sc.FromStatus) + " → "
 		switch sc.ToStatus {
-		case "UP":
+		case string(models.StatusUp):
 			arrow += m.st.specialStyle.Render(sc.ToStatus)
-		case "LATE":
+		case string(models.StatusLate):
 			arrow += m.st.warnStyle.Render(sc.ToStatus)
-		case "STALE":
+		case string(models.StatusStale):
 			arrow += m.st.staleStyle.Render(sc.ToStatus)
 		default:
 			arrow += m.st.dangerStyle.Render(sc.ToStatus)
@@ -138,7 +138,7 @@ func (m Model) buildHistoryContent() string {
 		}
 
 		reason := ""
-		if sc.ErrorReason != "" && sc.ToStatus != "UP" {
+		if sc.ErrorReason != "" && sc.ToStatus != string(models.StatusUp) {
 			reason = m.st.dangerStyle.Render(limitStr(sc.ErrorReason, reasonWidth))
 		}
 

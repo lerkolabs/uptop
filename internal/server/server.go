@@ -468,15 +468,15 @@ func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
 			}
 			public := make(map[int]statusSite, len(state))
 			for id, site := range state {
-				status := site.Status
+				displayStatus := string(site.Status)
 				if allInMaint || maintSet[site.ID] || (site.ParentID > 0 && maintSet[site.ParentID]) {
-					status = "MAINT"
+					displayStatus = "MAINT"
 				}
 				public[id] = statusSite{
 					Name:      site.Name,
 					Type:      site.Type,
 					URL:       site.URL,
-					Status:    status,
+					Status:    displayStatus,
 					Paused:    site.Paused,
 					LastCheck: site.LastCheck,
 					Latency:   site.Latency,
@@ -569,10 +569,10 @@ func renderStatusPage(w http.ResponseWriter, title string, eng *monitor.Engine) 
 
 	sort.Slice(sites, func(i, j int) bool {
 		if sites[i].Status != sites[j].Status {
-			if sites[i].Status == "DOWN" {
+			if sites[i].Status == models.StatusDown {
 				return true
 			}
-			if sites[j].Status == "DOWN" {
+			if sites[j].Status == models.StatusDown {
 				return false
 			}
 		}

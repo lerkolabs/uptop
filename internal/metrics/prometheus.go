@@ -2,11 +2,12 @@ package metrics
 
 import (
 	"fmt"
-	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
-	"gitea.lerkolabs.com/lerkolabs/uptop/internal/monitor"
 	"net/http"
 	"sort"
 	"strings"
+
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/monitor"
 )
 
 func Handler(eng *monitor.Engine) http.HandlerFunc {
@@ -19,7 +20,7 @@ func Handler(eng *monitor.Engine) http.HandlerFunc {
 		writeHelp(&b, "uptop_monitor_up", "gauge", "Whether the monitor is up (1) or down (0).")
 		for _, s := range sites {
 			val := 0
-			if s.Status == "UP" {
+			if s.Status == models.StatusUp {
 				val = 1
 			}
 			writeGauge(&b, "uptop_monitor_up", labels(s), float64(val))

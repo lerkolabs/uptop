@@ -137,24 +137,24 @@ func TestComputeDailyBreakdown(t *testing.T) {
 	}
 }
 
-func TestIsDown(t *testing.T) {
-	if !isDown("DOWN") {
-		t.Error("DOWN should be down")
+func TestIsBroken(t *testing.T) {
+	if !models.StatusDown.IsBroken() {
+		t.Error("DOWN should be broken")
 	}
-	if !isDown("SSL EXP") {
-		t.Error("SSL EXP should be down")
+	if !models.StatusSSLExp.IsBroken() {
+		t.Error("SSL EXP should be broken")
 	}
-	if isDown("UP") {
-		t.Error("UP should not be down")
+	if models.StatusUp.IsBroken() {
+		t.Error("UP should not be broken")
 	}
-	if isDown("LATE") {
-		t.Error("LATE should not be down")
+	if models.StatusLate.IsBroken() {
+		t.Error("LATE should not be broken")
 	}
-	if isDown("STALE") {
-		t.Error("STALE should not be down")
+	if models.StatusStale.IsBroken() {
+		t.Error("STALE should not be broken")
 	}
-	if isDown("PENDING") {
-		t.Error("PENDING should not be down")
+	if models.StatusPending.IsBroken() {
+		t.Error("PENDING should not be broken")
 	}
 }
 

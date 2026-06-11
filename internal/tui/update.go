@@ -455,7 +455,7 @@ func (m *Model) handleSLAData(msg slaDataMsg) (tea.Model, tea.Cmd) {
 	}
 	period := slaPeriods[msg.periodIdx]
 
-	var currentStatus string
+	var currentStatus models.Status
 	for _, s := range m.sites {
 		if s.ID == msg.siteID {
 			currentStatus = s.Status

@@ -143,16 +143,16 @@ func (m Model) fmtRetries(site models.Site) string {
 		dispCount = site.MaxRetries
 	}
 	s := fmt.Sprintf("%d/%d", dispCount, site.MaxRetries)
-	if site.Status == "DOWN" {
+	if site.Status == models.StatusDown {
 		return m.st.dangerStyle.Render(s)
 	}
-	if site.Status == "UP" && site.FailureCount > 0 {
+	if site.Status == models.StatusUp && site.FailureCount > 0 {
 		return m.st.warnStyle.Render(s)
 	}
 	return s
 }
 
-func (m Model) fmtStatus(status string, paused bool, inMaint bool) string {
+func (m Model) fmtStatus(status models.Status, paused bool, inMaint bool) string {
 	if paused {
 		return m.st.warnStyle.Render("◇ PAUSED")
 	}
@@ -160,18 +160,18 @@ func (m Model) fmtStatus(status string, paused bool, inMaint bool) string {
 		return m.st.maintStyle.Render("◼ MAINT")
 	}
 	switch status {
-	case "DOWN":
+	case models.StatusDown:
 		return m.st.dangerStyle.Render("▼ DOWN")
-	case "SSL EXP":
+	case models.StatusSSLExp:
 		return m.st.dangerStyle.Render("▼ SSL EXP")
-	case "LATE":
+	case models.StatusLate:
 		return m.st.warnStyle.Render("◆ LATE")
-	case "STALE":
+	case models.StatusStale:
 		return m.st.staleStyle.Render("◆ STALE")
-	case "PENDING":
+	case models.StatusPending:
 		return m.st.subtleStyle.Render("○ PENDING")
 	default:
-		return m.st.specialStyle.Render("▲ " + status)
+		return m.st.specialStyle.Render("▲ " + string(status))
 	}
 }
 
