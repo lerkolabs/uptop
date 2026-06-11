@@ -64,7 +64,7 @@ func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
 
 func (s *Server) Start() *http.Server {
 	if s.cfg.ClusterKey == "" {
-		slog.Warn("no UPTOP_CLUSTER_SECRET set, cluster API endpoints are unauthenticated")
+		slog.Warn("no UPTOP_CLUSTER_SECRET set, cluster API endpoints will reject all requests")
 	}
 
 	if s.cfg.ClusterMode != "" && s.cfg.ClusterMode != "leader" && s.cfg.TLSCert == "" {
@@ -168,6 +168,10 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	if !s.requireAuth(r) {
 		http.Error(w, "Unauthorized: UPTOP_CLUSTER_SECRET required", http.StatusUnauthorized)
 		return

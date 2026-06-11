@@ -34,6 +34,9 @@ func (m Model) emptyState(message, hint string) string {
 }
 
 func limitStr(text string, max int) string {
+	if max < 3 {
+		return text
+	}
 	runes := []rune(text)
 	if len(runes) > max {
 		return string(runes[:max-3]) + "..."

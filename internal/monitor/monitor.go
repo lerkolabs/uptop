@@ -864,6 +864,9 @@ func (e *Engine) handleStatusChange(snap models.Site, rawStatus string, code int
 }
 
 func (e *Engine) triggerAlert(alertID int, title, message string) {
+	if alertID <= 0 {
+		return
+	}
 	cfg, err := e.db.GetAlert(context.Background(), alertID)
 	if err != nil {
 		e.AddLog(fmt.Sprintf("Failed to load alert config %d: %v", alertID, err))

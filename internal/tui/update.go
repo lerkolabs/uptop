@@ -336,8 +336,8 @@ func (m *Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+c":
 		return m, tea.Quit
 	default:
-		if len(msg.String()) == 1 {
-			m.filterText += msg.String()
+		if len(msg.Runes) == 1 {
+			m.filterText += string(msg.Runes)
 			m.cursor = 0
 			m.tableOffset = 0
 			m.refreshLive()

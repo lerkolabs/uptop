@@ -603,7 +603,9 @@ func seedKeysFromEnv(s store.Store) {
 
 	if path := os.Getenv("UPTOP_KEYS"); path != "" {
 		f, err := os.Open(filepath.Clean(path))
-		if err == nil {
+		if err != nil {
+			slog.Warn("failed to open UPTOP_KEYS file", "path", path, "err", err) //nolint:gosec // structured slog, not format string
+		} else {
 			scanner := bufio.NewScanner(f)
 			for scanner.Scan() {
 				line := strings.TrimSpace(scanner.Text())

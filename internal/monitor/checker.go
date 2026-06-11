@@ -3,6 +3,7 @@ package monitor
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"strconv"
@@ -103,7 +104,10 @@ func runHTTPCheck(ctx context.Context, site models.SiteConfig, strict, insecure 
 		result.ErrorReason = truncateError(err.Error(), maxErrorLength)
 		return result
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
 	result.StatusCode = resp.StatusCode
 	if !isCodeAccepted(resp.StatusCode, site.AcceptedCodes) {
