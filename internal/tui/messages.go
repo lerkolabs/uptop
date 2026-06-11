@@ -54,3 +54,11 @@ type slaDataMsg struct {
 	periodIdx int
 	changes   []models.StateChange
 }
+
+// writeDoneMsg reports a store mutation that ran off the UI goroutine. op
+// names the action for the error log; the handler reloads tab data so the UI
+// converges on what was actually written.
+type writeDoneMsg struct {
+	op  string
+	err error
+}

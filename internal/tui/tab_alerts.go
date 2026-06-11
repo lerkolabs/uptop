@@ -445,7 +445,7 @@ func (m *Model) initAlertHuhForm() tea.Cmd {
 	return m.huhForm.Init()
 }
 
-func (m *Model) submitAlertForm() {
+func (m *Model) submitAlertForm() tea.Cmd {
 	d := m.alertFormData
 	settings := make(map[string]string)
 
@@ -486,14 +486,16 @@ func (m *Model) submitAlertForm() {
 		settings["url"] = d.WebhookURL
 	}
 
-	if m.editID > 0 {
-		if err := m.store.UpdateAlert(m.editID, d.Name, d.AlertType, settings); err != nil {
-			m.engine.AddLog("Update alert failed: " + err.Error())
-		}
-	} else {
-		if err := m.store.AddAlert(d.Name, d.AlertType, settings); err != nil {
-			m.engine.AddLog("Add alert failed: " + err.Error())
-		}
-	}
+	st := m.store
+	id := m.editID
+	name, aType := d.Name, d.AlertType
 	m.state = stateDashboard
+	if id > 0 {
+		return writeCmd("Update alert", func() error {
+			return st.UpdateAlert(id, name, aType, settings)
+		})
+	}
+	return writeCmd("Add alert", func() error {
+		return st.AddAlert(name, aType, settings)
+	})
 }

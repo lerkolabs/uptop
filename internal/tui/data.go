@@ -27,7 +27,9 @@ func loadCollapsed(s store.Store) map[int]bool {
 	return m
 }
 
-func saveCollapsed(s store.Store, collapsed map[int]bool) {
+// collapsedJSON snapshots the collapsed-group set for persistence. Marshaling
+// happens on the UI goroutine so the write Cmd never reads the live map.
+func collapsedJSON(collapsed map[int]bool) string {
 	var ids []int
 	for id, v := range collapsed {
 		if v {
@@ -35,7 +37,15 @@ func saveCollapsed(s store.Store, collapsed map[int]bool) {
 		}
 	}
 	data, _ := json.Marshal(ids)
-	_ = s.SetPreference("collapsed_groups", string(data))
+	return string(data)
+}
+
+// writeCmd runs a store mutation off the UI goroutine. The closure must only
+// capture values snapshotted in Update — never the model itself.
+func writeCmd(op string, fn func() error) tea.Cmd {
+	return func() tea.Msg {
+		return writeDoneMsg{op: op, err: fn()}
+	}
 }
 
 func sortSitesForDisplay(allSites []models.Site, collapsed map[int]bool) []models.Site {

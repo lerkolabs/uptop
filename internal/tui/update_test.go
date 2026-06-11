@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -19,6 +20,7 @@ type tuiMockStore struct {
 	maint            []models.MaintenanceWindow
 	stateChanges     []models.StateChange
 	stateChangeCalls int // counts GetStateChanges hits (to prove View does no IO)
+	deleteSiteCalls  int // counts DeleteSite hits (to prove writes run in Cmds)
 }
 
 func (m *tuiMockStore) GetAllAlerts() ([]models.AlertConfig, error) { return m.alerts, nil }
@@ -32,12 +34,15 @@ func (m *tuiMockStore) GetAllMaintenanceWindows(int) ([]models.MaintenanceWindow
 	return m.maint, nil
 }
 
-func (m *tuiMockStore) Init() error                                              { return nil }
-func (m *tuiMockStore) GetSites() ([]models.Site, error)                         { return nil, nil }
-func (m *tuiMockStore) AddSite(models.Site) error                                { return nil }
-func (m *tuiMockStore) UpdateSite(models.Site) error                             { return nil }
-func (m *tuiMockStore) UpdateSitePaused(int, bool) error                         { return nil }
-func (m *tuiMockStore) DeleteSite(int) error                                     { return nil }
+func (m *tuiMockStore) Init() error                      { return nil }
+func (m *tuiMockStore) GetSites() ([]models.Site, error) { return nil, nil }
+func (m *tuiMockStore) AddSite(models.Site) error        { return nil }
+func (m *tuiMockStore) UpdateSite(models.Site) error     { return nil }
+func (m *tuiMockStore) UpdateSitePaused(int, bool) error { return nil }
+func (m *tuiMockStore) DeleteSite(int) error {
+	m.deleteSiteCalls++
+	return nil
+}
 func (m *tuiMockStore) GetAlert(int) (models.AlertConfig, error)                 { return models.AlertConfig{}, nil }
 func (m *tuiMockStore) AddAlert(string, string, map[string]string) error         { return nil }
 func (m *tuiMockStore) UpdateAlert(int, string, string, map[string]string) error { return nil }
@@ -306,6 +311,54 @@ func TestSLAData_DropsStaleReply(t *testing.T) {
 	updated, _ = updated.(*Model).Update(slaDataMsg{siteID: 3, periodIdx: m.slaPeriodIdx})
 	if mm := updated.(*Model); mm.slaDailyBreakdown == nil {
 		t.Error("matching SLA reply was not applied")
+	}
+}
+
+func TestConfirmDelete_WritesOffUIGoroutine(t *testing.T) {
+	ms := &tuiMockStore{}
+	m := newTestModel(ms)
+	m.sites = []models.Site{{ID: 4, Name: "s"}}
+	m.state = stateConfirmDelete
+	m.deleteTab = 0
+	m.deleteID = 4
+
+	updated, cmd := (&m).handleConfirmDelete(keyMsg("y"))
+	if ms.deleteSiteCalls != 0 {
+		t.Fatal("delete hit the store synchronously in Update")
+	}
+	if cmd == nil {
+		t.Fatal("expected a write Cmd")
+	}
+	if got := updated.(*Model); got.state != stateDashboard {
+		t.Fatalf("expected return to dashboard, got state %v", got.state)
+	}
+
+	wd, ok := cmd().(writeDoneMsg)
+	if !ok || wd.err != nil {
+		t.Fatalf("unexpected write result: %+v", wd)
+	}
+	if ms.deleteSiteCalls != 1 {
+		t.Fatalf("expected exactly 1 store delete from the Cmd, got %d", ms.deleteSiteCalls)
+	}
+}
+
+func TestWriteDoneMsg_LogsErrorAndReloads(t *testing.T) {
+	m := newTestModel(&tuiMockStore{})
+
+	updated, cmd := m.Update(writeDoneMsg{op: "Delete site", err: errSentinel})
+	if cmd == nil {
+		t.Error("writeDoneMsg did not trigger a tab-data reload")
+	}
+
+	mm := updated.(Model)
+	found := false
+	for _, line := range mm.engine.GetLogs() {
+		if strings.Contains(line, "Delete site failed: boom") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("write error was not logged")
 	}
 }
 

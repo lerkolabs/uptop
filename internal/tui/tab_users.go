@@ -110,16 +110,18 @@ func (m *Model) initUserHuhForm() tea.Cmd {
 	return m.huhForm.Init()
 }
 
-func (m *Model) submitUserForm() {
+func (m *Model) submitUserForm() tea.Cmd {
 	d := m.userFormData
-	if m.editID > 0 {
-		if err := m.store.UpdateUser(m.editID, d.Username, d.PublicKey, d.Role); err != nil {
-			m.engine.AddLog("Update user failed: " + err.Error())
-		}
-	} else {
-		if err := m.store.AddUser(d.Username, d.PublicKey, d.Role); err != nil {
-			m.engine.AddLog("Add user failed: " + err.Error())
-		}
-	}
+	st := m.store
+	id := m.editID
+	username, key, role := d.Username, d.PublicKey, d.Role
 	m.state = stateUsers
+	if id > 0 {
+		return writeCmd("Update user", func() error {
+			return st.UpdateUser(id, username, key, role)
+		})
+	}
+	return writeCmd("Add user", func() error {
+		return st.AddUser(username, key, role)
+	})
 }

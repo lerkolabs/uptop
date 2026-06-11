@@ -518,7 +518,7 @@ func (m *Model) initSiteHuhForm() tea.Cmd {
 	return m.huhForm.Init()
 }
 
-func (m *Model) submitSiteForm() {
+func (m *Model) submitSiteForm() tea.Cmd {
 	d := m.siteFormData
 	interval, _ := strconv.Atoi(d.Interval)
 	alertID, _ := strconv.Atoi(d.AlertID)
@@ -555,15 +555,14 @@ func (m *Model) submitSiteForm() {
 		Regions:         d.Regions,
 	}
 
-	if m.editID > 0 {
-		if err := m.store.UpdateSite(site); err != nil {
-			m.engine.AddLog("Update site failed: " + err.Error())
-		}
-		m.engine.UpdateSiteConfig(site)
-	} else {
-		if err := m.store.AddSite(site); err != nil {
-			m.engine.AddLog("Add site failed: " + err.Error())
-		}
-	}
+	st := m.store
 	m.state = stateDashboard
+	if m.editID > 0 {
+		// The engine's in-memory config updates immediately; the DB write
+		// follows in the Cmd. New sites enter the engine via its poll loop
+		// once the insert lands.
+		m.engine.UpdateSiteConfig(site)
+		return writeCmd("Update site", func() error { return st.UpdateSite(site) })
+	}
+	return writeCmd("Add site", func() error { return st.AddSite(site) })
 }

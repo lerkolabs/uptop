@@ -38,6 +38,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case slaDataMsg:
 		return m.handleSLAData(msg)
+	case writeDoneMsg:
+		if msg.err != nil {
+			m.engine.AddLog(msg.op + " failed: " + msg.err.Error())
+		}
+		m.refreshLive()
+		return m, m.loadTabDataCmd()
 	}
 
 	if m.state == stateConfirmDelete {
@@ -63,27 +69,26 @@ func (m *Model) handleConfirmDelete(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	switch keyMsg.String() {
 	case "y", "Y":
+		// The store delete runs in a Cmd; the in-memory engine/model updates
+		// stay here so the row vanishes immediately. If the delete fails, the
+		// writeDoneMsg reload converges the UI back to the DB state (and the
+		// engine poll loop re-adds a site that is still in the DB).
+		st := m.store
+		id := m.deleteID
+		var cmd tea.Cmd
 		switch m.deleteTab {
 		case 0:
-			if err := m.store.DeleteSite(m.deleteID); err != nil {
-				m.engine.AddLog("Delete site failed: " + err.Error())
-			}
-			m.engine.RemoveSite(m.deleteID)
+			cmd = writeCmd("Delete site", func() error { return st.DeleteSite(id) })
+			m.engine.RemoveSite(id)
 			m.adjustCursor(len(m.sites) - 1)
 		case 1:
-			if err := m.store.DeleteAlert(m.deleteID); err != nil {
-				m.engine.AddLog("Delete alert failed: " + err.Error())
-			}
+			cmd = writeCmd("Delete alert", func() error { return st.DeleteAlert(id) })
 			m.adjustCursor(len(m.alerts) - 1)
 		case 4:
-			if err := m.store.DeleteMaintenanceWindow(m.deleteID); err != nil {
-				m.engine.AddLog("Delete maintenance window failed: " + err.Error())
-			}
+			cmd = writeCmd("Delete maintenance window", func() error { return st.DeleteMaintenanceWindow(id) })
 			m.adjustCursor(len(m.maintenanceWindows) - 1)
 		case 5:
-			if err := m.store.DeleteUser(m.deleteID); err != nil {
-				m.engine.AddLog("Delete user failed: " + err.Error())
-			}
+			cmd = writeCmd("Delete user", func() error { return st.DeleteUser(id) })
 			m.adjustCursor(len(m.users) - 1)
 		}
 		m.refreshLive()
@@ -91,7 +96,7 @@ func (m *Model) handleConfirmDelete(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.deleteTab == 5 {
 			m.state = stateUsers
 		}
-		return m, m.loadTabDataCmd()
+		return m, cmd
 	case "n", "N", "esc":
 		m.state = stateDashboard
 		if m.deleteTab == 5 {
@@ -127,10 +132,12 @@ func (m *Model) handleFormMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.huhForm = f
 		}
 		if m.huhForm.State == huh.StateCompleted {
-			m.submitForm()
+			// The store write runs in the returned Cmd; its writeDoneMsg
+			// triggers the tab-data reload once the row actually exists.
+			cmd := m.submitForm()
 			m.refreshLive()
 			m.huhForm = nil
-			return m, m.loadTabDataCmd()
+			return m, cmd
 		}
 		return m, formCmd
 	}
@@ -555,16 +562,22 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.currentTab == 0 && len(m.sites) > 0 && m.sites[m.cursor].Type == "group" {
 			gid := m.sites[m.cursor].ID
 			m.collapsed[gid] = !m.collapsed[gid]
-			saveCollapsed(m.store, m.collapsed)
+			payload := collapsedJSON(m.collapsed)
+			st := m.store
 			m.refreshLive()
+			return m, writeCmd("Save collapsed groups", func() error {
+				return st.SetPreference("collapsed_groups", payload)
+			})
 		}
 	case "p":
 		if m.currentTab == 0 && len(m.sites) > 0 {
-			site := m.sites[m.cursor]
-			m.engine.ToggleSitePause(site.ID)
-			site.Paused = !site.Paused
-			_ = m.store.UpdateSitePaused(site.ID, site.Paused)
+			id := m.sites[m.cursor].ID
+			paused := m.engine.ToggleSitePause(id)
+			st := m.store
 			m.refreshLive()
+			return m, writeCmd("Update pause state", func() error {
+				return st.UpdateSitePaused(id, paused)
+			})
 		}
 	case "i":
 		if m.currentTab == 0 && len(m.sites) > 0 {
@@ -579,18 +592,23 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			now := time.Now()
 			isActive := !mw.StartTime.After(now) && (mw.EndTime.IsZero() || mw.EndTime.After(now))
 			if isActive {
-				if err := m.store.EndMaintenanceWindow(mw.ID); err != nil {
-					m.engine.AddLog("End maintenance failed: " + err.Error())
-				}
+				st := m.store
+				id := mw.ID
 				m.refreshLive()
-				return m, m.loadTabDataCmd()
+				return m, writeCmd("End maintenance", func() error {
+					return st.EndMaintenanceWindow(id)
+				})
 			}
 		}
 	case "T":
 		m.themeIndex = (m.themeIndex + 1) % len(themes)
 		m.theme = themes[m.themeIndex]
 		m.st = newStyles(m.theme)
-		_ = m.store.SetPreference("theme", m.theme.Name)
+		st := m.store
+		name := m.theme.Name
+		return m, writeCmd("Save theme", func() error {
+			return st.SetPreference("theme", name)
+		})
 	case "d", "backspace":
 		return m.handleDeleteItem()
 	}
@@ -738,25 +756,26 @@ func (m *Model) adjustCursor(newLen int) {
 	}
 }
 
-func (m *Model) submitForm() {
+func (m *Model) submitForm() tea.Cmd {
 	switch m.state {
 	case stateFormSite:
 		if m.siteFormData != nil {
-			m.submitSiteForm()
+			return m.submitSiteForm()
 		}
 	case stateFormAlert:
 		if m.alertFormData != nil {
-			m.submitAlertForm()
+			return m.submitAlertForm()
 		}
 	case stateFormUser:
 		if m.userFormData != nil {
-			m.submitUserForm()
+			return m.submitUserForm()
 		}
 	case stateFormMaint:
 		if m.maintFormData != nil {
-			m.submitMaintForm()
+			return m.submitMaintForm()
 		}
 	}
+	return nil
 }
 
 func (m Model) currentListLen() int {

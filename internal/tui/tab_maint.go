@@ -206,7 +206,7 @@ func (m *Model) initMaintHuhForm() tea.Cmd {
 	return m.huhForm.Init()
 }
 
-func (m *Model) submitMaintForm() {
+func (m *Model) submitMaintForm() tea.Cmd {
 	d := m.maintFormData
 	monitorID, _ := strconv.Atoi(d.MonitorID)
 
@@ -237,8 +237,9 @@ func (m *Model) submitMaintForm() {
 		}
 	}
 
-	if err := m.store.AddMaintenanceWindow(mw); err != nil {
-		m.engine.AddLog("Add maintenance window failed: " + err.Error())
-	}
+	st := m.store
 	m.state = stateDashboard
+	return writeCmd("Add maintenance window", func() error {
+		return st.AddMaintenanceWindow(mw)
+	})
 }
