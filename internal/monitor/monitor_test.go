@@ -69,7 +69,13 @@ func (m *mockStore) LoadAlertHealth() (map[int]models.AlertHealthRecord, error) 
 }
 func (m *mockStore) SaveAlertHealth(models.AlertHealthRecord) error { return nil }
 func (m *mockStore) GetActiveMaintenanceWindows() ([]models.MaintenanceWindow, error) {
-	return nil, nil
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var windows []models.MaintenanceWindow
+	for id := range m.maintenance {
+		windows = append(windows, models.MaintenanceWindow{MonitorID: id})
+	}
+	return windows, nil
 }
 func (m *mockStore) GetAllMaintenanceWindows(int) ([]models.MaintenanceWindow, error) {
 	return nil, nil
@@ -330,6 +336,7 @@ func TestHandleStatusChange_AlertSuppressedMaintenance(t *testing.T) {
 	e := newTestEngine(ms)
 	site := models.Site{ID: 1, Name: "test", Status: "UP", MaxRetries: 0, AlertID: 1}
 	injectSite(e, site)
+	e.refreshMaintenanceCache()
 
 	e.handleStatusChange(site, "DOWN", 0, 0, "test error")
 
@@ -361,6 +368,7 @@ func TestHandleStatusChange_RecoverySuppressedMaintenance(t *testing.T) {
 	e := newTestEngine(ms)
 	site := models.Site{ID: 1, Name: "test", Status: "DOWN", AlertID: 1}
 	injectSite(e, site)
+	e.refreshMaintenanceCache()
 
 	e.handleStatusChange(site, "UP", 200, 0, "")
 
@@ -448,6 +456,7 @@ func TestHandleStatusChange_SSLWarningSuppressedMaint(t *testing.T) {
 		CertExpiry: time.Now().Add(15 * 24 * time.Hour),
 	}
 	injectSite(e, site)
+	e.refreshMaintenanceCache()
 
 	e.handleStatusChange(site, "UP", 200, 0, "")
 
@@ -700,6 +709,7 @@ func TestCheckGroup_MaintenanceChildIgnored(t *testing.T) {
 	injectSite(e, group)
 	injectSite(e, child1)
 	injectSite(e, child2)
+	e.refreshMaintenanceCache()
 
 	e.checkGroup(group)
 
@@ -1215,6 +1225,167 @@ func TestEngineStop_Idempotent(t *testing.T) {
 	e.Start(context.Background())
 	e.Stop()
 	e.Stop() // must not panic or block
+}
+
+// --- Group 12: Phase 3 engine correctness ---
+
+// Groups must not auto-pause when all children are paused — that creates a
+// one-way trap because monitorRoutine skips paused sites.
+func TestCheckGroup_AllPausedNoAutoFreeze(t *testing.T) {
+	ms := newMockStore()
+	e := newTestEngine(ms)
+	group := models.Site{ID: 1, Name: "group", Type: "group", Status: "UP"}
+	child1 := models.Site{ID: 2, Name: "child1", Type: "http", ParentID: 1, Status: "UP", Paused: true}
+	child2 := models.Site{ID: 3, Name: "child2", Type: "http", ParentID: 1, Status: "UP", Paused: true}
+	injectSite(e, group)
+	injectSite(e, child1)
+	injectSite(e, child2)
+
+	e.checkGroup(group)
+
+	s, _ := getSite(e, 1)
+	if s.Paused {
+		t.Error("group must not auto-pause when all children are paused")
+	}
+}
+
+// PENDING→DOWN must honor MaxRetries instead of alerting on first failure.
+func TestHandleStatusChange_PendingRetriesBeforeDown(t *testing.T) {
+	ms := newMockStore()
+	e := newTestEngine(ms)
+	site := models.Site{ID: 1, Name: "new-monitor", Status: "PENDING", MaxRetries: 2}
+	injectSite(e, site)
+
+	e.handleStatusChange(site, "DOWN", 0, 0, "timeout")
+	s, _ := getSite(e, 1)
+	if s.Status != "PENDING" {
+		t.Errorf("expected PENDING during retry, got %s", s.Status)
+	}
+	if s.FailureCount != 1 {
+		t.Errorf("expected FailureCount 1, got %d", s.FailureCount)
+	}
+
+	e.handleStatusChange(s, "DOWN", 0, 0, "timeout")
+	s, _ = getSite(e, 1)
+	if s.Status != "PENDING" {
+		t.Errorf("expected PENDING during retry 2, got %s", s.Status)
+	}
+
+	e.handleStatusChange(s, "DOWN", 0, 0, "timeout")
+	s, _ = getSite(e, 1)
+	if s.Status != "DOWN" {
+		t.Errorf("expected DOWN after retries exhausted, got %s", s.Status)
+	}
+}
+
+// LATE→DOWN must also honor MaxRetries.
+func TestHandleStatusChange_LateRetriesBeforeDown(t *testing.T) {
+	ms := newMockStore()
+	e := newTestEngine(ms)
+	site := models.Site{ID: 1, Name: "push-mon", Status: "LATE", MaxRetries: 1}
+	injectSite(e, site)
+
+	e.handleStatusChange(site, "DOWN", 0, 0, "missed heartbeat")
+	s, _ := getSite(e, 1)
+	if s.Status != "LATE" {
+		t.Errorf("expected LATE during retry, got %s", s.Status)
+	}
+
+	e.handleStatusChange(s, "DOWN", 0, 0, "missed heartbeat")
+	s, _ = getSite(e, 1)
+	if s.Status != "DOWN" {
+		t.Errorf("expected DOWN after retries exhausted, got %s", s.Status)
+	}
+}
+
+// Dead probe results must be expired so they don't poison aggregation.
+func TestIngestProbeResult_ExpiresStaleProbes(t *testing.T) {
+	ms := newMockStore()
+	e := newTestEngine(ms)
+	site := models.Site{ID: 1, Name: "test", Type: "http", Status: "UP", Interval: 30}
+	injectSite(e, site)
+
+	e.probeResultsMu.Lock()
+	e.probeResults[1] = map[string]NodeResult{
+		"dead-probe": {
+			NodeID:    "dead-probe",
+			IsUp:      false,
+			CheckedAt: time.Now().Add(-10 * time.Minute),
+		},
+	}
+	e.probeResultsMu.Unlock()
+
+	e.IngestProbeResult("live-probe", 1, 5000, true, "")
+
+	e.probeResultsMu.RLock()
+	_, deadExists := e.probeResults[1]["dead-probe"]
+	_, liveExists := e.probeResults[1]["live-probe"]
+	e.probeResultsMu.RUnlock()
+
+	if deadExists {
+		t.Error("stale probe result should have been expired")
+	}
+	if !liveExists {
+		t.Error("live probe result should still exist")
+	}
+}
+
+// RemoveSite must clean up probeResults.
+func TestRemoveSite_CleansProbeResults(t *testing.T) {
+	ms := newMockStore()
+	e := newTestEngine(ms)
+	site := models.Site{ID: 1, Name: "test", Type: "http", Status: "UP"}
+	injectSite(e, site)
+
+	e.probeResultsMu.Lock()
+	e.probeResults[1] = map[string]NodeResult{
+		"node-a": {NodeID: "node-a", IsUp: true, CheckedAt: time.Now()},
+	}
+	e.probeResultsMu.Unlock()
+
+	e.RemoveSite(1)
+
+	e.probeResultsMu.RLock()
+	defer e.probeResultsMu.RUnlock()
+	if _, exists := e.probeResults[1]; exists {
+		t.Error("probe results should be cleaned up after RemoveSite")
+	}
+}
+
+// Maintenance cache resolves parent relationships correctly.
+func TestIsInMaintenance_UsesCache(t *testing.T) {
+	ms := newMockStore()
+	ms.maintenance[10] = true // direct maintenance on group
+	e := newTestEngine(ms)
+	group := models.Site{ID: 10, Name: "group", Type: "group", Status: "UP"}
+	child := models.Site{ID: 20, Name: "child", Type: "http", ParentID: 10, Status: "UP"}
+	injectSite(e, group)
+	injectSite(e, child)
+	e.refreshMaintenanceCache()
+
+	if !e.isInMaintenance(10) {
+		t.Error("group should be in maintenance (direct)")
+	}
+	if !e.isInMaintenance(20) {
+		t.Error("child should be in maintenance (parent)")
+	}
+	if e.isInMaintenance(99) {
+		t.Error("unknown monitor should not be in maintenance")
+	}
+}
+
+// Global maintenance (monitor_id=0) applies to all monitors.
+func TestIsInMaintenance_GlobalMaintenance(t *testing.T) {
+	ms := newMockStore()
+	ms.maintenance[0] = true
+	e := newTestEngine(ms)
+	site := models.Site{ID: 1, Name: "test", Type: "http", Status: "UP"}
+	injectSite(e, site)
+	e.refreshMaintenanceCache()
+
+	if !e.isInMaintenance(1) {
+		t.Error("all monitors should be in maintenance during global window")
+	}
 }
 
 // --- Utilities ---

@@ -235,6 +235,46 @@ func TestImportExport(t *testing.T) {
 	}
 }
 
+func TestImportData_WipesHistory(t *testing.T) {
+	s := newTestStore(t)
+
+	if err := s.AddSite(models.Site{Name: "OldSite", URL: "https://old.com", Type: "http", Interval: 30}); err != nil {
+		t.Fatalf("AddSite: %v", err)
+	}
+	if err := s.SaveCheck(1, 5000, true); err != nil {
+		t.Fatalf("SaveCheck: %v", err)
+	}
+	if err := s.SaveStateChange(1, "UP", "DOWN", "timeout"); err != nil {
+		t.Fatalf("SaveStateChange: %v", err)
+	}
+	if err := s.SaveAlertHealth(models.AlertHealthRecord{AlertID: 1, LastSendOK: true, SendCount: 1}); err != nil {
+		t.Fatalf("SaveAlertHealth: %v", err)
+	}
+
+	backup := models.Backup{
+		Sites: []models.Site{{ID: 1, Name: "NewSite", URL: "https://new.com", Type: "http", Interval: 60}},
+	}
+	if err := s.ImportData(backup); err != nil {
+		t.Fatalf("ImportData: %v", err)
+	}
+
+	history, err := s.LoadAllHistory(100)
+	if err != nil {
+		t.Fatalf("LoadAllHistory: %v", err)
+	}
+	if len(history) != 0 {
+		t.Errorf("expected empty check_history after import, got %d sites with history", len(history))
+	}
+
+	changes, err := s.GetStateChanges(1, 100)
+	if err != nil {
+		t.Fatalf("GetStateChanges: %v", err)
+	}
+	if len(changes) != 0 {
+		t.Errorf("expected empty state_changes after import, got %d", len(changes))
+	}
+}
+
 func TestCheckHistory(t *testing.T) {
 	s := newTestStore(t)
 

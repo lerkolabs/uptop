@@ -60,6 +60,9 @@ type Engine struct {
 	recheckMu sync.RWMutex
 	recheck   map[int]chan struct{}
 
+	maintCacheMu sync.RWMutex
+	maintCache   map[int]bool
+
 	db                  store.Store
 	insecureSkipVerify  bool
 	allowPrivateTargets bool
@@ -67,10 +70,11 @@ type Engine struct {
 	strictClient        *http.Client
 	insecureClient      *http.Client
 
-	dbWrites chan dbWrite
-	writerWG sync.WaitGroup
-	cancel   context.CancelFunc
-	stopOnce sync.Once
+	dbWrites  chan dbWrite
+	writerWG  sync.WaitGroup
+	checkerWG sync.WaitGroup
+	cancel    context.CancelFunc
+	stopOnce  sync.Once
 }
 
 func NewEngine(s store.Store) *Engine {
@@ -231,7 +235,9 @@ func (e *Engine) Stop() {
 		if e.cancel != nil {
 			e.cancel()
 		}
+		e.checkerWG.Wait()
 		e.writerWG.Wait()
+		e.drainWrites()
 	})
 }
 
@@ -400,13 +406,17 @@ func (e *Engine) Start(ctx context.Context) {
 	e.writerWG.Add(1)
 	go e.dbWriter(ctx)
 
+	e.checkerWG.Add(1)
 	go func() {
+		defer e.checkerWG.Done()
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			default:
 			}
+
+			e.refreshMaintenanceCache()
 
 			sites, err := e.db.GetSites()
 			if err != nil {
@@ -438,7 +448,11 @@ func (e *Engine) Start(ctx context.Context) {
 					e.liveState[s.ID] = s
 					e.addToTokenIndex(s)
 					e.mu.Unlock()
-					go e.monitorRoutine(ctx, s.ID)
+					e.checkerWG.Add(1)
+					go func(id int) {
+						defer e.checkerWG.Done()
+						e.monitorRoutine(ctx, id)
+					}(s.ID)
 				}
 			}
 
@@ -450,7 +464,11 @@ func (e *Engine) Start(ctx context.Context) {
 		}
 	}()
 
-	go e.maintenancePruner(ctx)
+	e.checkerWG.Add(1)
+	go func() {
+		defer e.checkerWG.Done()
+		e.maintenancePruner(ctx)
+	}()
 }
 
 func (e *Engine) maintenancePruner(ctx context.Context) {
@@ -528,6 +546,10 @@ func (e *Engine) RemoveSite(id int) {
 	delete(e.liveState, id)
 	e.mu.Unlock()
 	e.removeHistory(id)
+
+	e.probeResultsMu.Lock()
+	delete(e.probeResults, id)
+	e.probeResultsMu.Unlock()
 
 	e.recheckMu.Lock()
 	delete(e.recheck, id)
@@ -748,22 +770,22 @@ func (e *Engine) handleStatusChange(snap models.Site, rawStatus string, code int
 		}
 
 		// Status + failure-count transition, based on the CURRENT live status.
-		switch {
-		case prev == "UP" && rawStatus != "UP":
-			s.FailureCount++
+		if rawStatus == "UP" {
+			s.FailureCount = 0
+			s.Status = "UP"
+		} else {
+			if s.FailureCount <= s.MaxRetries {
+				s.FailureCount++
+			}
 			if s.FailureCount > s.MaxRetries {
+				if s.Status != rawStatus {
+					confirmedDown = true
+				}
 				s.Status = rawStatus
 				s.FailureCount = s.MaxRetries + 1
-				confirmedDown = true
 			} else {
 				failedCheck = true
 			}
-		case rawStatus == "UP":
-			s.FailureCount = 0
-			s.Status = "UP"
-		default:
-			s.Status = rawStatus
-			s.FailureCount = s.MaxRetries + 1
 		}
 		failCount = s.FailureCount
 
@@ -927,11 +949,39 @@ func (e *Engine) TestAlert(alertID int) error {
 }
 
 func (e *Engine) isInMaintenance(monitorID int) bool {
-	inMaint, err := e.db.IsMonitorInMaintenance(monitorID)
+	e.maintCacheMu.RLock()
+	defer e.maintCacheMu.RUnlock()
+	return e.maintCache[monitorID]
+}
+
+func (e *Engine) refreshMaintenanceCache() {
+	windows, err := e.db.GetActiveMaintenanceWindows()
 	if err != nil {
-		return false
+		return
 	}
-	return inMaint
+
+	directMaint := make(map[int]bool)
+	var globalMaint bool
+	for _, w := range windows {
+		if w.MonitorID == 0 {
+			globalMaint = true
+		} else {
+			directMaint[w.MonitorID] = true
+		}
+	}
+
+	resolved := make(map[int]bool)
+	e.mu.RLock()
+	for id, site := range e.liveState {
+		if globalMaint || directMaint[id] || (site.ParentID > 0 && directMaint[site.ParentID]) {
+			resolved[id] = true
+		}
+	}
+	e.mu.RUnlock()
+
+	e.maintCacheMu.Lock()
+	e.maintCache = resolved
+	e.maintCacheMu.Unlock()
 }
 
 func (e *Engine) GetDisplayStatus(site models.Site) string {
@@ -948,15 +998,11 @@ func (e *Engine) checkGroup(site models.Site) {
 	e.mu.RLock()
 	status := "UP"
 	hasChildren := false
-	allPaused := true
 	for _, child := range e.liveState {
 		if child.ParentID != site.ID || child.Type == "group" {
 			continue
 		}
 		hasChildren = true
-		if !child.Paused {
-			allPaused = false
-		}
 		if child.Paused || e.isInMaintenance(child.ID) {
 			continue
 		}
@@ -978,10 +1024,11 @@ func (e *Engine) checkGroup(site models.Site) {
 
 	e.applyState(site.ID, func(s *models.Site) {
 		s.Status = status
-		if hasChildren && allPaused {
-			s.Paused = true
-		}
 	})
+}
+
+func (e *Engine) EnqueueProbeCheck(siteID int, nodeID string, latencyNs int64, isUp bool) {
+	e.enqueueWrite(writeProbeCheck{siteID: siteID, nodeID: nodeID, latencyNs: latencyNs, isUp: isUp})
 }
 
 func (e *Engine) SetAggStrategy(strategy AggregationStrategy) {
@@ -989,6 +1036,19 @@ func (e *Engine) SetAggStrategy(strategy AggregationStrategy) {
 }
 
 func (e *Engine) IngestProbeResult(nodeID string, siteID int, latencyNs int64, isUp bool, errorReason string) {
+	e.mu.RLock()
+	site, exists := e.liveState[siteID]
+	e.mu.RUnlock()
+	if !exists {
+		return
+	}
+
+	staleAfter := time.Duration(site.Interval) * time.Second * 3
+	if staleAfter < time.Minute {
+		staleAfter = time.Minute
+	}
+
+	now := time.Now()
 	e.probeResultsMu.Lock()
 	if e.probeResults[siteID] == nil {
 		e.probeResults[siteID] = make(map[string]NodeResult)
@@ -997,23 +1057,20 @@ func (e *Engine) IngestProbeResult(nodeID string, siteID int, latencyNs int64, i
 		NodeID:      nodeID,
 		IsUp:        isUp,
 		LatencyNs:   latencyNs,
-		CheckedAt:   time.Now(),
+		CheckedAt:   now,
 		ErrorReason: errorReason,
 	}
 	results := make([]NodeResult, 0, len(e.probeResults[siteID]))
-	for _, r := range e.probeResults[siteID] {
+	for id, r := range e.probeResults[siteID] {
+		if now.Sub(r.CheckedAt) > staleAfter {
+			delete(e.probeResults[siteID], id)
+			continue
+		}
 		results = append(results, r)
 	}
 	e.probeResultsMu.Unlock()
 
 	aggUp, avgLatency := AggregateStatus(results, e.aggStrategy)
-
-	e.mu.RLock()
-	site, exists := e.liveState[siteID]
-	e.mu.RUnlock()
-	if !exists {
-		return
-	}
 
 	rawStatus := "UP"
 	if !aggUp {

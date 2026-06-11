@@ -168,6 +168,15 @@ func (d *SQLiteDialect) ImportWipe(tx *sql.Tx) {
 	if _, err := tx.Exec("DELETE FROM sqlite_sequence WHERE name='maintenance_windows'"); err != nil {
 		log.Printf("import wipe error: %v", err)
 	}
+	if _, err := tx.Exec("DELETE FROM check_history"); err != nil {
+		log.Printf("import wipe error: %v", err)
+	}
+	if _, err := tx.Exec("DELETE FROM state_changes"); err != nil {
+		log.Printf("import wipe error: %v", err)
+	}
+	if _, err := tx.Exec("DELETE FROM alert_health"); err != nil {
+		log.Printf("import wipe error: %v", err)
+	}
 }
 
 func (d *SQLiteDialect) ImportResetSequences(tx *sql.Tx) {}

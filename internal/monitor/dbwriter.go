@@ -44,3 +44,15 @@ type writeAlertHealth struct{ rec models.AlertHealthRecord }
 
 func (w writeAlertHealth) exec(s store.Store) error { return s.SaveAlertHealth(w.rec) }
 func (w writeAlertHealth) desc() string             { return "alert-health" }
+
+type writeProbeCheck struct {
+	siteID    int
+	nodeID    string
+	latencyNs int64
+	isUp      bool
+}
+
+func (w writeProbeCheck) exec(s store.Store) error {
+	return s.SaveCheckFromNode(w.siteID, w.nodeID, w.latencyNs, w.isUp)
+}
+func (w writeProbeCheck) desc() string { return "probe-check" }

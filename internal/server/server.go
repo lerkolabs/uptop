@@ -424,9 +424,7 @@ func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
 			return
 		}
 		for _, result := range req.Results {
-			if err := s.SaveCheckFromNode(result.SiteID, req.NodeID, result.LatencyNs, result.IsUp); err != nil {
-				log.Printf("Failed to save probe result: %v", err)
-			}
+			eng.EnqueueProbeCheck(result.SiteID, req.NodeID, result.LatencyNs, result.IsUp)
 			eng.IngestProbeResult(req.NodeID, result.SiteID, result.LatencyNs, result.IsUp, result.ErrorReason)
 		}
 		if err := s.UpdateNodeLastSeen(req.NodeID); err != nil {

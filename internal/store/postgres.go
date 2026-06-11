@@ -133,6 +133,15 @@ func (d *PostgresDialect) ImportWipe(tx *sql.Tx) {
 	if _, err := tx.Exec("TRUNCATE TABLE maintenance_windows RESTART IDENTITY CASCADE"); err != nil {
 		log.Printf("import wipe error: %v", err)
 	}
+	if _, err := tx.Exec("TRUNCATE TABLE check_history RESTART IDENTITY CASCADE"); err != nil {
+		log.Printf("import wipe error: %v", err)
+	}
+	if _, err := tx.Exec("TRUNCATE TABLE state_changes RESTART IDENTITY CASCADE"); err != nil {
+		log.Printf("import wipe error: %v", err)
+	}
+	if _, err := tx.Exec("TRUNCATE TABLE alert_health RESTART IDENTITY CASCADE"); err != nil {
+		log.Printf("import wipe error: %v", err)
+	}
 }
 
 func (d *PostgresDialect) ImportResetSequences(tx *sql.Tx) {
