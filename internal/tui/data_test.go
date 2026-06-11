@@ -8,9 +8,9 @@ import (
 
 func TestSortSitesForDisplay_GroupsFirst(t *testing.T) {
 	sites := []models.Site{
-		{ID: 3, Name: "ungrouped", Type: "http", Status: "UP"},
-		{ID: 1, Name: "group-a", Type: "group", Status: "UP"},
-		{ID: 2, Name: "child", Type: "http", Status: "UP", ParentID: 1},
+		{SiteConfig: models.SiteConfig{ID: 3, Name: "ungrouped", Type: "http"}, SiteState: models.SiteState{Status: "UP"}},
+		{SiteConfig: models.SiteConfig{ID: 1, Name: "group-a", Type: "group"}, SiteState: models.SiteState{Status: "UP"}},
+		{SiteConfig: models.SiteConfig{ID: 2, Name: "child", Type: "http", ParentID: 1}, SiteState: models.SiteState{Status: "UP"}},
 	}
 	result := sortSitesForDisplay(sites, nil)
 	if len(result) != 3 {
@@ -29,9 +29,9 @@ func TestSortSitesForDisplay_GroupsFirst(t *testing.T) {
 
 func TestSortSitesForDisplay_CollapsedHidesChildren(t *testing.T) {
 	sites := []models.Site{
-		{ID: 1, Name: "group-a", Type: "group", Status: "UP"},
-		{ID: 2, Name: "child-1", Type: "http", Status: "UP", ParentID: 1},
-		{ID: 3, Name: "child-2", Type: "http", Status: "UP", ParentID: 1},
+		{SiteConfig: models.SiteConfig{ID: 1, Name: "group-a", Type: "group"}, SiteState: models.SiteState{Status: "UP"}},
+		{SiteConfig: models.SiteConfig{ID: 2, Name: "child-1", Type: "http", ParentID: 1}, SiteState: models.SiteState{Status: "UP"}},
+		{SiteConfig: models.SiteConfig{ID: 3, Name: "child-2", Type: "http", ParentID: 1}, SiteState: models.SiteState{Status: "UP"}},
 	}
 	collapsed := map[int]bool{1: true}
 	result := sortSitesForDisplay(sites, collapsed)
@@ -45,9 +45,9 @@ func TestSortSitesForDisplay_CollapsedHidesChildren(t *testing.T) {
 
 func TestSortSitesForDisplay_StatusOrdering(t *testing.T) {
 	sites := []models.Site{
-		{ID: 1, Name: "up-site", Type: "http", Status: "UP"},
-		{ID: 2, Name: "down-site", Type: "http", Status: "DOWN"},
-		{ID: 3, Name: "late-site", Type: "http", Status: "LATE"},
+		{SiteConfig: models.SiteConfig{ID: 1, Name: "up-site", Type: "http"}, SiteState: models.SiteState{Status: "UP"}},
+		{SiteConfig: models.SiteConfig{ID: 2, Name: "down-site", Type: "http"}, SiteState: models.SiteState{Status: "DOWN"}},
+		{SiteConfig: models.SiteConfig{ID: 3, Name: "late-site", Type: "http"}, SiteState: models.SiteState{Status: "LATE"}},
 	}
 	result := sortSitesForDisplay(sites, nil)
 	if result[0].Status != "DOWN" {
@@ -63,9 +63,9 @@ func TestSortSitesForDisplay_StatusOrdering(t *testing.T) {
 
 func TestFilterSites(t *testing.T) {
 	sites := []models.Site{
-		{Name: "Production API"},
-		{Name: "Staging API"},
-		{Name: "Database"},
+		{SiteConfig: models.SiteConfig{Name: "Production API"}},
+		{SiteConfig: models.SiteConfig{Name: "Staging API"}},
+		{SiteConfig: models.SiteConfig{Name: "Database"}},
 	}
 
 	tests := []struct {
@@ -87,7 +87,7 @@ func TestFilterSites(t *testing.T) {
 }
 
 func TestFilterSites_EmptyNeedle(t *testing.T) {
-	sites := []models.Site{{Name: "a"}, {Name: "b"}}
+	sites := []models.Site{{SiteConfig: models.SiteConfig{Name: "a"}}, {SiteConfig: models.SiteConfig{Name: "b"}}}
 	got := filterSites(sites, "")
 	if len(got) != 2 {
 		t.Errorf("empty needle should return all, got %d", len(got))

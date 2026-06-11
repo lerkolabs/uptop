@@ -11,9 +11,9 @@ import (
 // mocks and override only the methods you need via the exported Func fields or
 // by shadowing the method on the embedding struct.
 type BaseMock struct {
-	GetSitesFunc                    func(ctx context.Context) ([]models.Site, error)
-	AddSiteFunc                     func(ctx context.Context, site models.Site) error
-	UpdateSiteFunc                  func(ctx context.Context, site models.Site) error
+	GetSitesFunc                    func(ctx context.Context) ([]models.SiteConfig, error)
+	AddSiteFunc                     func(ctx context.Context, site models.SiteConfig) error
+	UpdateSiteFunc                  func(ctx context.Context, site models.SiteConfig) error
 	GetAllAlertsFunc                func(ctx context.Context) ([]models.AlertConfig, error)
 	GetAlertFunc                    func(ctx context.Context, id int) (models.AlertConfig, error)
 	GetAllUsersFunc                 func(ctx context.Context) ([]models.User, error)
@@ -41,21 +41,21 @@ type BaseMock struct {
 func (m *BaseMock) Init(_ context.Context) error { return nil }
 func (m *BaseMock) Close() error                 { return nil }
 
-func (m *BaseMock) GetSites(ctx context.Context) ([]models.Site, error) {
+func (m *BaseMock) GetSites(ctx context.Context) ([]models.SiteConfig, error) {
 	if m.GetSitesFunc != nil {
 		return m.GetSitesFunc(ctx)
 	}
 	return nil, nil
 }
 
-func (m *BaseMock) AddSite(ctx context.Context, site models.Site) error {
+func (m *BaseMock) AddSite(ctx context.Context, site models.SiteConfig) error {
 	if m.AddSiteFunc != nil {
 		return m.AddSiteFunc(ctx, site)
 	}
 	return nil
 }
 
-func (m *BaseMock) UpdateSite(ctx context.Context, site models.Site) error {
+func (m *BaseMock) UpdateSite(ctx context.Context, site models.SiteConfig) error {
 	if m.UpdateSiteFunc != nil {
 		return m.UpdateSiteFunc(ctx, site)
 	}
@@ -90,15 +90,17 @@ func (m *BaseMock) UpdateAlert(_ context.Context, _ int, _ string, _ string, _ m
 
 func (m *BaseMock) DeleteAlert(_ context.Context, _ int) error { return nil }
 
-func (m *BaseMock) GetSiteByName(_ context.Context, _ string) (models.Site, error) {
-	return models.Site{}, nil
+func (m *BaseMock) GetSiteByName(_ context.Context, _ string) (models.SiteConfig, error) {
+	return models.SiteConfig{}, nil
 }
 
 func (m *BaseMock) GetAlertByName(_ context.Context, _ string) (models.AlertConfig, error) {
 	return models.AlertConfig{}, nil
 }
 
-func (m *BaseMock) AddSiteReturningID(_ context.Context, _ models.Site) (int, error) { return 0, nil }
+func (m *BaseMock) AddSiteReturningID(_ context.Context, _ models.SiteConfig) (int, error) {
+	return 0, nil
+}
 
 func (m *BaseMock) AddAlertReturningID(_ context.Context, _ string, _ string, _ map[string]string) (int, error) {
 	return 0, nil

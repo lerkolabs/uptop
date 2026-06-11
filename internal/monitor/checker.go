@@ -35,7 +35,7 @@ type CheckResult struct {
 	ErrorReason string
 }
 
-func RunCheck(ctx context.Context, site models.Site, strict, insecure *http.Client, globalInsecure bool, allowPrivate ...bool) CheckResult {
+func RunCheck(ctx context.Context, site models.SiteConfig, strict, insecure *http.Client, globalInsecure bool, allowPrivate ...bool) CheckResult {
 	private := len(allowPrivate) > 0 && allowPrivate[0]
 
 	if site.Type != "http" && site.Type != "dns" && !private {
@@ -68,7 +68,7 @@ func RunCheck(ctx context.Context, site models.Site, strict, insecure *http.Clie
 	}
 }
 
-func runHTTPCheck(ctx context.Context, site models.Site, strict, insecure *http.Client, globalInsecure bool) CheckResult {
+func runHTTPCheck(ctx context.Context, site models.SiteConfig, strict, insecure *http.Client, globalInsecure bool) CheckResult {
 	method := site.Method
 	if method == "" {
 		method = "GET"
@@ -128,7 +128,7 @@ func runHTTPCheck(ctx context.Context, site models.Site, strict, insecure *http.
 	return result
 }
 
-func runPingCheck(_ context.Context, site models.Site) CheckResult {
+func runPingCheck(_ context.Context, site models.SiteConfig) CheckResult {
 	host := site.Hostname
 	if host == "" {
 		host = site.URL
@@ -157,7 +157,7 @@ func runPingCheck(_ context.Context, site models.Site) CheckResult {
 	return CheckResult{SiteID: site.ID, Status: string(models.StatusUp), LatencyNs: stats.AvgRtt.Nanoseconds()}
 }
 
-func runPortCheck(_ context.Context, site models.Site) CheckResult {
+func runPortCheck(_ context.Context, site models.SiteConfig) CheckResult {
 	host := site.Hostname
 	if host == "" {
 		host = site.URL
@@ -176,7 +176,7 @@ func runPortCheck(_ context.Context, site models.Site) CheckResult {
 	return CheckResult{SiteID: site.ID, Status: string(models.StatusUp), LatencyNs: latency.Nanoseconds()}
 }
 
-func runDNSCheck(_ context.Context, site models.Site) CheckResult {
+func runDNSCheck(_ context.Context, site models.SiteConfig) CheckResult {
 	host := site.Hostname
 	if host == "" {
 		host = site.URL
@@ -229,7 +229,7 @@ func runDNSCheck(_ context.Context, site models.Site) CheckResult {
 	return CheckResult{SiteID: site.ID, Status: string(models.StatusUp), LatencyNs: latency.Nanoseconds()}
 }
 
-func siteTimeout(site models.Site) time.Duration {
+func siteTimeout(site models.SiteConfig) time.Duration {
 	if site.Timeout > 0 {
 		return time.Duration(site.Timeout) * time.Second
 	}

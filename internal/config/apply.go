@@ -42,7 +42,7 @@ func Apply(ctx context.Context, s store.Store, f *File, opts ApplyOpts) ([]Chang
 		existingAlertsByName[a.Name] = a
 	}
 
-	existingSitesByName := make(map[string]models.Site, len(existingSites))
+	existingSitesByName := make(map[string]models.SiteConfig, len(existingSites))
 	for _, s := range existingSites {
 		existingSitesByName[s.Name] = s
 	}
@@ -181,7 +181,7 @@ func Apply(ctx context.Context, s store.Store, f *File, opts ApplyOpts) ([]Chang
 	return changes, nil
 }
 
-func applyMonitor(ctx context.Context, s store.Store, m Monitor, alertMap map[string]int, existing map[string]models.Site, parentID int, dryRun bool) ([]Change, error) {
+func applyMonitor(ctx context.Context, s store.Store, m Monitor, alertMap map[string]int, existing map[string]models.SiteConfig, parentID int, dryRun bool) ([]Change, error) {
 	alertID, err := resolveAlertID(alertMap, m.Alert)
 	if err != nil {
 		return nil, fmt.Errorf("monitor %q: %w", m.Name, err)
@@ -222,8 +222,8 @@ func resolveAlertID(alertMap map[string]int, name string) (int, error) {
 	return id, nil
 }
 
-func monitorToSite(m Monitor, alertID, parentID int) models.Site {
-	s := models.Site{
+func monitorToSite(m Monitor, alertID, parentID int) models.SiteConfig {
+	s := models.SiteConfig{
 		Name:     m.Name,
 		Type:     m.Type,
 		URL:      m.URL,
@@ -269,7 +269,7 @@ func collectMonitorNames(monitors []Monitor, names map[string]bool) {
 	}
 }
 
-func normalizeSite(s models.Site) models.Site {
+func normalizeSite(s models.SiteConfig) models.SiteConfig {
 	if s.Method == "" {
 		s.Method = "GET"
 	}
@@ -293,7 +293,7 @@ func diffAlert(existing models.AlertConfig, desired Alert) string {
 	return strings.Join(diffs, ", ")
 }
 
-func diffSite(existing, desired models.Site) string {
+func diffSite(existing, desired models.SiteConfig) string {
 	var diffs []string
 	if existing.URL != desired.URL {
 		diffs = append(diffs, fmt.Sprintf("url: %s -> %s", existing.URL, desired.URL))

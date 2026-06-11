@@ -3,9 +3,10 @@ package importer
 import (
 	"encoding/json"
 	"fmt"
-	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 	"os"
 	"strings"
+
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 )
 
 type KumaBackup struct {
@@ -80,7 +81,7 @@ func ConvertKuma(kb *KumaBackup) models.Backup {
 		}
 	}
 
-	var sites []models.Site
+	var sites []models.SiteConfig
 	for _, m := range kb.MonitorList {
 		site := convertKumaMonitor(m, kumaToUpkeepAlert)
 		sites = append(sites, site)
@@ -132,8 +133,8 @@ func convertKumaNotifications(entries []KumaNotifEntry) map[int]models.AlertConf
 	return result
 }
 
-func convertKumaMonitor(m KumaMonitor, alertMap map[int]int) models.Site {
-	site := models.Site{
+func convertKumaMonitor(m KumaMonitor, alertMap map[int]int) models.SiteConfig {
+	site := models.SiteConfig{
 		ID:          m.ID,
 		Name:        m.Name,
 		Description: m.Description,

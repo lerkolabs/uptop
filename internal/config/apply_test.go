@@ -114,8 +114,8 @@ func TestApplyUpdate(t *testing.T) {
 
 func TestApplyPrune(t *testing.T) {
 	s := newTestStore(t)
-	s.AddSite(context.Background(), models.Site{Name: "Keep", URL: "https://keep.com", Type: "http", Interval: 30, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
-	s.AddSite(context.Background(), models.Site{Name: "Remove", URL: "https://remove.com", Type: "http", Interval: 30, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
+	s.AddSite(context.Background(), models.SiteConfig{Name: "Keep", URL: "https://keep.com", Type: "http", Interval: 30, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
+	s.AddSite(context.Background(), models.SiteConfig{Name: "Remove", URL: "https://remove.com", Type: "http", Interval: 30, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
 
 	f := &File{
 		Monitors: []Monitor{
@@ -191,7 +191,7 @@ func TestApplyGroupHierarchy(t *testing.T) {
 	}
 
 	sites, _ := s.GetSites(context.Background())
-	var group models.Site
+	var group models.SiteConfig
 	for _, s := range sites {
 		if s.Type == "group" {
 			group = s

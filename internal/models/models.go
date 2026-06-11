@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-type Site struct {
+type SiteConfig struct {
 	ID              int
 	Name            string
 	URL             string
@@ -26,7 +26,9 @@ type Site struct {
 	IgnoreTLS      bool
 	Paused         bool
 	Regions        string
+}
 
+type SiteState struct {
 	FailureCount    int
 	Status          Status
 	StatusCode      int
@@ -38,6 +40,11 @@ type Site struct {
 	LastError       string
 	StatusChangedAt time.Time
 	LastSuccessAt   time.Time
+}
+
+type Site struct {
+	SiteConfig
+	SiteState
 }
 
 type StateChange struct {
@@ -103,7 +110,7 @@ type MaintenanceWindow struct {
 }
 
 type Backup struct {
-	Sites              []Site              `json:"sites"`
+	Sites              []SiteConfig        `json:"sites"`
 	Alerts             []AlertConfig       `json:"alerts"`
 	Users              []User              `json:"users"`
 	MaintenanceWindows []MaintenanceWindow `json:"maintenance_windows,omitempty"`

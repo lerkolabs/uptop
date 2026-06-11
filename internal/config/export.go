@@ -34,9 +34,9 @@ func Export(ctx context.Context, s store.Store) (*File, error) {
 		})
 	}
 
-	groups := make(map[int]models.Site)
-	children := make(map[int][]models.Site)
-	var topLevel []models.Site
+	groups := make(map[int]models.SiteConfig)
+	children := make(map[int][]models.SiteConfig)
+	var topLevel []models.SiteConfig
 
 	for _, s := range dbSites {
 		switch {
@@ -76,7 +76,7 @@ func Export(ctx context.Context, s store.Store) (*File, error) {
 	return &File{Alerts: yamlAlerts, Monitors: yamlMonitors}, nil
 }
 
-func siteToMonitor(s models.Site, alertIDToName map[int]string) Monitor {
+func siteToMonitor(s models.SiteConfig, alertIDToName map[int]string) Monitor {
 	m := Monitor{
 		Name:     s.Name,
 		Type:     s.Type,

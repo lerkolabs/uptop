@@ -19,7 +19,7 @@ func TestRunCheck_HTTP_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	site := models.Site{ID: 1, Type: "http", URL: srv.URL}
+	site := models.SiteConfig{ID: 1, Type: "http", URL: srv.URL}
 	result := RunCheck(context.Background(), site, http.DefaultClient, http.DefaultClient, false)
 
 	if result.Status != "UP" {
@@ -39,7 +39,7 @@ func TestRunCheck_HTTP_ServerError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	site := models.Site{ID: 1, Type: "http", URL: srv.URL}
+	site := models.SiteConfig{ID: 1, Type: "http", URL: srv.URL}
 	result := RunCheck(context.Background(), site, http.DefaultClient, http.DefaultClient, false)
 
 	if result.Status != "DOWN" {
@@ -60,7 +60,7 @@ func TestRunCheck_HTTP_CustomAcceptedCodes(t *testing.T) {
 		return http.ErrUseLastResponse
 	}}
 
-	site := models.Site{ID: 1, Type: "http", URL: srv.URL, AcceptedCodes: "200-399"}
+	site := models.SiteConfig{ID: 1, Type: "http", URL: srv.URL, AcceptedCodes: "200-399"}
 	result := RunCheck(context.Background(), site, client, client, false)
 
 	if result.Status != "UP" {
@@ -76,7 +76,7 @@ func TestRunCheck_HTTP_MethodRespected(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	site := models.Site{ID: 1, Type: "http", URL: srv.URL, Method: "HEAD"}
+	site := models.SiteConfig{ID: 1, Type: "http", URL: srv.URL, Method: "HEAD"}
 	RunCheck(context.Background(), site, http.DefaultClient, http.DefaultClient, false)
 
 	if receivedMethod != "HEAD" {
@@ -91,7 +91,7 @@ func TestRunCheck_HTTP_Timeout(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	site := models.Site{ID: 1, Type: "http", URL: srv.URL, Timeout: 1}
+	site := models.SiteConfig{ID: 1, Type: "http", URL: srv.URL, Timeout: 1}
 	result := RunCheck(context.Background(), site, http.DefaultClient, http.DefaultClient, false)
 
 	if result.Status != "DOWN" {
@@ -109,7 +109,7 @@ func TestRunCheck_HTTP_SSLFields(t *testing.T) {
 		Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
 	}
 
-	site := models.Site{ID: 1, Type: "http", URL: srv.URL, CheckSSL: true, IgnoreTLS: true}
+	site := models.SiteConfig{ID: 1, Type: "http", URL: srv.URL, CheckSSL: true, IgnoreTLS: true}
 	result := RunCheck(context.Background(), site, http.DefaultClient, insecureClient, false)
 
 	if result.Status != "UP" {
@@ -133,7 +133,7 @@ func TestRunCheck_Port_Open(t *testing.T) {
 	_, portStr, _ := net.SplitHostPort(ln.Addr().String())
 	port, _ := strconv.Atoi(portStr)
 
-	site := models.Site{ID: 1, Type: "port", Hostname: "127.0.0.1", Port: port, Timeout: 2}
+	site := models.SiteConfig{ID: 1, Type: "port", Hostname: "127.0.0.1", Port: port, Timeout: 2}
 	result := RunCheck(context.Background(), site, nil, nil, false, true)
 
 	if result.Status != "UP" {
@@ -153,7 +153,7 @@ func TestRunCheck_Port_Closed(t *testing.T) {
 	port, _ := strconv.Atoi(portStr)
 	ln.Close()
 
-	site := models.Site{ID: 1, Type: "port", Hostname: "127.0.0.1", Port: port, Timeout: 1}
+	site := models.SiteConfig{ID: 1, Type: "port", Hostname: "127.0.0.1", Port: port, Timeout: 1}
 	result := RunCheck(context.Background(), site, nil, nil, false, true)
 
 	if result.Status != "DOWN" {
@@ -171,7 +171,7 @@ func TestRunCheck_Port_BlocksPrivateByDefault(t *testing.T) {
 	_, portStr, _ := net.SplitHostPort(ln.Addr().String())
 	port, _ := strconv.Atoi(portStr)
 
-	site := models.Site{ID: 1, Type: "port", Hostname: "127.0.0.1", Port: port, Timeout: 2}
+	site := models.SiteConfig{ID: 1, Type: "port", Hostname: "127.0.0.1", Port: port, Timeout: 2}
 	result := RunCheck(context.Background(), site, nil, nil, false)
 
 	if result.Status != "DOWN" {
@@ -180,7 +180,7 @@ func TestRunCheck_Port_BlocksPrivateByDefault(t *testing.T) {
 }
 
 func TestRunCheck_UnknownType(t *testing.T) {
-	site := models.Site{ID: 1, Type: "invalid"}
+	site := models.SiteConfig{ID: 1, Type: "invalid"}
 	result := RunCheck(context.Background(), site, nil, nil, false)
 
 	if result.Status != "DOWN" {
@@ -214,10 +214,10 @@ func TestIsCodeAccepted(t *testing.T) {
 }
 
 func TestSiteTimeout(t *testing.T) {
-	if got := siteTimeout(models.Site{Timeout: 0}); got != 5*time.Second {
+	if got := siteTimeout(models.SiteConfig{Timeout: 0}); got != 5*time.Second {
 		t.Errorf("expected 5s default, got %v", got)
 	}
-	if got := siteTimeout(models.Site{Timeout: 10}); got != 10*time.Second {
+	if got := siteTimeout(models.SiteConfig{Timeout: 10}); got != 10*time.Second {
 		t.Errorf("expected 10s, got %v", got)
 	}
 }

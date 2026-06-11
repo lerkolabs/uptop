@@ -33,7 +33,7 @@ func TestSiteCRUD(t *testing.T) {
 		t.Fatalf("expected 0 sites, got %d", len(sites))
 	}
 
-	if err := s.AddSite(context.Background(), models.Site{Name: "Test", URL: "https://example.com", Type: "http", Interval: 30}); err != nil {
+	if err := s.AddSite(context.Background(), models.SiteConfig{Name: "Test", URL: "https://example.com", Type: "http", Interval: 30}); err != nil {
 		t.Fatalf("AddSite: %v", err)
 	}
 
@@ -174,7 +174,7 @@ func TestUserCRUD(t *testing.T) {
 func TestPushTokenGeneration(t *testing.T) {
 	s := newTestStore(t)
 
-	if err := s.AddSite(context.Background(), models.Site{Name: "Push Monitor", Type: "push", Interval: 60}); err != nil {
+	if err := s.AddSite(context.Background(), models.SiteConfig{Name: "Push Monitor", Type: "push", Interval: 60}); err != nil {
 		t.Fatalf("AddSite: %v", err)
 	}
 
@@ -199,7 +199,7 @@ func TestImportExport(t *testing.T) {
 	if err := s.AddAlert(context.Background(), "Test Alert", "webhook", map[string]string{"url": "https://example.com"}); err != nil {
 		t.Fatalf("AddAlert: %v", err)
 	}
-	if err := s.AddSite(context.Background(), models.Site{Name: "Site1", URL: "https://example.com", Type: "http", Interval: 30}); err != nil {
+	if err := s.AddSite(context.Background(), models.SiteConfig{Name: "Site1", URL: "https://example.com", Type: "http", Interval: 30}); err != nil {
 		t.Fatalf("AddSite: %v", err)
 	}
 	if err := s.AddUser(context.Background(), "user1", "ssh-ed25519 KEY", "user"); err != nil {
@@ -239,7 +239,7 @@ func TestImportExport(t *testing.T) {
 func TestImportData_WipesHistory(t *testing.T) {
 	s := newTestStore(t)
 
-	if err := s.AddSite(context.Background(), models.Site{Name: "OldSite", URL: "https://old.com", Type: "http", Interval: 30}); err != nil {
+	if err := s.AddSite(context.Background(), models.SiteConfig{Name: "OldSite", URL: "https://old.com", Type: "http", Interval: 30}); err != nil {
 		t.Fatalf("AddSite: %v", err)
 	}
 	if err := s.SaveCheck(context.Background(), 1, 5000, true); err != nil {
@@ -253,7 +253,7 @@ func TestImportData_WipesHistory(t *testing.T) {
 	}
 
 	backup := models.Backup{
-		Sites: []models.Site{{ID: 1, Name: "NewSite", URL: "https://new.com", Type: "http", Interval: 60}},
+		Sites: []models.SiteConfig{{ID: 1, Name: "NewSite", URL: "https://new.com", Type: "http", Interval: 60}},
 	}
 	if err := s.ImportData(context.Background(), backup); err != nil {
 		t.Fatalf("ImportData: %v", err)
@@ -314,7 +314,7 @@ func TestCheckHistory(t *testing.T) {
 func TestDeleteSiteCascade(t *testing.T) {
 	s := newTestStore(t)
 
-	site := models.Site{Name: "Cascade Test", URL: "https://example.com", Interval: 30}
+	site := models.SiteConfig{Name: "Cascade Test", URL: "https://example.com", Interval: 30}
 	if err := s.AddSite(context.Background(), site); err != nil {
 		t.Fatalf("AddSite: %v", err)
 	}

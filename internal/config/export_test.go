@@ -22,7 +22,7 @@ func TestExportAlertNames(t *testing.T) {
 	s := newTestStore(t)
 	s.AddAlert(context.Background(), "Discord", "discord", map[string]string{"url": "https://example.com"})
 	alerts, _ := s.GetAllAlerts(context.Background())
-	s.AddSite(context.Background(), models.Site{Name: "Web", URL: "https://example.com", Type: "http", Interval: 30, AlertID: alerts[0].ID, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
+	s.AddSite(context.Background(), models.SiteConfig{Name: "Web", URL: "https://example.com", Type: "http", Interval: 30, AlertID: alerts[0].ID, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
 
 	f, err := Export(context.Background(), s)
 	if err != nil {
@@ -39,9 +39,9 @@ func TestExportAlertNames(t *testing.T) {
 
 func TestExportGroupHierarchy(t *testing.T) {
 	s := newTestStore(t)
-	groupID, _ := s.AddSiteReturningID(context.Background(), models.Site{Name: "Prod", Type: "group", ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
-	s.AddSite(context.Background(), models.Site{Name: "Prod Web", URL: "https://prod.example.com", Type: "http", Interval: 15, ParentID: groupID, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
-	s.AddSite(context.Background(), models.Site{Name: "Top Level", URL: "https://example.com", Type: "http", Interval: 30, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
+	groupID, _ := s.AddSiteReturningID(context.Background(), models.SiteConfig{Name: "Prod", Type: "group", ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
+	s.AddSite(context.Background(), models.SiteConfig{Name: "Prod Web", URL: "https://prod.example.com", Type: "http", Interval: 15, ParentID: groupID, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
+	s.AddSite(context.Background(), models.SiteConfig{Name: "Top Level", URL: "https://example.com", Type: "http", Interval: 30, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
 
 	f, err := Export(context.Background(), s)
 	if err != nil {
@@ -72,7 +72,7 @@ func TestExportGroupHierarchy(t *testing.T) {
 
 func TestExportOmitsDefaults(t *testing.T) {
 	s := newTestStore(t)
-	s.AddSite(context.Background(), models.Site{
+	s.AddSite(context.Background(), models.SiteConfig{
 		Name: "Web", URL: "https://example.com", Type: "http", Interval: 30,
 		Method: "GET", AcceptedCodes: "200-299", ExpiryThreshold: 7,
 	})
@@ -98,8 +98,8 @@ func TestExportRoundTrip(t *testing.T) {
 	s1 := newTestStore(t)
 	s1.AddAlert(context.Background(), "Discord", "discord", map[string]string{"url": "https://example.com"})
 	alerts, _ := s1.GetAllAlerts(context.Background())
-	s1.AddSite(context.Background(), models.Site{Name: "Web", URL: "https://example.com", Type: "http", Interval: 30, AlertID: alerts[0].ID, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
-	s1.AddSite(context.Background(), models.Site{Name: "Ping", Type: "ping", Hostname: "10.0.0.1", Interval: 60, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
+	s1.AddSite(context.Background(), models.SiteConfig{Name: "Web", URL: "https://example.com", Type: "http", Interval: 30, AlertID: alerts[0].ID, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
+	s1.AddSite(context.Background(), models.SiteConfig{Name: "Ping", Type: "ping", Hostname: "10.0.0.1", Interval: 60, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
 
 	exported, err := Export(context.Background(), s1)
 	if err != nil {

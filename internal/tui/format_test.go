@@ -38,13 +38,13 @@ func TestSiteOrder(t *testing.T) {
 		site models.Site
 		want int
 	}{
-		{"down", models.Site{Status: "DOWN"}, 0},
-		{"ssl exp", models.Site{Status: "SSL EXP"}, 0},
-		{"late", models.Site{Status: "LATE"}, 1},
-		{"up", models.Site{Status: "UP"}, 2},
-		{"pending", models.Site{Status: "PENDING"}, 3},
-		{"paused up", models.Site{Status: "UP", Paused: true}, 3},
-		{"paused down", models.Site{Status: "DOWN", Paused: true}, 3},
+		{"down", models.Site{SiteState: models.SiteState{Status: "DOWN"}}, 0},
+		{"ssl exp", models.Site{SiteState: models.SiteState{Status: "SSL EXP"}}, 0},
+		{"late", models.Site{SiteState: models.SiteState{Status: "LATE"}}, 1},
+		{"up", models.Site{SiteState: models.SiteState{Status: "UP"}}, 2},
+		{"pending", models.Site{SiteState: models.SiteState{Status: "PENDING"}}, 3},
+		{"paused up", models.Site{SiteConfig: models.SiteConfig{Paused: true}, SiteState: models.SiteState{Status: "UP"}}, 3},
+		{"paused down", models.Site{SiteConfig: models.SiteConfig{Paused: true}, SiteState: models.SiteState{Status: "DOWN"}}, 3},
 	}
 	for _, tt := range tests {
 		got := siteOrder(tt.site)

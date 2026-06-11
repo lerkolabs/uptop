@@ -418,7 +418,7 @@ func (e *Engine) Start(ctx context.Context) {
 
 			e.refreshMaintenanceCache(ctx)
 
-			sites, err := e.db.GetSites(ctx)
+			configs, err := e.db.GetSites(ctx)
 			if err != nil {
 				e.AddLog(fmt.Sprintf("Failed to load sites: %v", err))
 				select {
@@ -428,31 +428,31 @@ func (e *Engine) Start(ctx context.Context) {
 				}
 				continue
 			}
-			for _, s := range sites {
+			for _, cfg := range configs {
 				e.mu.RLock()
-				_, exists := e.liveState[s.ID]
+				_, exists := e.liveState[cfg.ID]
 				e.mu.RUnlock()
 				if !exists {
 					e.mu.Lock()
-					s.Status = models.StatusPending
-					if h, ok := e.GetHistory(s.ID); ok && len(h.Statuses) > 0 {
+					site := models.Site{SiteConfig: cfg, SiteState: models.SiteState{Status: models.StatusPending}}
+					if h, ok := e.GetHistory(cfg.ID); ok && len(h.Statuses) > 0 {
 						if h.Statuses[len(h.Statuses)-1] {
-							s.Status = models.StatusUp
+							site.Status = models.StatusUp
 						} else {
-							s.Status = models.StatusDown
+							site.Status = models.StatusDown
 						}
 						if len(h.Latencies) > 0 {
-							s.Latency = h.Latencies[len(h.Latencies)-1]
+							site.Latency = h.Latencies[len(h.Latencies)-1]
 						}
 					}
-					e.liveState[s.ID] = s
-					e.addToTokenIndex(s)
+					e.liveState[cfg.ID] = site
+					e.addToTokenIndex(site)
 					e.mu.Unlock()
 					e.checkerWG.Add(1)
 					go func(id int) {
 						defer e.checkerWG.Done()
 						e.monitorRoutine(ctx, id)
-					}(s.ID)
+					}(cfg.ID)
 				}
 			}
 
@@ -498,27 +498,17 @@ func (e *Engine) pruneMaintenanceWindows(ctx context.Context) {
 	}
 }
 
-func (e *Engine) UpdateSiteConfig(site models.Site) {
+func (e *Engine) UpdateSiteConfig(cfg models.SiteConfig) {
 	e.mu.Lock()
-	if existing, ok := e.liveState[site.ID]; ok {
-		e.removeFromTokenIndex(site.ID)
-		site.Status = existing.Status
-		site.StatusCode = existing.StatusCode
-		site.Latency = existing.Latency
-		site.CertExpiry = existing.CertExpiry
-		site.HasSSL = existing.HasSSL
-		site.LastCheck = existing.LastCheck
-		site.SentSSLWarning = existing.SentSSLWarning
-		site.FailureCount = existing.FailureCount
-		site.LastError = existing.LastError
-		site.StatusChangedAt = existing.StatusChangedAt
-		site.LastSuccessAt = existing.LastSuccessAt
-		e.liveState[site.ID] = site
-		e.addToTokenIndex(site)
+	if existing, ok := e.liveState[cfg.ID]; ok {
+		e.removeFromTokenIndex(cfg.ID)
+		existing.SiteConfig = cfg
+		e.liveState[cfg.ID] = existing
+		e.addToTokenIndex(existing)
 	}
 	e.mu.Unlock()
 
-	e.signalRecheck(site.ID)
+	e.signalRecheck(cfg.ID)
 }
 
 func (e *Engine) getRecheckChan(id int) chan struct{} {
@@ -675,7 +665,7 @@ func (e *Engine) checkByID(ctx context.Context, id int) {
 	case "group":
 		e.checkGroup(ctx, site)
 	default:
-		result := RunCheck(ctx, site, e.strictClient, e.insecureClient, e.insecureSkipVerify, e.allowPrivateTargets)
+		result := RunCheck(ctx, site.SiteConfig, e.strictClient, e.insecureClient, e.insecureSkipVerify, e.allowPrivateTargets)
 		updatedSite := site
 		updatedSite.HasSSL = result.HasSSL
 		updatedSite.CertExpiry = result.CertExpiry

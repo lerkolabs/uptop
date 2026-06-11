@@ -152,7 +152,7 @@ loop:
 			defer wg.Done()
 			defer func() { <-sem }()
 
-			cr := monitor.RunCheck(ctx, s, strict, insecure, false, allowPrivate)
+			cr := monitor.RunCheck(ctx, s.SiteConfig, strict, insecure, false, allowPrivate)
 			mu.Lock()
 			results = append(results, probeResultItem{
 				SiteID:      s.ID,

@@ -112,7 +112,7 @@ func (s *SQLStore) Init(ctx context.Context) error {
 	return nil
 }
 
-func (s *SQLStore) GetSites(ctx context.Context) ([]models.Site, error) {
+func (s *SQLStore) GetSites(ctx context.Context) ([]models.SiteConfig, error) {
 	bf := s.dialect.BoolFalse()
 	query := fmt.Sprintf( //nolint:gosec // bf is a dialect boolean literal, not user input
 		"SELECT id, COALESCE(name, url), url, COALESCE(type, 'http'), COALESCE(token, ''), interval, alert_id, check_ssl, threshold, max_retries, COALESCE(hostname, ''), COALESCE(port, 0), COALESCE(timeout, 0), COALESCE(method, 'GET'), COALESCE(description, ''), COALESCE(parent_id, 0), COALESCE(accepted_codes, '200-299'), COALESCE(dns_resolve_type, ''), COALESCE(dns_server, ''), COALESCE(ignore_tls, %s), COALESCE(paused, %s), COALESCE(regions, '') FROM sites",
@@ -123,9 +123,9 @@ func (s *SQLStore) GetSites(ctx context.Context) ([]models.Site, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var sites []models.Site
+	var sites []models.SiteConfig
 	for rows.Next() {
-		var st models.Site
+		var st models.SiteConfig
 		if err := rows.Scan(&st.ID, &st.Name, &st.URL, &st.Type, &st.Token, &st.Interval, &st.AlertID,
 			&st.CheckSSL, &st.ExpiryThreshold, &st.MaxRetries, &st.Hostname, &st.Port, &st.Timeout,
 			&st.Method, &st.Description, &st.ParentID, &st.AcceptedCodes, &st.DNSResolveType,
@@ -137,7 +137,7 @@ func (s *SQLStore) GetSites(ctx context.Context) ([]models.Site, error) {
 	return sites, rows.Err()
 }
 
-func (s *SQLStore) AddSite(ctx context.Context, site models.Site) error {
+func (s *SQLStore) AddSite(ctx context.Context, site models.SiteConfig) error {
 	token := ""
 	if site.Type == "push" {
 		var err error
@@ -152,7 +152,7 @@ func (s *SQLStore) AddSite(ctx context.Context, site models.Site) error {
 	return err
 }
 
-func (s *SQLStore) UpdateSite(ctx context.Context, site models.Site) error {
+func (s *SQLStore) UpdateSite(ctx context.Context, site models.SiteConfig) error {
 	var existingToken string
 	_ = s.db.QueryRowContext(ctx, s.q("SELECT token FROM sites WHERE id=?"), site.ID).Scan(&existingToken) //nolint:errcheck
 	if site.Type == "push" && existingToken == "" {
@@ -198,13 +198,13 @@ func (s *SQLStore) DeleteSite(ctx context.Context, id int) error {
 	return nil
 }
 
-func (s *SQLStore) GetSiteByName(ctx context.Context, name string) (models.Site, error) {
+func (s *SQLStore) GetSiteByName(ctx context.Context, name string) (models.SiteConfig, error) {
 	bf := s.dialect.BoolFalse()
 	query := fmt.Sprintf( //nolint:gosec // bf is a dialect boolean literal, not user input
 		"SELECT id, COALESCE(name, url), url, COALESCE(type, 'http'), COALESCE(token, ''), interval, alert_id, check_ssl, threshold, max_retries, COALESCE(hostname, ''), COALESCE(port, 0), COALESCE(timeout, 0), COALESCE(method, 'GET'), COALESCE(description, ''), COALESCE(parent_id, 0), COALESCE(accepted_codes, '200-299'), COALESCE(dns_resolve_type, ''), COALESCE(dns_server, ''), COALESCE(ignore_tls, %s), COALESCE(paused, %s), COALESCE(regions, '') FROM sites WHERE name = %s",
 		bf, bf, s.q("?"),
 	)
-	var st models.Site
+	var st models.SiteConfig
 	err := s.db.QueryRowContext(ctx, query, name).Scan(&st.ID, &st.Name, &st.URL, &st.Type, &st.Token, &st.Interval, &st.AlertID,
 		&st.CheckSSL, &st.ExpiryThreshold, &st.MaxRetries, &st.Hostname, &st.Port, &st.Timeout,
 		&st.Method, &st.Description, &st.ParentID, &st.AcceptedCodes, &st.DNSResolveType,
@@ -246,7 +246,7 @@ func (s *SQLStore) GetAlertByName(ctx context.Context, name string) (models.Aler
 	return a, nil
 }
 
-func (s *SQLStore) AddSiteReturningID(ctx context.Context, site models.Site) (int, error) {
+func (s *SQLStore) AddSiteReturningID(ctx context.Context, site models.SiteConfig) (int, error) {
 	token := ""
 	if site.Type == "push" {
 		var err error

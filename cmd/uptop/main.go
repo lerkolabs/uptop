@@ -474,7 +474,7 @@ func seedDemoData(s store.Store) {
 		alertID = alerts[0].ID
 	}
 
-	demoSites := []models.Site{
+	demoSites := []models.SiteConfig{
 		{Name: "Google", URL: "https://www.google.com", Type: "http", Interval: 30, AlertID: alertID, CheckSSL: true, ExpiryThreshold: 14, MaxRetries: 2},
 		{Name: "GitHub", URL: "https://github.com", Type: "http", Interval: 30, AlertID: alertID, CheckSSL: true, ExpiryThreshold: 7, MaxRetries: 3},
 		{Name: "Cloudflare DNS", URL: "https://1.1.1.1", Type: "http", Interval: 60, AlertID: alertID, ExpiryThreshold: 7, MaxRetries: 1},

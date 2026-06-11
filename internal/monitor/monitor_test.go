@@ -22,7 +22,7 @@ type savedCheck struct {
 type mockStore struct {
 	storetest.BaseMock
 	mu            sync.Mutex
-	sites         []models.Site
+	sites         []models.SiteConfig
 	alerts        map[int]models.AlertConfig
 	maintenance   map[int]bool
 	logs          []string
@@ -40,7 +40,7 @@ func newMockStore() *mockStore {
 	}
 }
 
-func (m *mockStore) GetSites(context.Context) ([]models.Site, error) { return m.sites, nil }
+func (m *mockStore) GetSites(context.Context) ([]models.SiteConfig, error) { return m.sites, nil }
 
 func (m *mockStore) GetActiveMaintenanceWindows(context.Context) ([]models.MaintenanceWindow, error) {
 	m.mu.Lock()
@@ -148,7 +148,10 @@ func (m *mockStore) getAlertCallsSnapshot() []int {
 func TestHandleStatusChange_PendingToUp(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", Status: "PENDING", MaxRetries: 3, AlertID: 1}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", MaxRetries: 3, AlertID: 1},
+		SiteState:  models.SiteState{Status: "PENDING"},
+	}
 	injectSite(e, site)
 
 	e.handleStatusChange(site, "UP", 200, 10*time.Millisecond, "")
@@ -169,7 +172,10 @@ func TestHandleStatusChange_PendingToUp(t *testing.T) {
 func TestHandleStatusChange_UpIncrementFailure(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", Status: "UP", MaxRetries: 3, FailureCount: 0}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", MaxRetries: 3},
+		SiteState:  models.SiteState{Status: "UP", FailureCount: 0},
+	}
 	injectSite(e, site)
 
 	e.handleStatusChange(site, "DOWN", 500, 0, "test error")
@@ -187,7 +193,10 @@ func TestHandleStatusChange_UpToDown_ExceedsRetries(t *testing.T) {
 	ms := newMockStore()
 	ms.alerts[1] = models.AlertConfig{ID: 1, Name: "discord", Type: "webhook", Settings: map[string]string{"url": "http://example.com"}}
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", Status: "UP", MaxRetries: 2, FailureCount: 2, AlertID: 1}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", MaxRetries: 2, AlertID: 1},
+		SiteState:  models.SiteState{Status: "UP", FailureCount: 2},
+	}
 	injectSite(e, site)
 
 	e.handleStatusChange(site, "DOWN", 500, 0, "test error")
@@ -210,7 +219,10 @@ func TestHandleStatusChange_UpToDown_ZeroRetries(t *testing.T) {
 	ms := newMockStore()
 	ms.alerts[1] = models.AlertConfig{ID: 1, Name: "test", Type: "webhook", Settings: map[string]string{"url": "http://example.com"}}
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", Status: "UP", MaxRetries: 0, FailureCount: 0, AlertID: 1}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", MaxRetries: 0, AlertID: 1},
+		SiteState:  models.SiteState{Status: "UP", FailureCount: 0},
+	}
 	injectSite(e, site)
 
 	e.handleStatusChange(site, "DOWN", 0, 0, "test error")
@@ -229,7 +241,10 @@ func TestHandleStatusChange_DownToUp_Recovery(t *testing.T) {
 	ms := newMockStore()
 	ms.alerts[1] = models.AlertConfig{ID: 1, Name: "test", Type: "webhook", Settings: map[string]string{"url": "http://example.com"}}
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", Status: "DOWN", FailureCount: 4, AlertID: 1}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", AlertID: 1},
+		SiteState:  models.SiteState{Status: "DOWN", FailureCount: 4},
+	}
 	injectSite(e, site)
 
 	e.handleStatusChange(site, "UP", 200, 5*time.Millisecond, "")
@@ -250,7 +265,10 @@ func TestHandleStatusChange_DownToUp_Recovery(t *testing.T) {
 func TestHandleStatusChange_DownStaysDown(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", Status: "DOWN", MaxRetries: 2, FailureCount: 3}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", MaxRetries: 2},
+		SiteState:  models.SiteState{Status: "DOWN", FailureCount: 3},
+	}
 	injectSite(e, site)
 
 	e.handleStatusChange(site, "DOWN", 0, 0, "test error")
@@ -269,7 +287,10 @@ func TestHandleStatusChange_SSLExpired(t *testing.T) {
 	ms := newMockStore()
 	ms.alerts[1] = models.AlertConfig{ID: 1, Name: "test", Type: "webhook", Settings: map[string]string{"url": "http://example.com"}}
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", Status: "UP", MaxRetries: 0, AlertID: 1}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", MaxRetries: 0, AlertID: 1},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
 	injectSite(e, site)
 
 	e.handleStatusChange(site, "SSL EXP", 0, 0, "SSL certificate expired")
@@ -289,7 +310,10 @@ func TestHandleStatusChange_AlertSuppressedMaintenance(t *testing.T) {
 	ms.maintenance[1] = true
 	ms.alerts[1] = models.AlertConfig{ID: 1, Name: "test", Type: "webhook", Settings: map[string]string{"url": "http://example.com"}}
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", Status: "UP", MaxRetries: 0, AlertID: 1}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", MaxRetries: 0, AlertID: 1},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
 	injectSite(e, site)
 	e.refreshMaintenanceCache(context.Background())
 
@@ -321,7 +345,10 @@ func TestHandleStatusChange_RecoverySuppressedMaintenance(t *testing.T) {
 	ms.maintenance[1] = true
 	ms.alerts[1] = models.AlertConfig{ID: 1, Name: "test", Type: "webhook", Settings: map[string]string{"url": "http://example.com"}}
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", Status: "DOWN", AlertID: 1}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", AlertID: 1},
+		SiteState:  models.SiteState{Status: "DOWN"},
+	}
 	injectSite(e, site)
 	e.refreshMaintenanceCache(context.Background())
 
@@ -342,10 +369,8 @@ func TestHandleStatusChange_SSLWarning(t *testing.T) {
 	ms.alerts[1] = models.AlertConfig{ID: 1, Name: "test", Type: "webhook", Settings: map[string]string{"url": "http://example.com"}}
 	e := newTestEngine(ms)
 	site := models.Site{
-		ID: 1, Name: "test", Status: "UP", Type: "http",
-		CheckSSL: true, HasSSL: true, ExpiryThreshold: 30,
-		SentSSLWarning: false, AlertID: 1,
-		CertExpiry: time.Now().Add(15 * 24 * time.Hour),
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", Type: "http", CheckSSL: true, ExpiryThreshold: 30, AlertID: 1},
+		SiteState:  models.SiteState{Status: "UP", HasSSL: true, SentSSLWarning: false, CertExpiry: time.Now().Add(15 * 24 * time.Hour)},
 	}
 	injectSite(e, site)
 
@@ -365,10 +390,8 @@ func TestHandleStatusChange_SSLWarningNotRepeated(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
 	site := models.Site{
-		ID: 1, Name: "test", Status: "UP", Type: "http",
-		CheckSSL: true, HasSSL: true, ExpiryThreshold: 30,
-		SentSSLWarning: true, AlertID: 1,
-		CertExpiry: time.Now().Add(15 * 24 * time.Hour),
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", Type: "http", CheckSSL: true, ExpiryThreshold: 30, AlertID: 1},
+		SiteState:  models.SiteState{Status: "UP", HasSSL: true, SentSSLWarning: true, CertExpiry: time.Now().Add(15 * 24 * time.Hour)},
 	}
 	injectSite(e, site)
 
@@ -384,10 +407,8 @@ func TestHandleStatusChange_SSLWarningReset(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
 	site := models.Site{
-		ID: 1, Name: "test", Status: "UP", Type: "http",
-		CheckSSL: true, HasSSL: true, ExpiryThreshold: 30,
-		SentSSLWarning: true,
-		CertExpiry:     time.Now().Add(60 * 24 * time.Hour),
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", Type: "http", CheckSSL: true, ExpiryThreshold: 30},
+		SiteState:  models.SiteState{Status: "UP", HasSSL: true, SentSSLWarning: true, CertExpiry: time.Now().Add(60 * 24 * time.Hour)},
 	}
 	injectSite(e, site)
 
@@ -405,10 +426,8 @@ func TestHandleStatusChange_SSLWarningSuppressedMaint(t *testing.T) {
 	ms.alerts[1] = models.AlertConfig{ID: 1, Name: "test", Type: "webhook", Settings: map[string]string{"url": "http://example.com"}}
 	e := newTestEngine(ms)
 	site := models.Site{
-		ID: 1, Name: "test", Status: "UP", Type: "http",
-		CheckSSL: true, HasSSL: true, ExpiryThreshold: 30,
-		SentSSLWarning: false, AlertID: 1,
-		CertExpiry: time.Now().Add(15 * 24 * time.Hour),
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", Type: "http", CheckSSL: true, ExpiryThreshold: 30, AlertID: 1},
+		SiteState:  models.SiteState{Status: "UP", HasSSL: true, SentSSLWarning: false, CertExpiry: time.Now().Add(15 * 24 * time.Hour)},
 	}
 	injectSite(e, site)
 	e.refreshMaintenanceCache(context.Background())
@@ -428,7 +447,10 @@ func TestHandleStatusChange_SSLWarningSuppressedMaint(t *testing.T) {
 func TestHandleStatusChange_InactiveEngine(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", Status: "UP", MaxRetries: 0}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", MaxRetries: 0},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
 	injectSite(e, site)
 	e.SetActive(false)
 
@@ -445,7 +467,10 @@ func TestHandleStatusChange_InactiveEngine(t *testing.T) {
 func TestRecordHeartbeat_ValidToken(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "push-test", Type: "push", Token: "abc123", Status: "UP"}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "push-test", Type: "push", Token: "abc123"},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
 	injectSite(e, site)
 
 	if !e.RecordHeartbeat("abc123") {
@@ -465,7 +490,10 @@ func TestRecordHeartbeat_RecoveryFromDown(t *testing.T) {
 	ms := newMockStore()
 	ms.alerts[1] = models.AlertConfig{ID: 1, Name: "test", Type: "webhook", Settings: map[string]string{"url": "http://example.com"}}
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "push-test", Type: "push", Token: "abc123", Status: "DOWN", AlertID: 1, FailureCount: 3}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "push-test", Type: "push", Token: "abc123", AlertID: 1},
+		SiteState:  models.SiteState{Status: "DOWN", FailureCount: 3},
+	}
 	injectSite(e, site)
 
 	if !e.RecordHeartbeat("abc123") {
@@ -497,7 +525,10 @@ func TestRecordHeartbeat_UnknownToken(t *testing.T) {
 func TestRecordHeartbeat_InactiveEngine(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Type: "push", Token: "abc123", Status: "UP"}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Type: "push", Token: "abc123"},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
 	injectSite(e, site)
 	e.SetActive(false)
 
@@ -512,9 +543,8 @@ func TestCheckPush_DeadlineMissed(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
 	site := models.Site{
-		ID: 1, Name: "push", Type: "push", Status: "UP",
-		Interval: 10, MaxRetries: 0,
-		LastCheck: time.Now().Add(-120 * time.Second),
+		SiteConfig: models.SiteConfig{ID: 1, Name: "push", Type: "push", Interval: 10, MaxRetries: 0},
+		SiteState:  models.SiteState{Status: "UP", LastCheck: time.Now().Add(-120 * time.Second)},
 	}
 	injectSite(e, site)
 
@@ -530,9 +560,8 @@ func TestCheckPush_OverdueBecomesLate(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
 	site := models.Site{
-		ID: 1, Name: "push", Type: "push", Status: "UP",
-		Interval:  300,
-		LastCheck: time.Now().Add(-310 * time.Second),
+		SiteConfig: models.SiteConfig{ID: 1, Name: "push", Type: "push", Interval: 300},
+		SiteState:  models.SiteState{Status: "UP", LastCheck: time.Now().Add(-310 * time.Second)},
 	}
 	injectSite(e, site)
 
@@ -550,9 +579,8 @@ func TestCheckPush_OverdueBecomesStale(t *testing.T) {
 	// interval=300, grace=150 (300/2), staleMark=overdue+75
 	// at 380s: past staleMark(375) but before graceEnd(450)
 	site := models.Site{
-		ID: 1, Name: "push", Type: "push", Status: "UP",
-		Interval:  300,
-		LastCheck: time.Now().Add(-380 * time.Second),
+		SiteConfig: models.SiteConfig{ID: 1, Name: "push", Type: "push", Interval: 300},
+		SiteState:  models.SiteState{Status: "UP", LastCheck: time.Now().Add(-380 * time.Second)},
 	}
 	injectSite(e, site)
 
@@ -568,8 +596,8 @@ func TestCheckPush_WithinDeadline(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
 	site := models.Site{
-		ID: 1, Name: "push", Type: "push", Status: "UP",
-		Interval: 60, LastCheck: time.Now(),
+		SiteConfig: models.SiteConfig{ID: 1, Name: "push", Type: "push", Interval: 60},
+		SiteState:  models.SiteState{Status: "UP", LastCheck: time.Now()},
 	}
 	injectSite(e, site)
 
@@ -585,8 +613,8 @@ func TestCheckPush_PendingStaysPending(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
 	site := models.Site{
-		ID: 1, Name: "push", Type: "push", Status: "PENDING",
-		Interval: 60,
+		SiteConfig: models.SiteConfig{ID: 1, Name: "push", Type: "push", Interval: 60},
+		SiteState:  models.SiteState{Status: "PENDING"},
 	}
 	injectSite(e, site)
 
@@ -603,9 +631,18 @@ func TestCheckPush_PendingStaysPending(t *testing.T) {
 func TestCheckGroup_AllChildrenUp(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	group := models.Site{ID: 1, Name: "group", Type: "group", Status: "PENDING"}
-	child1 := models.Site{ID: 2, Name: "child1", Type: "http", ParentID: 1, Status: "UP"}
-	child2 := models.Site{ID: 3, Name: "child2", Type: "http", ParentID: 1, Status: "UP"}
+	group := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "group", Type: "group"},
+		SiteState:  models.SiteState{Status: "PENDING"},
+	}
+	child1 := models.Site{
+		SiteConfig: models.SiteConfig{ID: 2, Name: "child1", Type: "http", ParentID: 1},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
+	child2 := models.Site{
+		SiteConfig: models.SiteConfig{ID: 3, Name: "child2", Type: "http", ParentID: 1},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
 	injectSite(e, group)
 	injectSite(e, child1)
 	injectSite(e, child2)
@@ -621,9 +658,18 @@ func TestCheckGroup_AllChildrenUp(t *testing.T) {
 func TestCheckGroup_OneChildDown(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	group := models.Site{ID: 1, Name: "group", Type: "group", Status: "UP"}
-	child1 := models.Site{ID: 2, Name: "child1", Type: "http", ParentID: 1, Status: "UP"}
-	child2 := models.Site{ID: 3, Name: "child2", Type: "http", ParentID: 1, Status: "DOWN"}
+	group := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "group", Type: "group"},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
+	child1 := models.Site{
+		SiteConfig: models.SiteConfig{ID: 2, Name: "child1", Type: "http", ParentID: 1},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
+	child2 := models.Site{
+		SiteConfig: models.SiteConfig{ID: 3, Name: "child2", Type: "http", ParentID: 1},
+		SiteState:  models.SiteState{Status: "DOWN"},
+	}
 	injectSite(e, group)
 	injectSite(e, child1)
 	injectSite(e, child2)
@@ -639,9 +685,17 @@ func TestCheckGroup_OneChildDown(t *testing.T) {
 func TestCheckGroup_PausedChildIgnored(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	group := models.Site{ID: 1, Name: "group", Type: "group"}
-	child1 := models.Site{ID: 2, Name: "child1", Type: "http", ParentID: 1, Status: "UP"}
-	child2 := models.Site{ID: 3, Name: "child2", Type: "http", ParentID: 1, Status: "DOWN", Paused: true}
+	group := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "group", Type: "group"},
+	}
+	child1 := models.Site{
+		SiteConfig: models.SiteConfig{ID: 2, Name: "child1", Type: "http", ParentID: 1},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
+	child2 := models.Site{
+		SiteConfig: models.SiteConfig{ID: 3, Name: "child2", Type: "http", ParentID: 1, Paused: true},
+		SiteState:  models.SiteState{Status: "DOWN"},
+	}
 	injectSite(e, group)
 	injectSite(e, child1)
 	injectSite(e, child2)
@@ -658,9 +712,17 @@ func TestCheckGroup_MaintenanceChildIgnored(t *testing.T) {
 	ms := newMockStore()
 	ms.maintenance[3] = true
 	e := newTestEngine(ms)
-	group := models.Site{ID: 1, Name: "group", Type: "group"}
-	child1 := models.Site{ID: 2, Name: "child1", Type: "http", ParentID: 1, Status: "UP"}
-	child2 := models.Site{ID: 3, Name: "child2", Type: "http", ParentID: 1, Status: "DOWN"}
+	group := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "group", Type: "group"},
+	}
+	child1 := models.Site{
+		SiteConfig: models.SiteConfig{ID: 2, Name: "child1", Type: "http", ParentID: 1},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
+	child2 := models.Site{
+		SiteConfig: models.SiteConfig{ID: 3, Name: "child2", Type: "http", ParentID: 1},
+		SiteState:  models.SiteState{Status: "DOWN"},
+	}
 	injectSite(e, group)
 	injectSite(e, child1)
 	injectSite(e, child2)
@@ -677,7 +739,10 @@ func TestCheckGroup_MaintenanceChildIgnored(t *testing.T) {
 func TestCheckGroup_NoChildren(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	group := models.Site{ID: 1, Name: "group", Type: "group", Status: "UP"}
+	group := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "group", Type: "group"},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
 	injectSite(e, group)
 
 	e.checkGroup(context.Background(), group)
@@ -772,10 +837,13 @@ func TestInitHistory_LoadsFromDB(t *testing.T) {
 func TestUpdateSiteConfig_PreservesRuntime(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", URL: "http://old.com", Status: "DOWN", FailureCount: 3, Latency: 100 * time.Millisecond}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", URL: "http://old.com"},
+		SiteState:  models.SiteState{Status: "DOWN", FailureCount: 3, Latency: 100 * time.Millisecond},
+	}
 	injectSite(e, site)
 
-	updated := models.Site{ID: 1, Name: "test", URL: "http://new.com", Interval: 60}
+	updated := models.SiteConfig{ID: 1, Name: "test", URL: "http://new.com", Interval: 60}
 	e.UpdateSiteConfig(updated)
 
 	s, _ := getSite(e, 1)
@@ -796,7 +864,10 @@ func TestUpdateSiteConfig_PreservesRuntime(t *testing.T) {
 func TestRemoveSite_CleansUp(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", Type: "push", Token: "tok1", Status: "UP"}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", Type: "push", Token: "tok1"},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
 	injectSite(e, site)
 	e.recordCheck(1, 5*time.Millisecond, true)
 
@@ -816,7 +887,10 @@ func TestRemoveSite_CleansUp(t *testing.T) {
 func TestToggleSitePause(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", Status: "UP"}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test"},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
 	injectSite(e, site)
 
 	paused := e.ToggleSitePause(1)
@@ -845,8 +919,14 @@ func TestToggleSitePause_NonexistentSite(t *testing.T) {
 func TestGetAllSites_ReturnsCopy(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	injectSite(e, models.Site{ID: 1, Name: "s1", Status: "UP"})
-	injectSite(e, models.Site{ID: 2, Name: "s2", Status: "DOWN"})
+	injectSite(e, models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "s1"},
+		SiteState:  models.SiteState{Status: "UP"},
+	})
+	injectSite(e, models.Site{
+		SiteConfig: models.SiteConfig{ID: 2, Name: "s2"},
+		SiteState:  models.SiteState{Status: "DOWN"},
+	})
 
 	sites := e.GetAllSites()
 	if len(sites) != 2 {
@@ -865,10 +945,13 @@ func TestGetAllSites_ReturnsCopy(t *testing.T) {
 func TestGetLiveState_ReturnsCopy(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	injectSite(e, models.Site{ID: 1, Name: "s1", Status: "UP"})
+	injectSite(e, models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "s1"},
+		SiteState:  models.SiteState{Status: "UP"},
+	})
 
 	state := e.GetLiveState()
-	state[1] = models.Site{Name: "mutated"}
+	state[1] = models.Site{SiteConfig: models.SiteConfig{Name: "mutated"}}
 
 	fresh := e.GetLiveState()
 	if fresh[1].Name == "mutated" {
@@ -984,7 +1067,8 @@ func TestConcurrent_RecordHeartbeat(t *testing.T) {
 	e := newTestEngine(ms)
 	for i := 0; i < 10; i++ {
 		injectSite(e, models.Site{
-			ID: i + 1, Type: "push", Token: fmt.Sprintf("tok-%d", i+1), Status: "UP",
+			SiteConfig: models.SiteConfig{ID: i + 1, Type: "push", Token: fmt.Sprintf("tok-%d", i+1)},
+			SiteState:  models.SiteState{Status: "UP"},
 		})
 	}
 
@@ -1002,7 +1086,10 @@ func TestConcurrent_RecordHeartbeat(t *testing.T) {
 func TestConcurrent_HandleStatusChangeAndGetState(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", Status: "UP", MaxRetries: 100}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", MaxRetries: 100},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
 	injectSite(e, site)
 
 	var wg sync.WaitGroup
@@ -1055,7 +1142,10 @@ func TestConcurrent_RecordCheckAndGetHistory(t *testing.T) {
 func TestHandleStatusChange_PauseDuringCheckSurvives(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", Status: "UP", MaxRetries: 0}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", MaxRetries: 0},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
 	injectSite(e, site)
 
 	// `site` is the stale snapshot the check ran against (Paused=false).
@@ -1079,11 +1169,14 @@ func TestHandleStatusChange_PauseDuringCheckSurvives(t *testing.T) {
 func TestHandleStatusChange_ConfigEditDuringCheckSurvives(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", URL: "http://old.com", Type: "http", Status: "UP", MaxRetries: 0, Interval: 30}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", URL: "http://old.com", Type: "http", MaxRetries: 0, Interval: 30},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
 	injectSite(e, site)
 
 	// Config changes mid-check.
-	e.UpdateSiteConfig(models.Site{ID: 1, Name: "test", URL: "http://new.com", Type: "http", Interval: 60})
+	e.UpdateSiteConfig(models.SiteConfig{ID: 1, Name: "test", URL: "http://new.com", Type: "http", Interval: 60})
 
 	// Stale check (ran against http://old.com) folds its result in.
 	e.handleStatusChange(site, "UP", 200, 5*time.Millisecond, "")
@@ -1105,7 +1198,10 @@ func TestHandleStatusChange_HeartbeatNotOverwrittenByStaleDown(t *testing.T) {
 	e := newTestEngine(ms)
 	// Snapshot the engine would have taken before evaluating staleness:
 	// LastCheck is old, so checkPush decided "DOWN".
-	snap := models.Site{ID: 1, Name: "push", Type: "push", Token: "tok", Status: "UP", Interval: 10, LastCheck: time.Now().Add(-120 * time.Second)}
+	snap := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "push", Type: "push", Token: "tok", Interval: 10},
+		SiteState:  models.SiteState{Status: "UP", LastCheck: time.Now().Add(-120 * time.Second)},
+	}
 	injectSite(e, snap)
 
 	// A heartbeat lands first, advancing LastCheck and confirming UP.
@@ -1126,7 +1222,10 @@ func TestHandleStatusChange_HeartbeatNotOverwrittenByStaleDown(t *testing.T) {
 func TestHandleStatusChange_RemovedSiteDropped(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", Status: "UP", MaxRetries: 0}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", MaxRetries: 0},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
 	injectSite(e, site)
 
 	e.RemoveSite(1)
@@ -1189,9 +1288,18 @@ func TestEngineStop_Idempotent(t *testing.T) {
 func TestCheckGroup_AllPausedNoAutoFreeze(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	group := models.Site{ID: 1, Name: "group", Type: "group", Status: "UP"}
-	child1 := models.Site{ID: 2, Name: "child1", Type: "http", ParentID: 1, Status: "UP", Paused: true}
-	child2 := models.Site{ID: 3, Name: "child2", Type: "http", ParentID: 1, Status: "UP", Paused: true}
+	group := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "group", Type: "group"},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
+	child1 := models.Site{
+		SiteConfig: models.SiteConfig{ID: 2, Name: "child1", Type: "http", ParentID: 1, Paused: true},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
+	child2 := models.Site{
+		SiteConfig: models.SiteConfig{ID: 3, Name: "child2", Type: "http", ParentID: 1, Paused: true},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
 	injectSite(e, group)
 	injectSite(e, child1)
 	injectSite(e, child2)
@@ -1208,7 +1316,10 @@ func TestCheckGroup_AllPausedNoAutoFreeze(t *testing.T) {
 func TestHandleStatusChange_PendingRetriesBeforeDown(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "new-monitor", Status: "PENDING", MaxRetries: 2}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "new-monitor", MaxRetries: 2},
+		SiteState:  models.SiteState{Status: "PENDING"},
+	}
 	injectSite(e, site)
 
 	e.handleStatusChange(site, "DOWN", 0, 0, "timeout")
@@ -1237,7 +1348,10 @@ func TestHandleStatusChange_PendingRetriesBeforeDown(t *testing.T) {
 func TestHandleStatusChange_LateRetriesBeforeDown(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "push-mon", Status: "LATE", MaxRetries: 1}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "push-mon", MaxRetries: 1},
+		SiteState:  models.SiteState{Status: "LATE"},
+	}
 	injectSite(e, site)
 
 	e.handleStatusChange(site, "DOWN", 0, 0, "missed heartbeat")
@@ -1257,7 +1371,10 @@ func TestHandleStatusChange_LateRetriesBeforeDown(t *testing.T) {
 func TestIngestProbeResult_ExpiresStaleProbes(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", Type: "http", Status: "UP", Interval: 30}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", Type: "http", Interval: 30},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
 	injectSite(e, site)
 
 	e.probeResultsMu.Lock()
@@ -1289,7 +1406,10 @@ func TestIngestProbeResult_ExpiresStaleProbes(t *testing.T) {
 func TestRemoveSite_CleansProbeResults(t *testing.T) {
 	ms := newMockStore()
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", Type: "http", Status: "UP"}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", Type: "http"},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
 	injectSite(e, site)
 
 	e.probeResultsMu.Lock()
@@ -1312,8 +1432,14 @@ func TestIsInMaintenance_UsesCache(t *testing.T) {
 	ms := newMockStore()
 	ms.maintenance[10] = true // direct maintenance on group
 	e := newTestEngine(ms)
-	group := models.Site{ID: 10, Name: "group", Type: "group", Status: "UP"}
-	child := models.Site{ID: 20, Name: "child", Type: "http", ParentID: 10, Status: "UP"}
+	group := models.Site{
+		SiteConfig: models.SiteConfig{ID: 10, Name: "group", Type: "group"},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
+	child := models.Site{
+		SiteConfig: models.SiteConfig{ID: 20, Name: "child", Type: "http", ParentID: 10},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
 	injectSite(e, group)
 	injectSite(e, child)
 	e.refreshMaintenanceCache(context.Background())
@@ -1334,7 +1460,10 @@ func TestIsInMaintenance_GlobalMaintenance(t *testing.T) {
 	ms := newMockStore()
 	ms.maintenance[0] = true
 	e := newTestEngine(ms)
-	site := models.Site{ID: 1, Name: "test", Type: "http", Status: "UP"}
+	site := models.Site{
+		SiteConfig: models.SiteConfig{ID: 1, Name: "test", Type: "http"},
+		SiteState:  models.SiteState{Status: "UP"},
+	}
 	injectSite(e, site)
 	e.refreshMaintenanceCache(context.Background())
 

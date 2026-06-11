@@ -15,16 +15,16 @@ import (
 
 type mockStore struct {
 	storetest.BaseMock
-	sites []models.Site
+	sites []models.SiteConfig
 }
 
-func (m *mockStore) GetSites(_ context.Context) ([]models.Site, error) {
+func (m *mockStore) GetSites(_ context.Context) ([]models.SiteConfig, error) {
 	return m.sites, nil
 }
 
 func TestMetricsHandler(t *testing.T) {
 	ms := &mockStore{
-		sites: []models.Site{
+		sites: []models.SiteConfig{
 			{ID: 1, Name: "Example", URL: "https://example.com", Type: "http", Interval: 30},
 			{ID: 2, Name: "DNS Check", Type: "dns", Interval: 60},
 		},

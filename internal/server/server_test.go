@@ -21,7 +21,7 @@ import (
 type mockStore struct {
 	storetest.BaseMock
 	mu              sync.Mutex
-	sites           []models.Site
+	sites           []models.SiteConfig
 	alerts          []models.AlertConfig
 	nodes           map[string]models.ProbeNode
 	importedData    *models.Backup
@@ -35,7 +35,7 @@ func newMockStore() *mockStore {
 	}
 }
 
-func (m *mockStore) GetSites(_ context.Context) ([]models.Site, error) { return m.sites, nil }
+func (m *mockStore) GetSites(_ context.Context) ([]models.SiteConfig, error) { return m.sites, nil }
 func (m *mockStore) GetAllAlerts(_ context.Context) ([]models.AlertConfig, error) {
 	return m.alerts, nil
 }
@@ -252,7 +252,7 @@ func TestExport_Unauthorized_WrongKey(t *testing.T) {
 
 func TestExport_Success(t *testing.T) {
 	ts := newTestServer(t, "secret", false)
-	ts.store.sites = []models.Site{{ID: 1, Name: "example", URL: "http://example.com"}}
+	ts.store.sites = []models.SiteConfig{{ID: 1, Name: "example", URL: "http://example.com"}}
 
 	resp, err := authReq("GET", ts.baseURL+"/api/backup/export", "secret", nil)
 	if err != nil {
@@ -299,7 +299,7 @@ func TestImport_Unauthorized(t *testing.T) {
 func TestImport_Success(t *testing.T) {
 	ts := newTestServer(t, "secret", false)
 	backup := models.Backup{
-		Sites: []models.Site{{Name: "imported", URL: "http://example.com"}},
+		Sites: []models.SiteConfig{{Name: "imported", URL: "http://example.com"}},
 	}
 	body, _ := json.Marshal(backup)
 	resp, err := authReq("POST", ts.baseURL+"/api/backup/import", "secret", body)
@@ -437,9 +437,9 @@ func TestStatusJSON_PublicDTOOnly(t *testing.T) {
 	// take. The old version of this test injected via UpdateSiteConfig, which
 	// no-ops for unknown IDs, so it asserted over zero sites and passed
 	// against a server that leaked tokens.
-	ts.store.sites = []models.Site{{
+	ts.store.sites = []models.SiteConfig{{
 		ID: 1, Name: "test", Type: "push", Token: "secret-token",
-		Hostname: "internal-host", LastError: "internal failure detail", AlertID: 3,
+		Hostname: "internal-host", AlertID: 3,
 	}}
 	ctx, cancel := context.WithCancel(context.Background())
 	ts.engine.Start(ctx)

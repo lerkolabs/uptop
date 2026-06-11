@@ -535,7 +535,7 @@ func (m *Model) submitSiteForm() tea.Cmd {
 		threshold = 7
 	}
 
-	site := models.Site{
+	cfg := models.SiteConfig{
 		ID:              m.editID,
 		Name:            d.Name,
 		URL:             d.URL,
@@ -559,11 +559,8 @@ func (m *Model) submitSiteForm() tea.Cmd {
 	st := m.store
 	m.state = stateDashboard
 	if m.editID > 0 {
-		// The engine's in-memory config updates immediately; the DB write
-		// follows in the Cmd. New sites enter the engine via its poll loop
-		// once the insert lands.
-		m.engine.UpdateSiteConfig(site)
-		return writeCmd("Update site", func() error { return st.UpdateSite(context.Background(), site) })
+		m.engine.UpdateSiteConfig(cfg)
+		return writeCmd("Update site", func() error { return st.UpdateSite(context.Background(), cfg) })
 	}
-	return writeCmd("Add site", func() error { return st.AddSite(context.Background(), site) })
+	return writeCmd("Add site", func() error { return st.AddSite(context.Background(), cfg) })
 }

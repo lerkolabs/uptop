@@ -116,7 +116,7 @@ func (*stubErr) Error() string { return "boom" }
 func TestDetailLoad_CachesAndViewDoesNoIO(t *testing.T) {
 	ms := &tuiMockStore{stateChanges: []models.StateChange{{FromStatus: "UP", ToStatus: "DOWN"}}}
 	m := newTestModel(ms)
-	m.sites = []models.Site{{ID: 1, Name: "site", Status: "DOWN"}}
+	m.sites = []models.Site{{SiteConfig: models.SiteConfig{ID: 1, Name: "site"}, SiteState: models.SiteState{Status: "DOWN"}}}
 	m.cursor = 0
 	m.state = stateDetail
 	m.termWidth = 120
@@ -201,7 +201,7 @@ func TestHandleTabData_DropsStaleSeq(t *testing.T) {
 func TestHistoryKey_LoadsOffUIGoroutine(t *testing.T) {
 	ms := &tuiMockStore{stateChanges: []models.StateChange{{FromStatus: "UP", ToStatus: "DOWN"}}}
 	m := newTestModel(ms)
-	m.sites = []models.Site{{ID: 7, Name: "site"}}
+	m.sites = []models.Site{{SiteConfig: models.SiteConfig{ID: 7, Name: "site"}}}
 	m.state = stateDetail
 	m.termWidth, m.termHeight = 120, 40
 
@@ -240,7 +240,7 @@ func TestHistoryKey_LoadsOffUIGoroutine(t *testing.T) {
 func TestSLAData_DropsStaleReply(t *testing.T) {
 	m := newTestModel(&tuiMockStore{})
 	m.termWidth, m.termHeight = 120, 40
-	m.sites = []models.Site{{ID: 3, Status: "UP"}}
+	m.sites = []models.Site{{SiteConfig: models.SiteConfig{ID: 3}, SiteState: models.SiteState{Status: "UP"}}}
 
 	if cmd := (&m).openSLAView(m.sites[0]); cmd == nil {
 		t.Fatal("openSLAView should return a load Cmd")
@@ -264,7 +264,7 @@ func TestSLAData_DropsStaleReply(t *testing.T) {
 func TestConfirmDelete_WritesOffUIGoroutine(t *testing.T) {
 	ms := &tuiMockStore{}
 	m := newTestModel(ms)
-	m.sites = []models.Site{{ID: 4, Name: "s"}}
+	m.sites = []models.Site{{SiteConfig: models.SiteConfig{ID: 4, Name: "s"}}}
 	m.state = stateConfirmDelete
 	m.deleteTab = 0
 	m.deleteID = 4
@@ -312,7 +312,7 @@ func TestWriteDoneMsg_LogsErrorAndReloads(t *testing.T) {
 func TestDetailRefreshCmd_OnlyWhileDetailOpen(t *testing.T) {
 	ms := &tuiMockStore{stateChanges: []models.StateChange{{FromStatus: "UP", ToStatus: "DOWN"}}}
 	m := newTestModel(ms)
-	m.sites = []models.Site{{ID: 5, Name: "site"}}
+	m.sites = []models.Site{{SiteConfig: models.SiteConfig{ID: 5, Name: "site"}}}
 
 	m.state = stateDashboard
 	if (&m).detailRefreshCmd() != nil {

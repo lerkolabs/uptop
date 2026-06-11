@@ -11,9 +11,9 @@ type Store interface {
 	Init(ctx context.Context) error
 
 	// Sites
-	GetSites(ctx context.Context) ([]models.Site, error)
-	AddSite(ctx context.Context, site models.Site) error
-	UpdateSite(ctx context.Context, site models.Site) error
+	GetSites(ctx context.Context) ([]models.SiteConfig, error)
+	AddSite(ctx context.Context, site models.SiteConfig) error
+	UpdateSite(ctx context.Context, site models.SiteConfig) error
 	UpdateSitePaused(ctx context.Context, id int, paused bool) error
 	DeleteSite(ctx context.Context, id int) error
 
@@ -25,9 +25,9 @@ type Store interface {
 	DeleteAlert(ctx context.Context, id int) error
 
 	// Declarative config support
-	GetSiteByName(ctx context.Context, name string) (models.Site, error)
+	GetSiteByName(ctx context.Context, name string) (models.SiteConfig, error)
 	GetAlertByName(ctx context.Context, name string) (models.AlertConfig, error)
-	AddSiteReturningID(ctx context.Context, site models.Site) (int, error)
+	AddSiteReturningID(ctx context.Context, site models.SiteConfig) (int, error)
 	AddAlertReturningID(ctx context.Context, name, aType string, settings map[string]string) (int, error)
 
 	// Users

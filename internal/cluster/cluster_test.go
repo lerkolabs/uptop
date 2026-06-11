@@ -203,7 +203,7 @@ func TestProbeRegister_Failure(t *testing.T) {
 func TestProbeFetchAssignments_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string][]models.Site{
-			"sites": {{ID: 1, Name: "s1", Type: "http", URL: "http://example.com"}},
+			"sites": {{SiteConfig: models.SiteConfig{ID: 1, Name: "s1", Type: "http", URL: "http://example.com"}}},
 		})
 	}))
 	defer srv.Close()
@@ -240,8 +240,8 @@ func TestProbeExecuteChecks(t *testing.T) {
 	defer srv.Close()
 
 	sites := []models.Site{
-		{ID: 1, Type: "http", URL: srv.URL},
-		{ID: 2, Type: "http", URL: srv.URL},
+		{SiteConfig: models.SiteConfig{ID: 1, Type: "http", URL: srv.URL}},
+		{SiteConfig: models.SiteConfig{ID: 2, Type: "http", URL: srv.URL}},
 	}
 
 	strict := &http.Client{}
@@ -277,7 +277,7 @@ func TestProbeExecuteChecks_Concurrency(t *testing.T) {
 
 	var sites []models.Site
 	for i := 0; i < 20; i++ {
-		sites = append(sites, models.Site{ID: i + 1, Type: "http", URL: srv.URL})
+		sites = append(sites, models.Site{SiteConfig: models.SiteConfig{ID: i + 1, Type: "http", URL: srv.URL}})
 	}
 
 	results := probeExecuteChecks(context.Background(), sites, &http.Client{}, &http.Client{}, true)
