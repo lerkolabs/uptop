@@ -7,6 +7,7 @@ import (
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/store"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func loadCollapsed(s store.Store) map[int]bool {
@@ -80,45 +81,67 @@ func filterSites(sites []models.Site, needle string) []models.Site {
 	return filtered
 }
 
-func (m *Model) refreshData() {
+// refreshLive updates everything sourced from in-memory engine copies — the
+// live site list (sorted + filtered) and the log viewport. It does no database
+// IO, so it is safe to call on every tick. DB-backed tab data is loaded
+// separately via loadTabDataCmd.
+func (m *Model) refreshLive() {
 	allSites := m.engine.GetAllSites()
 	ordered := sortSitesForDisplay(allSites, m.collapsed)
 	if m.filterText != "" {
 		ordered = filterSites(ordered, m.filterText)
 	}
 	m.sites = ordered
-
-	if alerts, err := m.store.GetAllAlerts(); err == nil {
-		m.alerts = alerts
-	}
-	if m.isAdmin {
-		if users, err := m.store.GetAllUsers(); err == nil {
-			m.users = users
-		}
-	}
-	if nodes, err := m.store.GetAllNodes(); err == nil {
-		m.nodes = nodes
-	}
-	if windows, err := m.store.GetAllMaintenanceWindows(100); err == nil {
-		m.maintenanceWindows = windows
-	}
 	m.logViewport.SetContent(strings.Join(m.engine.GetLogs(), "\n"))
+	m.clampCursor()
+}
 
-	listLen := len(m.sites)
-	switch m.currentTab {
-	case 1:
-		listLen = len(m.alerts)
-	case 3:
-		listLen = len(m.nodes)
-	case 4:
-		listLen = len(m.maintenanceWindows)
-	case 5:
-		listLen = len(m.users)
-	}
+// clampCursor keeps the cursor and scroll offset within the current tab's list.
+func (m *Model) clampCursor() {
+	listLen := m.currentListLen()
 	if listLen > 0 && m.cursor >= listLen {
 		m.cursor = listLen - 1
 	}
 	if m.cursor < m.tableOffset {
 		m.tableOffset = m.cursor
+	}
+}
+
+// loadTabDataCmd returns a tea.Cmd that loads the DB-backed tab tables off the
+// UI goroutine. The closure reads only stable fields (store, isAdmin) and never
+// mutates the model; results come back as a tabDataMsg. On the first store
+// error it returns an error-only msg so the model keeps its previous data.
+func (m *Model) loadTabDataCmd() tea.Cmd {
+	st := m.store
+	isAdmin := m.isAdmin
+	return func() tea.Msg {
+		alerts, err := st.GetAllAlerts()
+		if err != nil {
+			return tabDataMsg{err: err}
+		}
+		var users []models.User
+		if isAdmin {
+			if users, err = st.GetAllUsers(); err != nil {
+				return tabDataMsg{err: err}
+			}
+		}
+		nodes, err := st.GetAllNodes()
+		if err != nil {
+			return tabDataMsg{err: err}
+		}
+		maint, err := st.GetAllMaintenanceWindows(100)
+		if err != nil {
+			return tabDataMsg{err: err}
+		}
+		return tabDataMsg{alerts: alerts, users: users, nodes: nodes, maint: maint}
+	}
+}
+
+// loadDetailCmd loads the state-change history for the detail panel off the UI
+// goroutine. View renders the cached result rather than querying the DB.
+func (m *Model) loadDetailCmd(siteID int) tea.Cmd {
+	eng := m.engine
+	return func() tea.Msg {
+		return detailDataMsg{siteID: siteID, changes: eng.GetStateChanges(siteID, 5)}
 	}
 }

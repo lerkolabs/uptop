@@ -140,6 +140,11 @@ type Model struct {
 	users              []models.User
 	nodes              []models.ProbeNode
 	maintenanceWindows []models.MaintenanceWindow
+	lastTabLoad        time.Time // last dispatch of loadTabDataCmd (throttle)
+
+	// detail-panel state-change history, loaded on enter so View does no DB IO
+	detailChanges       []models.StateChange
+	detailChangesSiteID int
 
 	filterMode bool
 	filterText string
@@ -189,6 +194,12 @@ func InitialModel(isAdmin bool, s store.Store, eng *monitor.Engine, version stri
 	}
 }
 
+// tickCmd schedules the next one-second heartbeat.
+func tickCmd() tea.Cmd {
+	return tea.Tick(time.Second, func(t time.Time) tea.Msg { return tickMsg(t) })
+}
+
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(tea.ClearScreen, tea.Tick(time.Second, func(t time.Time) tea.Msg { return t }))
+	// Load tab data immediately so the dashboard isn't empty for the first second.
+	return tea.Batch(tea.ClearScreen, tickCmd(), m.loadTabDataCmd())
 }

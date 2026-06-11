@@ -179,7 +179,11 @@ func (m Model) viewDetailPanel() string {
 		}
 	}
 
-	stateChanges := m.engine.GetStateChanges(site.ID, 5)
+	// Loaded on panel-enter (loadDetailCmd) and cached, so View does no DB IO.
+	var stateChanges []models.StateChange
+	if m.detailChangesSiteID == site.ID {
+		stateChanges = m.detailChanges
+	}
 	if len(stateChanges) > 0 {
 		b.WriteString("\n" + subtleStyle.Render("  STATE CHANGES") + "\n")
 		for i, sc := range stateChanges {

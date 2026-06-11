@@ -15,8 +15,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return m.handleResize(msg)
-	case time.Time:
-		return m.handleTick(msg)
+	case tickMsg:
+		return m.handleTick(time.Time(msg))
+	case tabDataMsg:
+		return m.handleTabData(msg)
+	case detailDataMsg:
+		m.detailChanges = msg.changes
+		m.detailChangesSiteID = msg.siteID
+		return m, nil
 	}
 
 	if m.state == stateConfirmDelete {
@@ -65,11 +71,12 @@ func (m *Model) handleConfirmDelete(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.adjustCursor(len(m.users) - 1)
 		}
-		m.refreshData()
+		m.refreshLive()
 		m.state = stateDashboard
 		if m.deleteTab == 5 {
 			m.state = stateUsers
 		}
+		return m, m.loadTabDataCmd()
 	case "n", "N", "esc":
 		m.state = stateDashboard
 		if m.deleteTab == 5 {
@@ -106,9 +113,9 @@ func (m *Model) handleFormMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.huhForm.State == huh.StateCompleted {
 			m.submitForm()
-			m.refreshData()
+			m.refreshLive()
 			m.huhForm = nil
-			return m, nil
+			return m, m.loadTabDataCmd()
 		}
 		return m, formCmd
 	}
@@ -136,11 +143,47 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleTick(t time.Time) (tea.Model, tea.Cmd) {
-	m.refreshData()
+	m.refreshLive()
 	m.tickCount++
 	target := sinApprox(float64(m.tickCount)*0.3)*0.5 + 0.5
 	m.pulsePos, m.pulseVel = m.pulseSpring.Update(m.pulsePos, m.pulseVel, target)
-	return m, tea.Tick(time.Second, func(t time.Time) tea.Msg { return t })
+
+	cmds := []tea.Cmd{tickCmd()}
+	if t.Sub(m.lastTabLoad) > tabRefreshTTL {
+		m.lastTabLoad = t
+		cmds = append(cmds, m.loadTabDataCmd())
+	}
+	return m, tea.Batch(cmds...)
+}
+
+// handleTabData folds an async tab-data load into the model. On error the
+// previous data is kept and the failure logged, so a transient store error
+// never blanks the view.
+func (m *Model) handleTabData(msg tabDataMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil {
+		m.engine.AddLog("Tab data refresh failed: " + msg.err.Error())
+		return m, nil
+	}
+	m.alerts = msg.alerts
+	if m.isAdmin {
+		m.users = msg.users
+	}
+	m.nodes = msg.nodes
+	m.maintenanceWindows = msg.maint
+	m.clampCursor()
+	return m, nil
+}
+
+// testAlertCmd sends a test notification off the UI goroutine; the outcome
+// surfaces through the engine log (picked up by the next refreshLive).
+func (m *Model) testAlertCmd(id int, name string) tea.Cmd {
+	eng := m.engine
+	return func() tea.Msg {
+		if err := eng.TestAlert(id); err != nil {
+			eng.AddLog(fmt.Sprintf("Test alert failed (%s): %v", name, err))
+		}
+		return nil
+	}
 }
 
 func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
@@ -240,7 +283,7 @@ func (m *Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.filterText = ""
 		m.cursor = 0
 		m.tableOffset = 0
-		m.refreshData()
+		m.refreshLive()
 	case "enter":
 		m.filterMode = false
 	case "backspace":
@@ -248,7 +291,7 @@ func (m *Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.filterText = m.filterText[:len(m.filterText)-1]
 			m.cursor = 0
 			m.tableOffset = 0
-			m.refreshData()
+			m.refreshLive()
 		}
 	case "ctrl+c":
 		return m, tea.Quit
@@ -257,7 +300,7 @@ func (m *Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.filterText += msg.String()
 			m.cursor = 0
 			m.tableOffset = 0
-			m.refreshData()
+			m.refreshLive()
 		}
 	}
 	return m, nil
@@ -459,19 +502,14 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "t":
 		if m.currentTab == 1 && len(m.alerts) > 0 {
 			a := m.alerts[m.cursor]
-			go func() {
-				if err := m.engine.TestAlert(a.ID); err != nil {
-					m.engine.AddLog(fmt.Sprintf("Test alert failed (%s): %v", a.Name, err))
-				}
-			}()
-			return m, nil
+			return m, m.testAlertCmd(a.ID, a.Name)
 		}
 	case " ":
 		if m.currentTab == 0 && len(m.sites) > 0 && m.sites[m.cursor].Type == "group" {
 			gid := m.sites[m.cursor].ID
 			m.collapsed[gid] = !m.collapsed[gid]
 			saveCollapsed(m.store, m.collapsed)
-			m.refreshData()
+			m.refreshLive()
 		}
 	case "p":
 		if m.currentTab == 0 && len(m.sites) > 0 {
@@ -479,11 +517,12 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.engine.ToggleSitePause(site.ID)
 			site.Paused = !site.Paused
 			_ = m.store.UpdateSitePaused(site.ID, site.Paused)
-			m.refreshData()
+			m.refreshLive()
 		}
 	case "i":
 		if m.currentTab == 0 && len(m.sites) > 0 {
 			m.state = stateDetail
+			return m, m.loadDetailCmd(m.sites[m.cursor].ID)
 		} else if m.currentTab == 1 && len(m.alerts) > 0 {
 			m.state = stateAlertDetail
 		}
@@ -496,7 +535,8 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if err := m.store.EndMaintenanceWindow(mw.ID); err != nil {
 					m.engine.AddLog("End maintenance failed: " + err.Error())
 				}
-				m.refreshData()
+				m.refreshLive()
+				return m, m.loadTabDataCmd()
 			}
 		}
 	case "T":
