@@ -5,10 +5,16 @@ import (
 	"strconv"
 )
 
+type Migration struct {
+	Version int
+	SQL     string
+}
+
 type Dialect interface {
 	DriverName() string
 	CreateTablesSQL() []string
-	MigrationsSQL() []string
+	Migrations() []Migration
+	BaselineVersion() int
 	BoolFalse() string
 	ResetSequenceOnEmpty(db *sql.DB, table string)
 	ImportWipe(tx *sql.Tx)

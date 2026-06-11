@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
@@ -80,13 +79,34 @@ func (s *SQLStore) Init(ctx context.Context) error {
 			return err
 		}
 	}
-	for _, m := range s.dialect.MigrationsSQL() {
-		if _, err := s.db.ExecContext(ctx, m); err != nil {
-			errMsg := err.Error()
-			if strings.Contains(errMsg, "already exists") || strings.Contains(errMsg, "duplicate column") {
-				continue
-			}
-			return fmt.Errorf("migration failed: %w", err)
+
+	if _, err := s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_version (
+		version INTEGER PRIMARY KEY,
+		applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	)`); err != nil {
+		return fmt.Errorf("create schema_version: %w", err)
+	}
+
+	var current int
+	_ = s.db.QueryRowContext(ctx, "SELECT COALESCE(MAX(version), 0) FROM schema_version").Scan(&current) //nolint:errcheck
+
+	if current == 0 {
+		baseline := s.dialect.BaselineVersion()
+		if _, err := s.db.ExecContext(ctx, s.q("INSERT INTO schema_version (version) VALUES (?)"), baseline); err != nil {
+			return fmt.Errorf("seed baseline version: %w", err)
+		}
+		current = baseline
+	}
+
+	for _, m := range s.dialect.Migrations() {
+		if m.Version <= current {
+			continue
+		}
+		if _, err := s.db.ExecContext(ctx, m.SQL); err != nil {
+			return fmt.Errorf("migration %d failed: %w", m.Version, err)
+		}
+		if _, err := s.db.ExecContext(ctx, s.q("INSERT INTO schema_version (version) VALUES (?)"), m.Version); err != nil {
+			return fmt.Errorf("record migration %d: %w", m.Version, err)
 		}
 	}
 	return nil
@@ -325,8 +345,10 @@ func (s *SQLStore) UpdateAlert(ctx context.Context, id int, name, aType string, 
 }
 
 func (s *SQLStore) DeleteAlert(ctx context.Context, id int) error {
-	_, err := s.db.ExecContext(ctx, s.q("DELETE FROM alerts WHERE id=?"), id)
-	if err != nil {
+	if _, err := s.db.ExecContext(ctx, s.q("UPDATE sites SET alert_id = 0 WHERE alert_id = ?"), id); err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, s.q("DELETE FROM alerts WHERE id=?"), id); err != nil {
 		return err
 	}
 	s.dialect.ResetSequenceOnEmpty(s.db, "alerts")

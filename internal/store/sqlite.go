@@ -28,8 +28,9 @@ func NewSQLiteStore(path string) (*SQLStore, error) {
 	return s, nil
 }
 
-func (d *SQLiteDialect) DriverName() string { return "sqlite" }
-func (d *SQLiteDialect) BoolFalse() string  { return "0" }
+func (d *SQLiteDialect) DriverName() string   { return "sqlite" }
+func (d *SQLiteDialect) BoolFalse() string    { return "0" }
+func (d *SQLiteDialect) BaselineVersion() int { return 13 }
 
 func (d *SQLiteDialect) CreateTablesSQL() []string {
 	return []string{
@@ -47,7 +48,8 @@ func (d *SQLiteDialect) CreateTablesSQL() []string {
 			method TEXT DEFAULT 'GET', description TEXT DEFAULT '',
 			parent_id INTEGER DEFAULT 0, accepted_codes TEXT DEFAULT '200-299',
 			dns_resolve_type TEXT DEFAULT '', dns_server TEXT DEFAULT '',
-			ignore_tls BOOLEAN DEFAULT 0, paused BOOLEAN DEFAULT 0
+			ignore_tls BOOLEAN DEFAULT 0, paused BOOLEAN DEFAULT 0,
+			regions TEXT DEFAULT ''
 		)`,
 		`CREATE TABLE IF NOT EXISTS users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,7 +59,8 @@ func (d *SQLiteDialect) CreateTablesSQL() []string {
 		`CREATE TABLE IF NOT EXISTS check_history (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			site_id INTEGER NOT NULL, latency_ns INTEGER,
-			is_up BOOLEAN, checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			is_up BOOLEAN, checked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			node_id TEXT DEFAULT ''
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_check_history_site ON check_history(site_id, checked_at DESC)`,
 		`CREATE TABLE IF NOT EXISTS nodes (
@@ -107,21 +110,21 @@ func (d *SQLiteDialect) CreateTablesSQL() []string {
 	}
 }
 
-func (d *SQLiteDialect) MigrationsSQL() []string {
-	return []string{
-		"ALTER TABLE sites ADD COLUMN hostname TEXT DEFAULT ''",
-		"ALTER TABLE sites ADD COLUMN port INTEGER DEFAULT 0",
-		"ALTER TABLE sites ADD COLUMN timeout INTEGER DEFAULT 0",
-		"ALTER TABLE sites ADD COLUMN method TEXT DEFAULT 'GET'",
-		"ALTER TABLE sites ADD COLUMN description TEXT DEFAULT ''",
-		"ALTER TABLE sites ADD COLUMN parent_id INTEGER DEFAULT 0",
-		"ALTER TABLE sites ADD COLUMN accepted_codes TEXT DEFAULT '200-299'",
-		"ALTER TABLE sites ADD COLUMN dns_resolve_type TEXT DEFAULT ''",
-		"ALTER TABLE sites ADD COLUMN dns_server TEXT DEFAULT ''",
-		"ALTER TABLE sites ADD COLUMN ignore_tls BOOLEAN DEFAULT 0",
-		"ALTER TABLE sites ADD COLUMN paused BOOLEAN DEFAULT 0",
-		"ALTER TABLE check_history ADD COLUMN node_id TEXT DEFAULT ''",
-		"ALTER TABLE sites ADD COLUMN regions TEXT DEFAULT ''",
+func (d *SQLiteDialect) Migrations() []Migration {
+	return []Migration{
+		{1, "ALTER TABLE sites ADD COLUMN hostname TEXT DEFAULT ''"},
+		{2, "ALTER TABLE sites ADD COLUMN port INTEGER DEFAULT 0"},
+		{3, "ALTER TABLE sites ADD COLUMN timeout INTEGER DEFAULT 0"},
+		{4, "ALTER TABLE sites ADD COLUMN method TEXT DEFAULT 'GET'"},
+		{5, "ALTER TABLE sites ADD COLUMN description TEXT DEFAULT ''"},
+		{6, "ALTER TABLE sites ADD COLUMN parent_id INTEGER DEFAULT 0"},
+		{7, "ALTER TABLE sites ADD COLUMN accepted_codes TEXT DEFAULT '200-299'"},
+		{8, "ALTER TABLE sites ADD COLUMN dns_resolve_type TEXT DEFAULT ''"},
+		{9, "ALTER TABLE sites ADD COLUMN dns_server TEXT DEFAULT ''"},
+		{10, "ALTER TABLE sites ADD COLUMN ignore_tls BOOLEAN DEFAULT 0"},
+		{11, "ALTER TABLE sites ADD COLUMN paused BOOLEAN DEFAULT 0"},
+		{12, "ALTER TABLE check_history ADD COLUMN node_id TEXT DEFAULT ''"},
+		{13, "ALTER TABLE sites ADD COLUMN regions TEXT DEFAULT ''"},
 	}
 }
 

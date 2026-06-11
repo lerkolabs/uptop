@@ -13,8 +13,9 @@ func NewPostgresStore(connStr string) (*SQLStore, error) {
 	return NewSQLStore("postgres", connStr, &PostgresDialect{})
 }
 
-func (d *PostgresDialect) DriverName() string { return "postgres" }
-func (d *PostgresDialect) BoolFalse() string  { return "FALSE" }
+func (d *PostgresDialect) DriverName() string   { return "postgres" }
+func (d *PostgresDialect) BoolFalse() string    { return "FALSE" }
+func (d *PostgresDialect) BaselineVersion() int { return 21 }
 
 func (d *PostgresDialect) CreateTablesSQL() []string {
 	return []string{
@@ -32,7 +33,8 @@ func (d *PostgresDialect) CreateTablesSQL() []string {
 			method TEXT DEFAULT 'GET', description TEXT DEFAULT '',
 			parent_id INTEGER DEFAULT 0, accepted_codes TEXT DEFAULT '200-299',
 			dns_resolve_type TEXT DEFAULT '', dns_server TEXT DEFAULT '',
-			ignore_tls BOOLEAN DEFAULT FALSE, paused BOOLEAN DEFAULT FALSE
+			ignore_tls BOOLEAN DEFAULT FALSE, paused BOOLEAN DEFAULT FALSE,
+			regions TEXT DEFAULT ''
 		)`,
 		`CREATE TABLE IF NOT EXISTS users (
 			id SERIAL PRIMARY KEY,
@@ -42,7 +44,8 @@ func (d *PostgresDialect) CreateTablesSQL() []string {
 		`CREATE TABLE IF NOT EXISTS check_history (
 			id SERIAL PRIMARY KEY,
 			site_id INTEGER NOT NULL, latency_ns BIGINT,
-			is_up BOOLEAN, checked_at TIMESTAMPTZ DEFAULT NOW()
+			is_up BOOLEAN, checked_at TIMESTAMPTZ DEFAULT NOW(),
+			node_id TEXT DEFAULT ''
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_check_history_site ON check_history(site_id, checked_at DESC)`,
 		`CREATE TABLE IF NOT EXISTS nodes (
@@ -92,29 +95,29 @@ func (d *PostgresDialect) CreateTablesSQL() []string {
 	}
 }
 
-func (d *PostgresDialect) MigrationsSQL() []string {
-	return []string{
-		"ALTER TABLE sites ADD COLUMN IF NOT EXISTS hostname TEXT DEFAULT ''",
-		"ALTER TABLE sites ADD COLUMN IF NOT EXISTS port INTEGER DEFAULT 0",
-		"ALTER TABLE sites ADD COLUMN IF NOT EXISTS timeout INTEGER DEFAULT 0",
-		"ALTER TABLE sites ADD COLUMN IF NOT EXISTS method TEXT DEFAULT 'GET'",
-		"ALTER TABLE sites ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''",
-		"ALTER TABLE sites ADD COLUMN IF NOT EXISTS parent_id INTEGER DEFAULT 0",
-		"ALTER TABLE sites ADD COLUMN IF NOT EXISTS accepted_codes TEXT DEFAULT '200-299'",
-		"ALTER TABLE sites ADD COLUMN IF NOT EXISTS dns_resolve_type TEXT DEFAULT ''",
-		"ALTER TABLE sites ADD COLUMN IF NOT EXISTS dns_server TEXT DEFAULT ''",
-		"ALTER TABLE sites ADD COLUMN IF NOT EXISTS ignore_tls BOOLEAN DEFAULT FALSE",
-		"ALTER TABLE sites ADD COLUMN IF NOT EXISTS paused BOOLEAN DEFAULT FALSE",
-		"ALTER TABLE check_history ADD COLUMN IF NOT EXISTS node_id TEXT DEFAULT ''",
-		"ALTER TABLE sites ADD COLUMN IF NOT EXISTS regions TEXT DEFAULT ''",
-		"ALTER TABLE check_history ALTER COLUMN checked_at TYPE TIMESTAMPTZ USING checked_at AT TIME ZONE 'UTC'",
-		"ALTER TABLE nodes ALTER COLUMN last_seen TYPE TIMESTAMPTZ USING last_seen AT TIME ZONE 'UTC'",
-		"ALTER TABLE logs ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC'",
-		"ALTER TABLE maintenance_windows ALTER COLUMN start_time TYPE TIMESTAMPTZ USING start_time AT TIME ZONE 'UTC'",
-		"ALTER TABLE maintenance_windows ALTER COLUMN end_time TYPE TIMESTAMPTZ USING end_time AT TIME ZONE 'UTC'",
-		"ALTER TABLE maintenance_windows ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC'",
-		"ALTER TABLE state_changes ALTER COLUMN changed_at TYPE TIMESTAMPTZ USING changed_at AT TIME ZONE 'UTC'",
-		"ALTER TABLE alert_health ALTER COLUMN last_send_at TYPE TIMESTAMPTZ USING last_send_at AT TIME ZONE 'UTC'",
+func (d *PostgresDialect) Migrations() []Migration {
+	return []Migration{
+		{1, "ALTER TABLE sites ADD COLUMN IF NOT EXISTS hostname TEXT DEFAULT ''"},
+		{2, "ALTER TABLE sites ADD COLUMN IF NOT EXISTS port INTEGER DEFAULT 0"},
+		{3, "ALTER TABLE sites ADD COLUMN IF NOT EXISTS timeout INTEGER DEFAULT 0"},
+		{4, "ALTER TABLE sites ADD COLUMN IF NOT EXISTS method TEXT DEFAULT 'GET'"},
+		{5, "ALTER TABLE sites ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''"},
+		{6, "ALTER TABLE sites ADD COLUMN IF NOT EXISTS parent_id INTEGER DEFAULT 0"},
+		{7, "ALTER TABLE sites ADD COLUMN IF NOT EXISTS accepted_codes TEXT DEFAULT '200-299'"},
+		{8, "ALTER TABLE sites ADD COLUMN IF NOT EXISTS dns_resolve_type TEXT DEFAULT ''"},
+		{9, "ALTER TABLE sites ADD COLUMN IF NOT EXISTS dns_server TEXT DEFAULT ''"},
+		{10, "ALTER TABLE sites ADD COLUMN IF NOT EXISTS ignore_tls BOOLEAN DEFAULT FALSE"},
+		{11, "ALTER TABLE sites ADD COLUMN IF NOT EXISTS paused BOOLEAN DEFAULT FALSE"},
+		{12, "ALTER TABLE check_history ADD COLUMN IF NOT EXISTS node_id TEXT DEFAULT ''"},
+		{13, "ALTER TABLE sites ADD COLUMN IF NOT EXISTS regions TEXT DEFAULT ''"},
+		{14, "ALTER TABLE check_history ALTER COLUMN checked_at TYPE TIMESTAMPTZ USING checked_at AT TIME ZONE 'UTC'"},
+		{15, "ALTER TABLE nodes ALTER COLUMN last_seen TYPE TIMESTAMPTZ USING last_seen AT TIME ZONE 'UTC'"},
+		{16, "ALTER TABLE logs ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC'"},
+		{17, "ALTER TABLE maintenance_windows ALTER COLUMN start_time TYPE TIMESTAMPTZ USING start_time AT TIME ZONE 'UTC'"},
+		{18, "ALTER TABLE maintenance_windows ALTER COLUMN end_time TYPE TIMESTAMPTZ USING end_time AT TIME ZONE 'UTC'"},
+		{19, "ALTER TABLE maintenance_windows ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC'"},
+		{20, "ALTER TABLE state_changes ALTER COLUMN changed_at TYPE TIMESTAMPTZ USING changed_at AT TIME ZONE 'UTC'"},
+		{21, "ALTER TABLE alert_health ALTER COLUMN last_send_at TYPE TIMESTAMPTZ USING last_send_at AT TIME ZONE 'UTC'"},
 	}
 }
 
