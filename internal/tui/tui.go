@@ -103,6 +103,7 @@ type Model struct {
 	state        sessionState
 	currentTab   int
 	cursor       int
+	selectedID   int
 	tableOffset  int
 	maxTableRows int
 	termWidth    int

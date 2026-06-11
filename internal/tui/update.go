@@ -286,6 +286,7 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
+	m.syncSelectedID()
 	return m, nil
 }
 
@@ -379,7 +380,7 @@ func (m *Model) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.openSLAView(m.sites[m.cursor])
 		}
 	case "q":
-		return m, tea.Quit
+		m.state = stateDashboard
 	}
 	return m, nil
 }
@@ -499,10 +500,8 @@ func (m *Model) handleHistoryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleAlertDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "i", "esc":
+	case "q", "i", "esc":
 		m.state = stateDashboard
-	case "q":
-		return m, tea.Quit
 	}
 	return m, nil
 }
@@ -537,6 +536,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.cursor < m.tableOffset {
 				m.tableOffset = m.cursor
 			}
+			m.syncSelectedID()
 		}
 	case "down", "j":
 		if m.state == stateLogs {
@@ -548,6 +548,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if m.cursor >= m.tableOffset+m.maxTableRows {
 					m.tableOffset++
 				}
+				m.syncSelectedID()
 			}
 		}
 	case "n":

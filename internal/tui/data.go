@@ -105,7 +105,22 @@ func (m *Model) refreshLive() {
 	}
 	m.sites = ordered
 	m.logViewport.SetContent(strings.Join(m.engine.GetLogs(), "\n"))
+
+	if m.currentTab == 0 && m.selectedID != 0 {
+		for i, s := range m.sites {
+			if s.ID == m.selectedID {
+				m.cursor = i
+				break
+			}
+		}
+	}
 	m.clampCursor()
+}
+
+func (m *Model) syncSelectedID() {
+	if m.currentTab == 0 && m.cursor < len(m.sites) {
+		m.selectedID = m.sites[m.cursor].ID
+	}
 }
 
 // clampCursor keeps the cursor and scroll offset within the current tab's list.

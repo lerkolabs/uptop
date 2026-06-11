@@ -254,7 +254,7 @@ func (m Model) viewDetailPanel() string {
 
 	b.WriteString("\n")
 	b.WriteString(m.divider() + "\n")
-	b.WriteString(m.st.subtleStyle.Render("  [i/Esc] Back  [e] Edit  [h] History  [s] SLA  [click] Inspect  [q] Quit"))
+	b.WriteString(m.st.subtleStyle.Render("  [q/Esc] Back  [e] Edit  [h] History  [s] SLA  [click] Inspect"))
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }
