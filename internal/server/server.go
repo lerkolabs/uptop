@@ -33,40 +33,8 @@ func extractBearerToken(r *http.Request) string {
 	return ""
 }
 
-// safeSettingKeys lists, per provider type, the settings that are NOT secret
-// and may be exported in the clear. Everything else is redacted. Providers
-// absent from this map (discord, slack, webhook, pushover) carry their secret
-// in a field a denylist would miss — the webhook URL, the pushover token/user —
-// so all of their settings are redacted.
-var safeSettingKeys = map[string]map[string]bool{
-	"email":     {"host": true, "port": true, "to": true, "from": true},
-	"ntfy":      {"topic": true, "priority": true},
-	"telegram":  {"chat_id": true},
-	"pagerduty": {"severity": true},
-	"gotify":    {"priority": true},
-	"opsgenie":  {"priority": true, "eu": true},
-}
-
-// redactByProvider keeps only the known-safe keys for the alert type and
-// redacts everything else. An allowlist fails safe: an unknown or newly added
-// setting is redacted by default instead of leaking. This closes the denylist
-// gap where url (discord/slack/webhook/ntfy/gotify) and api_key (opsgenie) —
-// the actual credentials — were exported in the clear.
-func redactByProvider(alertType string, settings map[string]string) map[string]string {
-	safe := safeSettingKeys[alertType]
-	redacted := make(map[string]string, len(settings))
-	for k, v := range settings {
-		switch {
-		case v == "":
-			redacted[k] = ""
-		case safe[k]:
-			redacted[k] = v
-		default:
-			redacted[k] = "***REDACTED***"
-		}
-	}
-	return redacted
-}
+// Alert-settings redaction policy lives in models.RedactAlertSettings so the
+// TUI detail panel and this export path share one allowlist.
 
 var statusTpl = template.Must(template.New("status").Parse(`
 <!DOCTYPE html>
@@ -211,6 +179,23 @@ type ServerConfig struct {
 	MetricsPublic  bool
 	CORSOrigin     string
 	TrustedProxies []*net.IPNet
+	// QuietHTTPLog disables per-request stderr logging. Set when the local
+	// TUI owns the terminal — request logs would scribble over the alt screen.
+	QuietHTTPLog bool
+}
+
+// statusSite is the public DTO for /status/json. models.Site must never be
+// serialized raw here: it carries internal fields (LastError, Hostname, Port,
+// DNSServer, AlertID, Token, ...) and every field added to it would become
+// public by default. Field names match what the status page JS reads.
+type statusSite struct {
+	Name      string
+	Type      string
+	URL       string
+	Status    string
+	Paused    bool
+	LastCheck time.Time
+	Latency   time.Duration
 }
 
 func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
@@ -278,7 +263,7 @@ func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
 		}
 		if r.URL.Query().Get("redact_secrets") != "false" {
 			for i := range data.Alerts {
-				data.Alerts[i].Settings = redactByProvider(data.Alerts[i].Type, data.Alerts[i].Settings)
+				data.Alerts[i].Settings = models.RedactAlertSettings(data.Alerts[i].Type, data.Alerts[i].Settings)
 			}
 		}
 		_ = json.NewEncoder(w).Encode(data) //nolint:errcheck
@@ -483,18 +468,27 @@ func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
 					maintSet[mw.MonitorID] = true
 				}
 			}
+			public := make(map[int]statusSite, len(state))
 			for id, site := range state {
-				site.Token = ""
+				status := site.Status
 				if allInMaint || maintSet[site.ID] || (site.ParentID > 0 && maintSet[site.ParentID]) {
-					site.Status = "MAINT"
+					status = "MAINT"
 				}
-				state[id] = site
+				public[id] = statusSite{
+					Name:      site.Name,
+					Type:      site.Type,
+					URL:       site.URL,
+					Status:    status,
+					Paused:    site.Paused,
+					LastCheck: site.LastCheck,
+					Latency:   site.Latency,
+				}
 			}
 			if cfg.CORSOrigin != "" {
 				w.Header().Set("Access-Control-Allow-Origin", cfg.CORSOrigin)
 			}
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(state) //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(public) //nolint:errcheck
 		}))
 	}
 
@@ -502,7 +496,10 @@ func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
 		fmt.Println("WARNING: Cluster mode active without TLS. Secrets transmitted in cleartext.")
 	}
 
-	handler := loggingMiddleware(cfg.TrustedProxies, securityHeadersMiddleware(mux))
+	handler := securityHeadersMiddleware(mux)
+	if !cfg.QuietHTTPLog {
+		handler = loggingMiddleware(cfg.TrustedProxies, handler)
+	}
 	if cfg.TLSCert != "" {
 		handler = hstsMiddleware(handler)
 	}

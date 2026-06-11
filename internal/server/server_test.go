@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -480,15 +481,32 @@ func TestStatusPage_Enabled(t *testing.T) {
 	}
 }
 
-func TestStatusJSON_TokensStripped(t *testing.T) {
+func TestStatusJSON_PublicDTOOnly(t *testing.T) {
 	ts := newTestServer(t, "secret", true)
 
-	// Inject a site with a token into engine state
-	ts.engine.UpdateSiteConfig(models.Site{ID: 1, Name: "test", Type: "push", Token: "secret-token", Status: "UP"})
-	// Need to inject directly since UpdateSiteConfig only updates existing
-	func() {
-		ts.engine.RecordHeartbeat("unused") // just to exercise, won't match
-	}()
+	// Seed a push monitor (no network IO) through the store and start the
+	// engine so its poll loop loads it into live state — the path real sites
+	// take. The old version of this test injected via UpdateSiteConfig, which
+	// no-ops for unknown IDs, so it asserted over zero sites and passed
+	// against a server that leaked tokens.
+	ts.store.sites = []models.Site{{
+		ID: 1, Name: "test", Type: "push", Token: "secret-token",
+		Hostname: "internal-host", LastError: "internal failure detail", AlertID: 3,
+	}}
+	ctx, cancel := context.WithCancel(context.Background())
+	ts.engine.Start(ctx)
+	t.Cleanup(func() {
+		cancel()
+		ts.engine.Stop()
+	})
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && len(ts.engine.GetLiveState()) == 0 {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if len(ts.engine.GetLiveState()) == 0 {
+		t.Fatal("engine never loaded the seeded site")
+	}
 
 	resp, err := http.Get(ts.baseURL + "/status/json")
 	if err != nil {
@@ -498,11 +516,23 @@ func TestStatusJSON_TokensStripped(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
-	var state map[string]models.Site
-	json.NewDecoder(resp.Body).Decode(&state)
+
+	// Decode raw so absent struct fields can't mask leaked JSON keys.
+	var state map[string]map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&state); err != nil {
+		t.Fatal(err)
+	}
+	if len(state) != 1 {
+		t.Fatalf("expected 1 site in status JSON, got %d", len(state))
+	}
 	for _, site := range state {
-		if site.Token != "" {
-			t.Error("expected token stripped from status JSON response")
+		if site["Name"] != "test" {
+			t.Errorf("expected Name to be public, got %v", site["Name"])
+		}
+		for _, leaked := range []string{"Token", "LastError", "Hostname", "Port", "DNSServer", "AlertID", "AcceptedCodes", "Interval"} {
+			if _, ok := site[leaked]; ok {
+				t.Errorf("status JSON leaks internal field %q", leaked)
+			}
 		}
 	}
 }
@@ -656,7 +686,7 @@ func TestRedactByProvider(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			out := redactByProvider(tt.typ, tt.in)
+			out := models.RedactAlertSettings(tt.typ, tt.in)
 			for _, k := range tt.redacted {
 				if out[k] != "***REDACTED***" {
 					t.Errorf("key %q: expected redacted, got %q", k, out[k])
