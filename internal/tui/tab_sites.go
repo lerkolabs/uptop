@@ -325,14 +325,13 @@ func (m *Model) initSiteHuhForm() tea.Cmd {
 		}
 	}
 
+	// m.alerts is the tab-data cache (≤5s stale) — no store IO in Update.
 	alertOpts := []huh.Option[string]{huh.NewOption("None", "0")}
-	if alerts, err := m.store.GetAllAlerts(); err == nil {
-		for _, a := range alerts {
-			alertOpts = append(alertOpts, huh.NewOption(
-				fmt.Sprintf("%s (%s)", a.Name, a.Type),
-				strconv.Itoa(a.ID),
-			))
-		}
+	for _, a := range m.alerts {
+		alertOpts = append(alertOpts, huh.NewOption(
+			fmt.Sprintf("%s (%s)", a.Name, a.Type),
+			strconv.Itoa(a.ID),
+		))
 	}
 
 	groupOpts := []huh.Option[string]{huh.NewOption("None", "0")}

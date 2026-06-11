@@ -18,8 +18,11 @@ type tickMsg time.Time
 
 // tabDataMsg carries the result of an async load of the DB-backed tab tables.
 // On err, the model keeps its previous data and logs — never wiping the view on
-// a transient store error.
+// a transient store error. seq orders in-flight loads: replies whose seq is
+// older than the model's current tabSeq are dropped, so a slow load can never
+// overwrite the result of a newer one.
 type tabDataMsg struct {
+	seq    int
 	alerts []models.AlertConfig
 	users  []models.User
 	nodes  []models.ProbeNode
@@ -28,8 +31,26 @@ type tabDataMsg struct {
 }
 
 // detailDataMsg carries the state-change history for the detail panel, loaded
-// when the panel is opened so View never touches the database.
+// on entry and refreshed on the tab-data cadence so View never touches the
+// database.
 type detailDataMsg struct {
 	siteID  int
 	changes []models.StateChange
+}
+
+// historyDataMsg carries the full state-change history for the history view.
+// siteID guards against a slow reply landing after the user opened a
+// different site's history.
+type historyDataMsg struct {
+	siteID  int
+	changes []models.StateChange
+}
+
+// slaDataMsg carries the state changes backing the SLA view for one
+// site+period request. siteID and periodIdx guard stale replies the same way
+// historyDataMsg does.
+type slaDataMsg struct {
+	siteID    int
+	periodIdx int
+	changes   []models.StateChange
 }

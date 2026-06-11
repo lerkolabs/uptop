@@ -20,9 +20,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tabDataMsg:
 		return m.handleTabData(msg)
 	case detailDataMsg:
+		// Drop replies for a site the user has already navigated away from,
+		// so a slow load can't clobber the panel currently on screen.
+		if m.state == stateDetail && m.cursor < len(m.sites) && m.sites[m.cursor].ID != msg.siteID {
+			return m, nil
+		}
 		m.detailChanges = msg.changes
 		m.detailChangesSiteID = msg.siteID
 		return m, nil
+	case historyDataMsg:
+		if msg.siteID != m.historySiteID {
+			return m, nil // stale reply for a previously opened history
+		}
+		m.historyChanges = msg.changes
+		m.historyViewport.SetContent(m.buildHistoryContent())
+		m.historyViewport.GotoTop()
+		return m, nil
+	case slaDataMsg:
+		return m.handleSLAData(msg)
 	}
 
 	if m.state == stateConfirmDelete {
@@ -152,14 +167,31 @@ func (m *Model) handleTick(t time.Time) (tea.Model, tea.Cmd) {
 	if t.Sub(m.lastTabLoad) > tabRefreshTTL {
 		m.lastTabLoad = t
 		cmds = append(cmds, m.loadTabDataCmd())
+		if dc := m.detailRefreshCmd(); dc != nil {
+			cmds = append(cmds, dc)
+		}
 	}
 	return m, tea.Batch(cmds...)
 }
 
-// handleTabData folds an async tab-data load into the model. On error the
-// previous data is kept and the failure logged, so a transient store error
-// never blanks the view.
+// detailRefreshCmd reloads the open detail panel's state-change list on the
+// tab-data cadence, so a flap that happens while the panel is on screen shows
+// up without leaving and re-entering. Nil when no detail panel is open.
+func (m *Model) detailRefreshCmd() tea.Cmd {
+	if m.state != stateDetail || m.cursor >= len(m.sites) {
+		return nil
+	}
+	return m.loadDetailCmd(m.sites[m.cursor].ID)
+}
+
+// handleTabData folds an async tab-data load into the model. Replies older
+// than the newest issued load are dropped so out-of-order completions can't
+// overwrite fresher data. On error the previous data is kept and the failure
+// logged, so a transient store error never blanks the view.
 func (m *Model) handleTabData(msg tabDataMsg) (tea.Model, tea.Cmd) {
+	if msg.seq != m.tabSeq {
+		return m, nil
+	}
 	if msg.err != nil {
 		m.engine.AddLog("Tab data refresh failed: " + msg.err.Error())
 		return m, nil
@@ -324,18 +356,19 @@ func (m *Model) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.cursor < len(m.sites) {
 			site := m.sites[m.cursor]
 			m.historySiteName = site.Name
-			m.historyChanges = m.engine.GetStateChanges(site.ID, 100)
+			m.historySiteID = site.ID
+			m.historyChanges = nil
 			m.historyViewport = viewport.New(
 				m.termWidth-chromePadH,
 				m.termHeight-10,
 			)
-			m.historyViewport.SetContent(m.buildHistoryContent())
-			m.historyViewport.GotoTop()
+			m.historyViewport.SetContent("\n  Loading state history...")
 			m.state = stateHistory
+			return m, m.loadHistoryCmd(site.ID)
 		}
 	case "s":
 		if m.cursor < len(m.sites) {
-			m.openSLAView(m.sites[m.cursor])
+			return m, m.openSLAView(m.sites[m.cursor])
 		}
 	case "q":
 		return m, tea.Quit
@@ -375,7 +408,7 @@ func (m *Model) handleSLAKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		idx := int(msg.String()[0]-'0') - 1
 		if idx >= 0 && idx < len(slaPeriods) {
 			m.slaPeriodIdx = idx
-			m.recomputeSLA()
+			return m, m.loadSLACmd(m.slaSiteID, idx)
 		}
 	case "up", "k":
 		m.slaViewport.ScrollUp(1)
@@ -391,26 +424,39 @@ func (m *Model) handleSLAKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) openSLAView(site models.Site) {
+func (m *Model) openSLAView(site models.Site) tea.Cmd {
 	m.slaSiteName = site.Name
 	m.slaSiteID = site.ID
 	m.slaPeriodIdx = 2 // default 30d
-	m.recomputeSLA()
+	m.slaViewport = viewport.New(
+		m.termWidth-chromePadH,
+		m.termHeight-16,
+	)
+	m.slaViewport.SetContent("\n  Loading SLA report...")
 	m.state = stateSLA
+	return m.loadSLACmd(site.ID, m.slaPeriodIdx)
 }
 
-func (m *Model) recomputeSLA() {
-	period := slaPeriods[m.slaPeriodIdx]
-	since := time.Now().Add(-period.duration)
-	changes := m.engine.GetStateChangesSince(m.slaSiteID, since)
+// handleSLAData folds an async SLA load into the model. The SLA math itself is
+// pure CPU and cheap, so it runs here; only the state-change read happens in
+// the Cmd. Replies for a different site or period than currently selected are
+// stale and dropped.
+func (m *Model) handleSLAData(msg slaDataMsg) (tea.Model, tea.Cmd) {
+	if msg.siteID != m.slaSiteID || msg.periodIdx != m.slaPeriodIdx {
+		return m, nil
+	}
+	period := slaPeriods[msg.periodIdx]
 
 	var currentStatus string
-	if m.cursor < len(m.sites) {
-		currentStatus = m.sites[m.cursor].Status
+	for _, s := range m.sites {
+		if s.ID == msg.siteID {
+			currentStatus = s.Status
+			break
+		}
 	}
 
-	m.slaReport = monitor.ComputeSLA(changes, currentStatus, period.duration)
-	m.slaDailyBreakdown = monitor.ComputeDailyBreakdown(changes, currentStatus, period.days, time.Now())
+	m.slaReport = monitor.ComputeSLA(msg.changes, currentStatus, period.duration)
+	m.slaDailyBreakdown = monitor.ComputeDailyBreakdown(msg.changes, currentStatus, period.days, time.Now())
 
 	m.slaViewport = viewport.New(
 		m.termWidth-chromePadH,
@@ -418,6 +464,7 @@ func (m *Model) recomputeSLA() {
 	)
 	m.slaViewport.SetContent(m.buildSLADailyContent())
 	m.slaViewport.GotoTop()
+	return m, nil
 }
 
 func (m *Model) handleHistoryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

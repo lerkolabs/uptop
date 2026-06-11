@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"sort"
 	"strings"
+	"time"
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/store"
@@ -108,32 +109,36 @@ func (m *Model) clampCursor() {
 }
 
 // loadTabDataCmd returns a tea.Cmd that loads the DB-backed tab tables off the
-// UI goroutine. The closure reads only stable fields (store, isAdmin) and never
-// mutates the model; results come back as a tabDataMsg. On the first store
-// error it returns an error-only msg so the model keeps its previous data.
+// UI goroutine. Each call bumps tabSeq and stamps the reply with it, so
+// handleTabData can drop out-of-order results from slower earlier loads. The
+// closure reads only stable fields (store, isAdmin) and never mutates the
+// model; results come back as a tabDataMsg. On the first store error it
+// returns an error-only msg so the model keeps its previous data.
 func (m *Model) loadTabDataCmd() tea.Cmd {
+	m.tabSeq++
+	seq := m.tabSeq
 	st := m.store
 	isAdmin := m.isAdmin
 	return func() tea.Msg {
 		alerts, err := st.GetAllAlerts()
 		if err != nil {
-			return tabDataMsg{err: err}
+			return tabDataMsg{seq: seq, err: err}
 		}
 		var users []models.User
 		if isAdmin {
 			if users, err = st.GetAllUsers(); err != nil {
-				return tabDataMsg{err: err}
+				return tabDataMsg{seq: seq, err: err}
 			}
 		}
 		nodes, err := st.GetAllNodes()
 		if err != nil {
-			return tabDataMsg{err: err}
+			return tabDataMsg{seq: seq, err: err}
 		}
 		maint, err := st.GetAllMaintenanceWindows(100)
 		if err != nil {
-			return tabDataMsg{err: err}
+			return tabDataMsg{seq: seq, err: err}
 		}
-		return tabDataMsg{alerts: alerts, users: users, nodes: nodes, maint: maint}
+		return tabDataMsg{seq: seq, alerts: alerts, users: users, nodes: nodes, maint: maint}
 	}
 }
 
@@ -143,5 +148,29 @@ func (m *Model) loadDetailCmd(siteID int) tea.Cmd {
 	eng := m.engine
 	return func() tea.Msg {
 		return detailDataMsg{siteID: siteID, changes: eng.GetStateChanges(siteID, 5)}
+	}
+}
+
+// loadHistoryCmd loads the full state-change history for the history view off
+// the UI goroutine.
+func (m *Model) loadHistoryCmd(siteID int) tea.Cmd {
+	eng := m.engine
+	return func() tea.Msg {
+		return historyDataMsg{siteID: siteID, changes: eng.GetStateChanges(siteID, 100)}
+	}
+}
+
+// loadSLACmd loads the state changes backing the SLA view off the UI
+// goroutine. The reply carries the request's site and period so a stale reply
+// can be recognized and dropped.
+func (m *Model) loadSLACmd(siteID, periodIdx int) tea.Cmd {
+	eng := m.engine
+	since := time.Now().Add(-slaPeriods[periodIdx].duration)
+	return func() tea.Msg {
+		return slaDataMsg{
+			siteID:    siteID,
+			periodIdx: periodIdx,
+			changes:   eng.GetStateChangesSince(siteID, since),
+		}
 	}
 }

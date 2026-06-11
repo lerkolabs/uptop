@@ -6,6 +6,7 @@ import (
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/monitor"
+	tea "github.com/charmbracelet/bubbletea"
 	zone "github.com/lrstanley/bubblezone"
 )
 
@@ -220,5 +221,116 @@ func TestHandleTick_ThrottlesTabLoad(t *testing.T) {
 	mp.handleTick(t2)
 	if !mp.lastTabLoad.Equal(t2) {
 		t.Errorf("tick past TTL should re-dispatch; lastTabLoad=%v want %v", mp.lastTabLoad, t2)
+	}
+}
+
+// keyMsg builds a plain-rune key message ("h", "s", ...).
+func keyMsg(s string) tea.KeyMsg {
+	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
+}
+
+func TestHandleTabData_DropsStaleSeq(t *testing.T) {
+	m := newTestModel(&tuiMockStore{})
+	mp := &m
+	_ = mp.loadTabDataCmd() // seq 1 (superseded)
+	_ = mp.loadTabDataCmd() // seq 2 (newest)
+
+	updated, _ := mp.handleTabData(tabDataMsg{seq: 1, alerts: []models.AlertConfig{{ID: 1}}})
+	if got := updated.(*Model); len(got.alerts) != 0 {
+		t.Error("stale tab-data reply was applied over a newer in-flight load")
+	}
+
+	updated, _ = mp.handleTabData(tabDataMsg{seq: 2, alerts: []models.AlertConfig{{ID: 2}}})
+	if got := updated.(*Model); len(got.alerts) != 1 || got.alerts[0].ID != 2 {
+		t.Error("fresh tab-data reply was not applied")
+	}
+}
+
+func TestHistoryKey_LoadsOffUIGoroutine(t *testing.T) {
+	ms := &tuiMockStore{stateChanges: []models.StateChange{{FromStatus: "UP", ToStatus: "DOWN"}}}
+	m := newTestModel(ms)
+	m.sites = []models.Site{{ID: 7, Name: "site"}}
+	m.state = stateDetail
+	m.termWidth, m.termHeight = 120, 40
+
+	updated, cmd := (&m).handleDetailKey(keyMsg("h"))
+	if ms.stateChangeCalls != 0 {
+		t.Fatal("history keypress hit the store synchronously in Update")
+	}
+	got := updated.(*Model)
+	if got.state != stateHistory || got.historySiteID != 7 {
+		t.Fatalf("history view not opened: state=%v siteID=%d", got.state, got.historySiteID)
+	}
+	if cmd == nil {
+		t.Fatal("expected a history load Cmd")
+	}
+
+	msg := cmd()
+	hd, ok := msg.(historyDataMsg)
+	if !ok || hd.siteID != 7 || len(hd.changes) != 1 {
+		t.Fatalf("unexpected historyDataMsg: %+v", msg)
+	}
+
+	folded, _ := got.Update(hd)
+	m2 := folded.(Model)
+	if len(m2.historyChanges) != 1 {
+		t.Fatal("history reply not folded into the model")
+	}
+
+	// A reply for a previously opened site must not clobber the current one.
+	m2.historySiteID = 9
+	stale, _ := m2.Update(historyDataMsg{siteID: 7, changes: nil})
+	if m3 := stale.(Model); len(m3.historyChanges) != 1 {
+		t.Error("stale history reply overwrote the current view")
+	}
+}
+
+func TestSLAData_DropsStaleReply(t *testing.T) {
+	m := newTestModel(&tuiMockStore{})
+	m.termWidth, m.termHeight = 120, 40
+	m.sites = []models.Site{{ID: 3, Status: "UP"}}
+
+	if cmd := (&m).openSLAView(m.sites[0]); cmd == nil {
+		t.Fatal("openSLAView should return a load Cmd")
+	}
+
+	// Reply for a different period than currently selected → dropped.
+	// (slaDataMsg routes through a pointer-receiver handler, so Update
+	// returns *Model on this path.)
+	updated, _ := m.Update(slaDataMsg{siteID: 3, periodIdx: 0})
+	if mm := updated.(*Model); mm.slaDailyBreakdown != nil {
+		t.Error("stale SLA reply (old period) was applied")
+	}
+
+	// Matching reply → report computed.
+	updated, _ = updated.(*Model).Update(slaDataMsg{siteID: 3, periodIdx: m.slaPeriodIdx})
+	if mm := updated.(*Model); mm.slaDailyBreakdown == nil {
+		t.Error("matching SLA reply was not applied")
+	}
+}
+
+func TestDetailRefreshCmd_OnlyWhileDetailOpen(t *testing.T) {
+	ms := &tuiMockStore{stateChanges: []models.StateChange{{FromStatus: "UP", ToStatus: "DOWN"}}}
+	m := newTestModel(ms)
+	m.sites = []models.Site{{ID: 5, Name: "site"}}
+
+	m.state = stateDashboard
+	if (&m).detailRefreshCmd() != nil {
+		t.Error("refresh Cmd issued outside the detail view")
+	}
+
+	m.state = stateDetail
+	cmd := (&m).detailRefreshCmd()
+	if cmd == nil {
+		t.Fatal("open detail panel should refresh on the tab-data cadence")
+	}
+	dd, ok := cmd().(detailDataMsg)
+	if !ok || dd.siteID != 5 || len(dd.changes) != 1 {
+		t.Fatalf("unexpected detail refresh reply: %+v", dd)
+	}
+
+	m.cursor = 7 // cursor out of range → no refresh, no panic
+	if (&m).detailRefreshCmd() != nil {
+		t.Error("refresh Cmd issued for an out-of-range cursor")
 	}
 }
