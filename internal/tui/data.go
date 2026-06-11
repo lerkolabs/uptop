@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"encoding/json"
 	"sort"
 	"strings"
@@ -13,7 +14,7 @@ import (
 
 func loadCollapsed(s store.Store) map[int]bool {
 	m := make(map[int]bool)
-	raw, err := s.GetPreference("collapsed_groups")
+	raw, err := s.GetPreference(context.Background(), "collapsed_groups")
 	if err != nil || raw == "" {
 		return m
 	}
@@ -130,21 +131,22 @@ func (m *Model) loadTabDataCmd() tea.Cmd {
 	st := m.store
 	isAdmin := m.isAdmin
 	return func() tea.Msg {
-		alerts, err := st.GetAllAlerts()
+		ctx := context.Background()
+		alerts, err := st.GetAllAlerts(ctx)
 		if err != nil {
 			return tabDataMsg{seq: seq, err: err}
 		}
 		var users []models.User
 		if isAdmin {
-			if users, err = st.GetAllUsers(); err != nil {
+			if users, err = st.GetAllUsers(ctx); err != nil {
 				return tabDataMsg{seq: seq, err: err}
 			}
 		}
-		nodes, err := st.GetAllNodes()
+		nodes, err := st.GetAllNodes(ctx)
 		if err != nil {
 			return tabDataMsg{seq: seq, err: err}
 		}
-		maint, err := st.GetAllMaintenanceWindows(100)
+		maint, err := st.GetAllMaintenanceWindows(ctx, 100)
 		if err != nil {
 			return tabDataMsg{seq: seq, err: err}
 		}

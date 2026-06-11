@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"context"
 	"crypto/tls"
 	"net"
 	"net/http"
@@ -19,7 +20,7 @@ func TestRunCheck_HTTP_Success(t *testing.T) {
 	defer srv.Close()
 
 	site := models.Site{ID: 1, Type: "http", URL: srv.URL}
-	result := RunCheck(site, http.DefaultClient, http.DefaultClient, false)
+	result := RunCheck(context.Background(), site, http.DefaultClient, http.DefaultClient, false)
 
 	if result.Status != "UP" {
 		t.Errorf("expected UP, got %s", result.Status)
@@ -39,7 +40,7 @@ func TestRunCheck_HTTP_ServerError(t *testing.T) {
 	defer srv.Close()
 
 	site := models.Site{ID: 1, Type: "http", URL: srv.URL}
-	result := RunCheck(site, http.DefaultClient, http.DefaultClient, false)
+	result := RunCheck(context.Background(), site, http.DefaultClient, http.DefaultClient, false)
 
 	if result.Status != "DOWN" {
 		t.Errorf("expected DOWN, got %s", result.Status)
@@ -60,7 +61,7 @@ func TestRunCheck_HTTP_CustomAcceptedCodes(t *testing.T) {
 	}}
 
 	site := models.Site{ID: 1, Type: "http", URL: srv.URL, AcceptedCodes: "200-399"}
-	result := RunCheck(site, client, client, false)
+	result := RunCheck(context.Background(), site, client, client, false)
 
 	if result.Status != "UP" {
 		t.Errorf("expected UP with accepted 200-399, got %s", result.Status)
@@ -76,7 +77,7 @@ func TestRunCheck_HTTP_MethodRespected(t *testing.T) {
 	defer srv.Close()
 
 	site := models.Site{ID: 1, Type: "http", URL: srv.URL, Method: "HEAD"}
-	RunCheck(site, http.DefaultClient, http.DefaultClient, false)
+	RunCheck(context.Background(), site, http.DefaultClient, http.DefaultClient, false)
 
 	if receivedMethod != "HEAD" {
 		t.Errorf("expected HEAD, got %s", receivedMethod)
@@ -91,7 +92,7 @@ func TestRunCheck_HTTP_Timeout(t *testing.T) {
 	defer srv.Close()
 
 	site := models.Site{ID: 1, Type: "http", URL: srv.URL, Timeout: 1}
-	result := RunCheck(site, http.DefaultClient, http.DefaultClient, false)
+	result := RunCheck(context.Background(), site, http.DefaultClient, http.DefaultClient, false)
 
 	if result.Status != "DOWN" {
 		t.Errorf("expected DOWN on timeout, got %s", result.Status)
@@ -109,7 +110,7 @@ func TestRunCheck_HTTP_SSLFields(t *testing.T) {
 	}
 
 	site := models.Site{ID: 1, Type: "http", URL: srv.URL, CheckSSL: true, IgnoreTLS: true}
-	result := RunCheck(site, http.DefaultClient, insecureClient, false)
+	result := RunCheck(context.Background(), site, http.DefaultClient, insecureClient, false)
 
 	if result.Status != "UP" {
 		t.Errorf("expected UP, got %s", result.Status)
@@ -133,7 +134,7 @@ func TestRunCheck_Port_Open(t *testing.T) {
 	port, _ := strconv.Atoi(portStr)
 
 	site := models.Site{ID: 1, Type: "port", Hostname: "127.0.0.1", Port: port, Timeout: 2}
-	result := RunCheck(site, nil, nil, false, true)
+	result := RunCheck(context.Background(), site, nil, nil, false, true)
 
 	if result.Status != "UP" {
 		t.Errorf("expected UP, got %s", result.Status)
@@ -153,7 +154,7 @@ func TestRunCheck_Port_Closed(t *testing.T) {
 	ln.Close()
 
 	site := models.Site{ID: 1, Type: "port", Hostname: "127.0.0.1", Port: port, Timeout: 1}
-	result := RunCheck(site, nil, nil, false, true)
+	result := RunCheck(context.Background(), site, nil, nil, false, true)
 
 	if result.Status != "DOWN" {
 		t.Errorf("expected DOWN, got %s", result.Status)
@@ -171,7 +172,7 @@ func TestRunCheck_Port_BlocksPrivateByDefault(t *testing.T) {
 	port, _ := strconv.Atoi(portStr)
 
 	site := models.Site{ID: 1, Type: "port", Hostname: "127.0.0.1", Port: port, Timeout: 2}
-	result := RunCheck(site, nil, nil, false)
+	result := RunCheck(context.Background(), site, nil, nil, false)
 
 	if result.Status != "DOWN" {
 		t.Errorf("expected DOWN when private targets blocked, got %s", result.Status)
@@ -180,7 +181,7 @@ func TestRunCheck_Port_BlocksPrivateByDefault(t *testing.T) {
 
 func TestRunCheck_UnknownType(t *testing.T) {
 	site := models.Site{ID: 1, Type: "invalid"}
-	result := RunCheck(site, nil, nil, false)
+	result := RunCheck(context.Background(), site, nil, nil, false)
 
 	if result.Status != "DOWN" {
 		t.Errorf("expected DOWN for unknown type, got %s", result.Status)

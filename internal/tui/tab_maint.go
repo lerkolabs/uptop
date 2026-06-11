@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -240,6 +241,6 @@ func (m *Model) submitMaintForm() tea.Cmd {
 	st := m.store
 	m.state = stateDashboard
 	return writeCmd("Add maintenance window", func() error {
-		return st.AddMaintenanceWindow(mw)
+		return st.AddMaintenanceWindow(context.Background(), mw)
 	})
 }

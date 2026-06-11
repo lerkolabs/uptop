@@ -1,6 +1,8 @@
 package monitor
 
 import (
+	"context"
+
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/store"
 )
@@ -10,14 +12,14 @@ import (
 // serializing all writes through one connection and surfacing errors instead of
 // discarding them. desc names the write for diagnostics on drop/failure.
 type dbWrite interface {
-	exec(s store.Store) error
+	exec(ctx context.Context, s store.Store) error
 	desc() string
 }
 
 type writeLog struct{ message string }
 
-func (w writeLog) exec(s store.Store) error { return s.SaveLog(w.message) }
-func (w writeLog) desc() string             { return "log" }
+func (w writeLog) exec(ctx context.Context, s store.Store) error { return s.SaveLog(ctx, w.message) }
+func (w writeLog) desc() string                                  { return "log" }
 
 type writeCheck struct {
 	siteID    int
@@ -25,8 +27,10 @@ type writeCheck struct {
 	isUp      bool
 }
 
-func (w writeCheck) exec(s store.Store) error { return s.SaveCheck(w.siteID, w.latencyNs, w.isUp) }
-func (w writeCheck) desc() string             { return "check" }
+func (w writeCheck) exec(ctx context.Context, s store.Store) error {
+	return s.SaveCheck(ctx, w.siteID, w.latencyNs, w.isUp)
+}
+func (w writeCheck) desc() string { return "check" }
 
 type writeStateChange struct {
 	siteID     int
@@ -35,15 +39,17 @@ type writeStateChange struct {
 	reason     string
 }
 
-func (w writeStateChange) exec(s store.Store) error {
-	return s.SaveStateChange(w.siteID, w.fromStatus, w.toStatus, w.reason)
+func (w writeStateChange) exec(ctx context.Context, s store.Store) error {
+	return s.SaveStateChange(ctx, w.siteID, w.fromStatus, w.toStatus, w.reason)
 }
 func (w writeStateChange) desc() string { return "state-change" }
 
 type writeAlertHealth struct{ rec models.AlertHealthRecord }
 
-func (w writeAlertHealth) exec(s store.Store) error { return s.SaveAlertHealth(w.rec) }
-func (w writeAlertHealth) desc() string             { return "alert-health" }
+func (w writeAlertHealth) exec(ctx context.Context, s store.Store) error {
+	return s.SaveAlertHealth(ctx, w.rec)
+}
+func (w writeAlertHealth) desc() string { return "alert-health" }
 
 type writeProbeCheck struct {
 	siteID    int
@@ -52,7 +58,7 @@ type writeProbeCheck struct {
 	isUp      bool
 }
 
-func (w writeProbeCheck) exec(s store.Store) error {
-	return s.SaveCheckFromNode(w.siteID, w.nodeID, w.latencyNs, w.isUp)
+func (w writeProbeCheck) exec(ctx context.Context, s store.Store) error {
+	return s.SaveCheckFromNode(ctx, w.siteID, w.nodeID, w.latencyNs, w.isUp)
 }
 func (w writeProbeCheck) desc() string { return "probe-check" }

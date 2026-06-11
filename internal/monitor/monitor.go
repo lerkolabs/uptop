@@ -185,16 +185,16 @@ func (e *Engine) dbWriter(ctx context.Context) {
 
 	pruneTicker := time.NewTicker(dbPruneInterval)
 	defer pruneTicker.Stop()
-	e.prune()
+	e.prune(ctx)
 
 	for {
 		select {
 		case w := <-e.dbWrites:
-			if err := w.exec(e.db); err != nil {
+			if err := w.exec(ctx, e.db); err != nil {
 				e.appendLog(fmt.Sprintf("db %s write failed: %v", w.desc(), err))
 			}
 		case <-pruneTicker.C:
-			e.prune()
+			e.prune(ctx)
 		case <-ctx.Done():
 			e.drainWrites()
 			return
@@ -207,7 +207,7 @@ func (e *Engine) drainWrites() {
 	for {
 		select {
 		case w := <-e.dbWrites:
-			if err := w.exec(e.db); err != nil {
+			if err := w.exec(context.Background(), e.db); err != nil {
 				e.appendLog(fmt.Sprintf("db %s write failed (drain): %v", w.desc(), err))
 			}
 		default:
@@ -216,14 +216,14 @@ func (e *Engine) drainWrites() {
 	}
 }
 
-func (e *Engine) prune() {
-	if err := e.db.PruneLogs(); err != nil {
+func (e *Engine) prune(ctx context.Context) {
+	if err := e.db.PruneLogs(ctx); err != nil {
 		e.appendLog(fmt.Sprintf("log prune failed: %v", err))
 	}
-	if err := e.db.PruneCheckHistory(); err != nil {
+	if err := e.db.PruneCheckHistory(ctx); err != nil {
 		e.appendLog(fmt.Sprintf("check-history prune failed: %v", err))
 	}
-	if err := e.db.PruneStateChanges(); err != nil {
+	if err := e.db.PruneStateChanges(ctx); err != nil {
 		e.appendLog(fmt.Sprintf("state-change prune failed: %v", err))
 	}
 }
@@ -242,7 +242,7 @@ func (e *Engine) Stop() {
 }
 
 func (e *Engine) InitLogs() {
-	logs, err := e.db.LoadLogs(maxLogEntries)
+	logs, err := e.db.LoadLogs(context.Background(), maxLogEntries)
 	if err != nil {
 		return
 	}
@@ -257,7 +257,7 @@ func (e *Engine) InitLogs() {
 // InitAlertHealth restores persisted alert send health so the dashboard shows real
 // "last sent" / health state on startup instead of resetting every channel to "never".
 func (e *Engine) InitAlertHealth() {
-	records, err := e.db.LoadAlertHealth()
+	records, err := e.db.LoadAlertHealth(context.Background())
 	if err != nil {
 		return
 	}
@@ -416,9 +416,9 @@ func (e *Engine) Start(ctx context.Context) {
 			default:
 			}
 
-			e.refreshMaintenanceCache()
+			e.refreshMaintenanceCache(ctx)
 
-			sites, err := e.db.GetSites()
+			sites, err := e.db.GetSites(ctx)
 			if err != nil {
 				e.AddLog(fmt.Sprintf("Failed to load sites: %v", err))
 				select {
@@ -475,20 +475,20 @@ func (e *Engine) maintenancePruner(ctx context.Context) {
 	ticker := time.NewTicker(maintPruneInterval)
 	defer ticker.Stop()
 
-	e.pruneMaintenanceWindows()
+	e.pruneMaintenanceWindows(ctx)
 
 	for {
 		select {
 		case <-ticker.C:
-			e.pruneMaintenanceWindows()
+			e.pruneMaintenanceWindows(ctx)
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (e *Engine) pruneMaintenanceWindows() {
-	pruned, err := e.db.PruneExpiredMaintenanceWindows(e.maintRetention)
+func (e *Engine) pruneMaintenanceWindows(ctx context.Context) {
+	pruned, err := e.db.PruneExpiredMaintenanceWindows(ctx, e.maintRetention)
 	if err != nil {
 		e.AddLog(fmt.Sprintf("Maintenance prune error: %v", err))
 		return
@@ -588,7 +588,7 @@ func (e *Engine) monitorRoutine(ctx context.Context, id int) {
 		return
 	}
 
-	e.checkByID(id)
+	e.checkByID(ctx, id)
 	for {
 		select {
 		case <-ctx.Done():
@@ -634,7 +634,7 @@ func (e *Engine) monitorRoutine(ctx context.Context, id int) {
 			return
 		case <-recheckCh:
 		}
-		e.checkByID(id)
+		e.checkByID(ctx, id)
 	}
 }
 
@@ -657,7 +657,7 @@ func (e *Engine) applyState(id int, mutate func(s *models.Site)) (models.Site, b
 	return cur, true
 }
 
-func (e *Engine) checkByID(id int) {
+func (e *Engine) checkByID(ctx context.Context, id int) {
 	if !e.IsActive() {
 		return
 	}
@@ -671,11 +671,11 @@ func (e *Engine) checkByID(id int) {
 
 	switch site.Type {
 	case "push":
-		e.checkPush(site)
+		e.checkPush(ctx, site)
 	case "group":
-		e.checkGroup(site)
+		e.checkGroup(ctx, site)
 	default:
-		result := RunCheck(site, e.strictClient, e.insecureClient, e.insecureSkipVerify, e.allowPrivateTargets)
+		result := RunCheck(ctx, site, e.strictClient, e.insecureClient, e.insecureSkipVerify, e.allowPrivateTargets)
 		updatedSite := site
 		updatedSite.HasSSL = result.HasSSL
 		updatedSite.CertExpiry = result.CertExpiry
@@ -685,7 +685,7 @@ func (e *Engine) checkByID(id int) {
 	}
 }
 
-func (e *Engine) checkPush(site models.Site) {
+func (e *Engine) checkPush(_ context.Context, site models.Site) {
 	if site.Status == "PENDING" {
 		return
 	}
@@ -875,7 +875,7 @@ func (e *Engine) handleStatusChange(snap models.Site, rawStatus string, code int
 }
 
 func (e *Engine) triggerAlert(alertID int, title, message string) {
-	cfg, err := e.db.GetAlert(alertID)
+	cfg, err := e.db.GetAlert(context.Background(), alertID)
 	if err != nil {
 		e.AddLog(fmt.Sprintf("Failed to load alert config %d: %v", alertID, err))
 		return
@@ -928,7 +928,7 @@ func (e *Engine) GetAlertHealth(alertID int) AlertHealth {
 }
 
 func (e *Engine) TestAlert(alertID int) error {
-	cfg, err := e.db.GetAlert(alertID)
+	cfg, err := e.db.GetAlert(context.Background(), alertID)
 	if err != nil {
 		return fmt.Errorf("failed to load alert: %w", err)
 	}
@@ -954,8 +954,8 @@ func (e *Engine) isInMaintenance(monitorID int) bool {
 	return e.maintCache[monitorID]
 }
 
-func (e *Engine) refreshMaintenanceCache() {
-	windows, err := e.db.GetActiveMaintenanceWindows()
+func (e *Engine) refreshMaintenanceCache(ctx context.Context) {
+	windows, err := e.db.GetActiveMaintenanceWindows(ctx)
 	if err != nil {
 		return
 	}
@@ -994,7 +994,7 @@ func (e *Engine) GetDisplayStatus(site models.Site) string {
 	return site.Status
 }
 
-func (e *Engine) checkGroup(site models.Site) {
+func (e *Engine) checkGroup(_ context.Context, site models.Site) {
 	e.mu.RLock()
 	status := "UP"
 	hasChildren := false
@@ -1095,7 +1095,7 @@ func (e *Engine) GetProbeResults(siteID int) map[string]NodeResult {
 }
 
 func (e *Engine) GetStateChanges(siteID int, limit int) []models.StateChange {
-	changes, err := e.db.GetStateChanges(siteID, limit)
+	changes, err := e.db.GetStateChanges(context.Background(), siteID, limit)
 	if err != nil {
 		return nil
 	}
@@ -1103,7 +1103,7 @@ func (e *Engine) GetStateChanges(siteID int, limit int) []models.StateChange {
 }
 
 func (e *Engine) GetStateChangesSince(siteID int, since time.Time) []models.StateChange {
-	changes, err := e.db.GetStateChangesSince(siteID, since)
+	changes, err := e.db.GetStateChangesSince(context.Background(), siteID, since)
 	if err != nil {
 		return nil
 	}

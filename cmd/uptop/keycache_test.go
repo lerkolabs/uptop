@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"errors"
@@ -22,8 +23,8 @@ type kcMockStore struct {
 	err   error
 }
 
-func (m *kcMockStore) GetAllUsers() ([]models.User, error) { return m.users, m.err }
-func (m *kcMockStore) DeleteUser(int) error                { return nil }
+func (m *kcMockStore) GetAllUsers(_ context.Context) ([]models.User, error) { return m.users, m.err }
+func (m *kcMockStore) DeleteUser(_ context.Context, _ int) error            { return nil }
 
 func testKey(t *testing.T) (string, ssh.PublicKey) {
 	t.Helper()
@@ -103,7 +104,7 @@ func TestUserInvalidatingStore_DeleteDropsKeyCache(t *testing.T) {
 
 	// Revoke the user; DB unreachable immediately after. The cached key must
 	// be gone the moment the delete returns.
-	if err := s.DeleteUser(1); err != nil {
+	if err := s.DeleteUser(context.Background(), 1); err != nil {
 		t.Fatal(err)
 	}
 	ms.users = nil

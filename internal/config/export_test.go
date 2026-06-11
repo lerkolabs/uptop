@@ -1,13 +1,15 @@
 package config
 
 import (
-	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
+	"context"
 	"testing"
+
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 )
 
 func TestExportEmpty(t *testing.T) {
 	s := newTestStore(t)
-	f, err := Export(s)
+	f, err := Export(context.Background(), s)
 	if err != nil {
 		t.Fatalf("Export: %v", err)
 	}
@@ -18,11 +20,11 @@ func TestExportEmpty(t *testing.T) {
 
 func TestExportAlertNames(t *testing.T) {
 	s := newTestStore(t)
-	s.AddAlert("Discord", "discord", map[string]string{"url": "https://example.com"})
-	alerts, _ := s.GetAllAlerts()
-	s.AddSite(models.Site{Name: "Web", URL: "https://example.com", Type: "http", Interval: 30, AlertID: alerts[0].ID, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
+	s.AddAlert(context.Background(), "Discord", "discord", map[string]string{"url": "https://example.com"})
+	alerts, _ := s.GetAllAlerts(context.Background())
+	s.AddSite(context.Background(), models.Site{Name: "Web", URL: "https://example.com", Type: "http", Interval: 30, AlertID: alerts[0].ID, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
 
-	f, err := Export(s)
+	f, err := Export(context.Background(), s)
 	if err != nil {
 		t.Fatalf("Export: %v", err)
 	}
@@ -37,11 +39,11 @@ func TestExportAlertNames(t *testing.T) {
 
 func TestExportGroupHierarchy(t *testing.T) {
 	s := newTestStore(t)
-	groupID, _ := s.AddSiteReturningID(models.Site{Name: "Prod", Type: "group", ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
-	s.AddSite(models.Site{Name: "Prod Web", URL: "https://prod.example.com", Type: "http", Interval: 15, ParentID: groupID, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
-	s.AddSite(models.Site{Name: "Top Level", URL: "https://example.com", Type: "http", Interval: 30, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
+	groupID, _ := s.AddSiteReturningID(context.Background(), models.Site{Name: "Prod", Type: "group", ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
+	s.AddSite(context.Background(), models.Site{Name: "Prod Web", URL: "https://prod.example.com", Type: "http", Interval: 15, ParentID: groupID, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
+	s.AddSite(context.Background(), models.Site{Name: "Top Level", URL: "https://example.com", Type: "http", Interval: 30, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
 
-	f, err := Export(s)
+	f, err := Export(context.Background(), s)
 	if err != nil {
 		t.Fatalf("Export: %v", err)
 	}
@@ -70,12 +72,12 @@ func TestExportGroupHierarchy(t *testing.T) {
 
 func TestExportOmitsDefaults(t *testing.T) {
 	s := newTestStore(t)
-	s.AddSite(models.Site{
+	s.AddSite(context.Background(), models.Site{
 		Name: "Web", URL: "https://example.com", Type: "http", Interval: 30,
 		Method: "GET", AcceptedCodes: "200-299", ExpiryThreshold: 7,
 	})
 
-	f, err := Export(s)
+	f, err := Export(context.Background(), s)
 	if err != nil {
 		t.Fatalf("Export: %v", err)
 	}
@@ -94,18 +96,18 @@ func TestExportOmitsDefaults(t *testing.T) {
 
 func TestExportRoundTrip(t *testing.T) {
 	s1 := newTestStore(t)
-	s1.AddAlert("Discord", "discord", map[string]string{"url": "https://example.com"})
-	alerts, _ := s1.GetAllAlerts()
-	s1.AddSite(models.Site{Name: "Web", URL: "https://example.com", Type: "http", Interval: 30, AlertID: alerts[0].ID, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
-	s1.AddSite(models.Site{Name: "Ping", Type: "ping", Hostname: "10.0.0.1", Interval: 60, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
+	s1.AddAlert(context.Background(), "Discord", "discord", map[string]string{"url": "https://example.com"})
+	alerts, _ := s1.GetAllAlerts(context.Background())
+	s1.AddSite(context.Background(), models.Site{Name: "Web", URL: "https://example.com", Type: "http", Interval: 30, AlertID: alerts[0].ID, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
+	s1.AddSite(context.Background(), models.Site{Name: "Ping", Type: "ping", Hostname: "10.0.0.1", Interval: 60, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
 
-	exported, err := Export(s1)
+	exported, err := Export(context.Background(), s1)
 	if err != nil {
 		t.Fatalf("Export: %v", err)
 	}
 
 	s2 := newTestStore(t)
-	changes, err := Apply(s2, exported, ApplyOpts{})
+	changes, err := Apply(context.Background(), s2, exported, ApplyOpts{})
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
@@ -120,7 +122,7 @@ func TestExportRoundTrip(t *testing.T) {
 		t.Fatalf("expected 3 creates, got %d", creates)
 	}
 
-	reexported, err := Export(s2)
+	reexported, err := Export(context.Background(), s2)
 	if err != nil {
 		t.Fatalf("re-Export: %v", err)
 	}

@@ -1,6 +1,9 @@
 package monitor
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 const maxHistoryLen = 60
 
@@ -12,7 +15,7 @@ type SiteHistory struct {
 }
 
 func (e *Engine) InitHistory() {
-	all, err := e.db.LoadAllHistory(maxHistoryLen)
+	all, err := e.db.LoadAllHistory(context.Background(), maxHistoryLen)
 	if err != nil {
 		e.AddLog("Failed to load check history: " + err.Error())
 		return

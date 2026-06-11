@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"os"
 	"time"
 
@@ -180,7 +181,7 @@ func InitialModel(isAdmin bool, s store.Store, eng *monitor.Engine, version stri
 	spring := harmonica.NewSpring(harmonica.FPS(10), 6.0, 0.4)
 	collapsed := loadCollapsed(s)
 
-	themeName, _ := s.GetPreference("theme")
+	themeName, _ := s.GetPreference(context.Background(), "theme")
 	theme := themeByName(themeName)
 	themeIdx := 0
 	for i, t := range themes {

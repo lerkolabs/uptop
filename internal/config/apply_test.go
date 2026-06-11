@@ -1,10 +1,12 @@
 package config
 
 import (
-	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
-	"gitea.lerkolabs.com/lerkolabs/uptop/internal/store"
+	"context"
 	"strings"
 	"testing"
+
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/store"
 )
 
 func newTestStore(t *testing.T) store.Store {
@@ -13,7 +15,7 @@ func newTestStore(t *testing.T) store.Store {
 	if err != nil {
 		t.Fatalf("NewSQLiteStore: %v", err)
 	}
-	if err := s.Init(); err != nil {
+	if err := s.Init(context.Background()); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
 	return s
@@ -31,7 +33,7 @@ func TestApplyCreateFromScratch(t *testing.T) {
 		},
 	}
 
-	changes, err := Apply(s, f, ApplyOpts{})
+	changes, err := Apply(context.Background(), s, f, ApplyOpts{})
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
@@ -46,12 +48,12 @@ func TestApplyCreateFromScratch(t *testing.T) {
 		t.Fatalf("expected 3 creates, got %d", creates)
 	}
 
-	sites, _ := s.GetSites()
+	sites, _ := s.GetSites(context.Background())
 	if len(sites) != 2 {
 		t.Fatalf("expected 2 sites, got %d", len(sites))
 	}
 
-	alerts, _ := s.GetAllAlerts()
+	alerts, _ := s.GetAllAlerts(context.Background())
 	if len(alerts) != 1 {
 		t.Fatalf("expected 1 alert, got %d", len(alerts))
 	}
@@ -68,11 +70,11 @@ func TestApplyIdempotent(t *testing.T) {
 		},
 	}
 
-	if _, err := Apply(s, f, ApplyOpts{}); err != nil {
+	if _, err := Apply(context.Background(), s, f, ApplyOpts{}); err != nil {
 		t.Fatalf("first Apply: %v", err)
 	}
 
-	changes, err := Apply(s, f, ApplyOpts{})
+	changes, err := Apply(context.Background(), s, f, ApplyOpts{})
 	if err != nil {
 		t.Fatalf("second Apply: %v", err)
 	}
@@ -90,12 +92,12 @@ func TestApplyUpdate(t *testing.T) {
 		},
 	}
 
-	if _, err := Apply(s, f, ApplyOpts{}); err != nil {
+	if _, err := Apply(context.Background(), s, f, ApplyOpts{}); err != nil {
 		t.Fatalf("first Apply: %v", err)
 	}
 
 	f.Monitors[0].Interval = 60
-	changes, err := Apply(s, f, ApplyOpts{})
+	changes, err := Apply(context.Background(), s, f, ApplyOpts{})
 	if err != nil {
 		t.Fatalf("second Apply: %v", err)
 	}
@@ -104,7 +106,7 @@ func TestApplyUpdate(t *testing.T) {
 		t.Fatalf("expected 1 update, got %+v", changes)
 	}
 
-	sites, _ := s.GetSites()
+	sites, _ := s.GetSites(context.Background())
 	if sites[0].Interval != 60 {
 		t.Fatalf("expected interval 60, got %d", sites[0].Interval)
 	}
@@ -112,8 +114,8 @@ func TestApplyUpdate(t *testing.T) {
 
 func TestApplyPrune(t *testing.T) {
 	s := newTestStore(t)
-	s.AddSite(models.Site{Name: "Keep", URL: "https://keep.com", Type: "http", Interval: 30, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
-	s.AddSite(models.Site{Name: "Remove", URL: "https://remove.com", Type: "http", Interval: 30, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
+	s.AddSite(context.Background(), models.Site{Name: "Keep", URL: "https://keep.com", Type: "http", Interval: 30, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
+	s.AddSite(context.Background(), models.Site{Name: "Remove", URL: "https://remove.com", Type: "http", Interval: 30, ExpiryThreshold: 7, Method: "GET", AcceptedCodes: "200-299"})
 
 	f := &File{
 		Monitors: []Monitor{
@@ -121,7 +123,7 @@ func TestApplyPrune(t *testing.T) {
 		},
 	}
 
-	changes, err := Apply(s, f, ApplyOpts{Prune: true})
+	changes, err := Apply(context.Background(), s, f, ApplyOpts{Prune: true})
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
@@ -136,7 +138,7 @@ func TestApplyPrune(t *testing.T) {
 		t.Fatalf("expected 1 delete, got %d", deleteCount)
 	}
 
-	sites, _ := s.GetSites()
+	sites, _ := s.GetSites(context.Background())
 	if len(sites) != 1 || sites[0].Name != "Keep" {
 		t.Fatalf("expected only 'Keep', got %+v", sites)
 	}
@@ -150,7 +152,7 @@ func TestApplyDryRun(t *testing.T) {
 		},
 	}
 
-	changes, err := Apply(s, f, ApplyOpts{DryRun: true})
+	changes, err := Apply(context.Background(), s, f, ApplyOpts{DryRun: true})
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
@@ -159,7 +161,7 @@ func TestApplyDryRun(t *testing.T) {
 		t.Fatalf("expected 1 create in dry-run, got %+v", changes)
 	}
 
-	sites, _ := s.GetSites()
+	sites, _ := s.GetSites(context.Background())
 	if len(sites) != 0 {
 		t.Fatalf("expected 0 sites after dry-run, got %d", len(sites))
 	}
@@ -179,7 +181,7 @@ func TestApplyGroupHierarchy(t *testing.T) {
 		},
 	}
 
-	changes, err := Apply(s, f, ApplyOpts{})
+	changes, err := Apply(context.Background(), s, f, ApplyOpts{})
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
@@ -188,7 +190,7 @@ func TestApplyGroupHierarchy(t *testing.T) {
 		t.Fatalf("expected 3 creates, got %d", len(changes))
 	}
 
-	sites, _ := s.GetSites()
+	sites, _ := s.GetSites(context.Background())
 	var group models.Site
 	for _, s := range sites {
 		if s.Type == "group" {
@@ -223,12 +225,12 @@ func TestApplyAlertReference(t *testing.T) {
 		},
 	}
 
-	if _, err := Apply(s, f, ApplyOpts{}); err != nil {
+	if _, err := Apply(context.Background(), s, f, ApplyOpts{}); err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
 
-	sites, _ := s.GetSites()
-	alerts, _ := s.GetAllAlerts()
+	sites, _ := s.GetSites(context.Background())
+	alerts, _ := s.GetAllAlerts(context.Background())
 
 	if sites[0].AlertID != alerts[0].ID {
 		t.Fatalf("expected alert_id %d, got %d", alerts[0].ID, sites[0].AlertID)
@@ -243,7 +245,7 @@ func TestApplyInvalidAlertRef(t *testing.T) {
 		},
 	}
 
-	_, err := Apply(s, f, ApplyOpts{})
+	_, err := Apply(context.Background(), s, f, ApplyOpts{})
 	if err == nil || !strings.Contains(err.Error(), "not found") {
 		t.Fatalf("expected alert not found error, got %v", err)
 	}
@@ -258,7 +260,7 @@ func TestApplyDuplicateNames(t *testing.T) {
 		},
 	}
 
-	_, err := Apply(s, f, ApplyOpts{})
+	_, err := Apply(context.Background(), s, f, ApplyOpts{})
 	if err == nil || !strings.Contains(err.Error(), "duplicate") {
 		t.Fatalf("expected duplicate error, got %v", err)
 	}
@@ -266,7 +268,7 @@ func TestApplyDuplicateNames(t *testing.T) {
 
 func TestApplyExistingAlertReference(t *testing.T) {
 	s := newTestStore(t)
-	s.AddAlert("Existing", "webhook", map[string]string{"url": "https://example.com"})
+	s.AddAlert(context.Background(), "Existing", "webhook", map[string]string{"url": "https://example.com"})
 
 	f := &File{
 		Monitors: []Monitor{
@@ -274,7 +276,7 @@ func TestApplyExistingAlertReference(t *testing.T) {
 		},
 	}
 
-	changes, err := Apply(s, f, ApplyOpts{})
+	changes, err := Apply(context.Background(), s, f, ApplyOpts{})
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
@@ -283,7 +285,7 @@ func TestApplyExistingAlertReference(t *testing.T) {
 		t.Fatalf("expected 1 create, got %+v", changes)
 	}
 
-	sites, _ := s.GetSites()
+	sites, _ := s.GetSites(context.Background())
 	if sites[0].AlertID == 0 {
 		t.Fatal("expected non-zero alert_id for existing alert reference")
 	}

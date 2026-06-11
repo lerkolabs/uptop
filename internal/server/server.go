@@ -255,7 +255,7 @@ func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
 			http.Error(w, "Unauthorized: UPTOP_CLUSTER_SECRET required", http.StatusUnauthorized)
 			return
 		}
-		data, err := s.ExportData()
+		data, err := s.ExportData(r.Context())
 		if err != nil {
 			log.Printf("Export failed: %v", err)
 			http.Error(w, "Export failed", http.StatusInternalServerError)
@@ -285,7 +285,7 @@ func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
 			return
 		}
-		if err := s.ImportData(data); err != nil {
+		if err := s.ImportData(r.Context(), data); err != nil {
 			log.Printf("Import failed: %v", err)
 			http.Error(w, "Import failed", http.StatusInternalServerError)
 			return
@@ -311,7 +311,7 @@ func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
 			return
 		}
 		backup := importer.ConvertKuma(&kb)
-		if err := s.ImportData(backup); err != nil {
+		if err := s.ImportData(r.Context(), backup); err != nil {
 			log.Printf("Kuma import failed: %v", err)
 			http.Error(w, "Import failed", http.StatusInternalServerError)
 			return
@@ -344,7 +344,7 @@ func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
 			http.Error(w, "id is required", http.StatusBadRequest)
 			return
 		}
-		if err := s.RegisterNode(models.ProbeNode{
+		if err := s.RegisterNode(r.Context(), models.ProbeNode{
 			ID: req.ID, Name: req.Name, Region: req.Region, Version: req.Version,
 		}); err != nil {
 			log.Printf("Probe register failed: %v", err)
@@ -367,7 +367,7 @@ func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
 		nodeID := r.URL.Query().Get("node_id")
 		var nodeRegion string
 		if nodeID != "" {
-			if node, err := s.GetNode(nodeID); err == nil {
+			if node, err := s.GetNode(r.Context(), nodeID); err == nil {
 				nodeRegion = node.Region
 			}
 		}
@@ -427,7 +427,7 @@ func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
 			eng.EnqueueProbeCheck(result.SiteID, req.NodeID, result.LatencyNs, result.IsUp)
 			eng.IngestProbeResult(req.NodeID, result.SiteID, result.LatencyNs, result.IsUp, result.ErrorReason)
 		}
-		if err := s.UpdateNodeLastSeen(req.NodeID); err != nil {
+		if err := s.UpdateNodeLastSeen(r.Context(), req.NodeID); err != nil {
 			log.Printf("Failed to update node last seen: %v", err)
 		}
 		_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true}) //nolint:errcheck
@@ -453,7 +453,7 @@ func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
 		mux.HandleFunc("/status", RateLimit(statusRL, func(w http.ResponseWriter, r *http.Request) { renderStatusPage(w, cfg.Title, eng) }))
 		mux.HandleFunc("/status/json", RateLimit(statusRL, func(w http.ResponseWriter, r *http.Request) {
 			state := eng.GetLiveState()
-			activeWindows, _ := s.GetActiveMaintenanceWindows()
+			activeWindows, _ := s.GetActiveMaintenanceWindows(r.Context())
 			maintSet := make(map[int]bool)
 			allInMaint := false
 			for _, mw := range activeWindows {

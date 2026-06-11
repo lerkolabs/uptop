@@ -1,11 +1,13 @@
 package config
 
 import (
+	"context"
 	"fmt"
-	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
-	"gitea.lerkolabs.com/lerkolabs/uptop/internal/store"
 	"reflect"
 	"strings"
+
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/store"
 )
 
 type ApplyOpts struct {
@@ -20,17 +22,17 @@ type Change struct {
 	Details string
 }
 
-func Apply(s store.Store, f *File, opts ApplyOpts) ([]Change, error) {
+func Apply(ctx context.Context, s store.Store, f *File, opts ApplyOpts) ([]Change, error) {
 	if err := Validate(f); err != nil {
 		return nil, err
 	}
 
-	existingAlerts, err := s.GetAllAlerts()
+	existingAlerts, err := s.GetAllAlerts(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load alerts: %w", err)
 	}
 
-	existingSites, err := s.GetSites()
+	existingSites, err := s.GetSites(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load sites: %w", err)
 	}
@@ -59,7 +61,7 @@ func Apply(s store.Store, f *File, opts ApplyOpts) ([]Change, error) {
 		if !exists {
 			changes = append(changes, Change{Action: "create", Kind: "alert", Name: a.Name, Details: a.Type})
 			if !opts.DryRun {
-				id, err := s.AddAlertReturningID(a.Name, a.Type, a.Settings)
+				id, err := s.AddAlertReturningID(ctx, a.Name, a.Type, a.Settings)
 				if err != nil {
 					return changes, fmt.Errorf("create alert %q: %w", a.Name, err)
 				}
@@ -70,7 +72,7 @@ func Apply(s store.Store, f *File, opts ApplyOpts) ([]Change, error) {
 			if diff := diffAlert(existing, a); diff != "" {
 				changes = append(changes, Change{Action: "update", Kind: "alert", Name: a.Name, Details: diff})
 				if !opts.DryRun {
-					if err := s.UpdateAlert(existing.ID, a.Name, a.Type, a.Settings); err != nil {
+					if err := s.UpdateAlert(ctx, existing.ID, a.Name, a.Type, a.Settings); err != nil {
 						return changes, fmt.Errorf("update alert %q: %w", a.Name, err)
 					}
 				}
@@ -102,7 +104,7 @@ func Apply(s store.Store, f *File, opts ApplyOpts) ([]Change, error) {
 		if !exists {
 			changes = append(changes, Change{Action: "create", Kind: "monitor", Name: g.Name, Details: "group"})
 			if !opts.DryRun {
-				id, err := s.AddSiteReturningID(site)
+				id, err := s.AddSiteReturningID(ctx, site)
 				if err != nil {
 					return changes, fmt.Errorf("create group %q: %w", g.Name, err)
 				}
@@ -114,7 +116,7 @@ func Apply(s store.Store, f *File, opts ApplyOpts) ([]Change, error) {
 			if diff := diffSite(normalizeSite(existing), site); diff != "" {
 				changes = append(changes, Change{Action: "update", Kind: "monitor", Name: g.Name, Details: diff})
 				if !opts.DryRun {
-					if err := s.UpdateSite(site); err != nil {
+					if err := s.UpdateSite(ctx, site); err != nil {
 						return changes, fmt.Errorf("update group %q: %w", g.Name, err)
 					}
 				}
@@ -125,7 +127,7 @@ func Apply(s store.Store, f *File, opts ApplyOpts) ([]Change, error) {
 	for _, g := range groups {
 		parentID := groupMap[g.Name]
 		for _, child := range g.Monitors {
-			c, err := applyMonitor(s, child, alertMap, existingSitesByName, parentID, opts.DryRun)
+			c, err := applyMonitor(ctx, s, child, alertMap, existingSitesByName, parentID, opts.DryRun)
 			if err != nil {
 				return changes, err
 			}
@@ -134,7 +136,7 @@ func Apply(s store.Store, f *File, opts ApplyOpts) ([]Change, error) {
 	}
 
 	for _, m := range topLevel {
-		c, err := applyMonitor(s, m, alertMap, existingSitesByName, 0, opts.DryRun)
+		c, err := applyMonitor(ctx, s, m, alertMap, existingSitesByName, 0, opts.DryRun)
 		if err != nil {
 			return changes, err
 		}
@@ -155,7 +157,7 @@ func Apply(s store.Store, f *File, opts ApplyOpts) ([]Change, error) {
 				childDeletes = append(childDeletes, c)
 			}
 			if !opts.DryRun {
-				if err := s.DeleteSite(es.ID); err != nil {
+				if err := s.DeleteSite(ctx, es.ID); err != nil {
 					return changes, fmt.Errorf("delete monitor %q: %w", es.Name, err)
 				}
 			}
@@ -169,7 +171,7 @@ func Apply(s store.Store, f *File, opts ApplyOpts) ([]Change, error) {
 			}
 			changes = append(changes, Change{Action: "delete", Kind: "alert", Name: ea.Name, Details: ea.Type})
 			if !opts.DryRun {
-				if err := s.DeleteAlert(ea.ID); err != nil {
+				if err := s.DeleteAlert(ctx, ea.ID); err != nil {
 					return changes, fmt.Errorf("delete alert %q: %w", ea.Name, err)
 				}
 			}
@@ -179,7 +181,7 @@ func Apply(s store.Store, f *File, opts ApplyOpts) ([]Change, error) {
 	return changes, nil
 }
 
-func applyMonitor(s store.Store, m Monitor, alertMap map[string]int, existing map[string]models.Site, parentID int, dryRun bool) ([]Change, error) {
+func applyMonitor(ctx context.Context, s store.Store, m Monitor, alertMap map[string]int, existing map[string]models.Site, parentID int, dryRun bool) ([]Change, error) {
 	alertID, err := resolveAlertID(alertMap, m.Alert)
 	if err != nil {
 		return nil, fmt.Errorf("monitor %q: %w", m.Name, err)
@@ -191,7 +193,7 @@ func applyMonitor(s store.Store, m Monitor, alertMap map[string]int, existing ma
 	if !exists {
 		changes = append(changes, Change{Action: "create", Kind: "monitor", Name: m.Name, Details: m.Type})
 		if !dryRun {
-			if _, err := s.AddSiteReturningID(site); err != nil {
+			if _, err := s.AddSiteReturningID(ctx, site); err != nil {
 				return changes, fmt.Errorf("create monitor %q: %w", m.Name, err)
 			}
 		}
@@ -200,7 +202,7 @@ func applyMonitor(s store.Store, m Monitor, alertMap map[string]int, existing ma
 		if diff := diffSite(normalizeSite(ex), site); diff != "" {
 			changes = append(changes, Change{Action: "update", Kind: "monitor", Name: m.Name, Details: diff})
 			if !dryRun {
-				if err := s.UpdateSite(site); err != nil {
+				if err := s.UpdateSite(ctx, site); err != nil {
 					return changes, fmt.Errorf("update monitor %q: %w", m.Name, err)
 				}
 			}

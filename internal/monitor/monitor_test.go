@@ -38,37 +38,43 @@ func newMockStore() *mockStore {
 	}
 }
 
-func (m *mockStore) Init() error                                              { return nil }
-func (m *mockStore) GetSites() ([]models.Site, error)                         { return m.sites, nil }
-func (m *mockStore) AddSite(models.Site) error                                { return nil }
-func (m *mockStore) UpdateSite(models.Site) error                             { return nil }
-func (m *mockStore) UpdateSitePaused(int, bool) error                         { return nil }
-func (m *mockStore) DeleteSite(int) error                                     { return nil }
-func (m *mockStore) AddAlert(string, string, map[string]string) error         { return nil }
-func (m *mockStore) UpdateAlert(int, string, string, map[string]string) error { return nil }
-func (m *mockStore) DeleteAlert(int) error                                    { return nil }
-func (m *mockStore) GetAllUsers() ([]models.User, error)                      { return nil, nil }
-func (m *mockStore) AddUser(string, string, string) error                     { return nil }
-func (m *mockStore) UpdateUser(int, string, string, string) error             { return nil }
-func (m *mockStore) DeleteUser(int) error                                     { return nil }
-func (m *mockStore) ExportData() (models.Backup, error)                       { return models.Backup{}, nil }
-func (m *mockStore) ImportData(models.Backup) error                           { return nil }
-func (m *mockStore) GetSiteByName(string) (models.Site, error)                { return models.Site{}, nil }
-func (m *mockStore) AddSiteReturningID(models.Site) (int, error)              { return 0, nil }
-func (m *mockStore) AddAlertReturningID(string, string, map[string]string) (int, error) {
+func (m *mockStore) Init(context.Context) error                                        { return nil }
+func (m *mockStore) GetSites(context.Context) ([]models.Site, error)                   { return m.sites, nil }
+func (m *mockStore) AddSite(context.Context, models.Site) error                        { return nil }
+func (m *mockStore) UpdateSite(context.Context, models.Site) error                     { return nil }
+func (m *mockStore) UpdateSitePaused(context.Context, int, bool) error                 { return nil }
+func (m *mockStore) DeleteSite(context.Context, int) error                             { return nil }
+func (m *mockStore) AddAlert(context.Context, string, string, map[string]string) error { return nil }
+func (m *mockStore) UpdateAlert(context.Context, int, string, string, map[string]string) error {
+	return nil
+}
+func (m *mockStore) DeleteAlert(context.Context, int) error                        { return nil }
+func (m *mockStore) GetAllUsers(context.Context) ([]models.User, error)            { return nil, nil }
+func (m *mockStore) AddUser(context.Context, string, string, string) error         { return nil }
+func (m *mockStore) UpdateUser(context.Context, int, string, string, string) error { return nil }
+func (m *mockStore) DeleteUser(context.Context, int) error                         { return nil }
+func (m *mockStore) ExportData(context.Context) (models.Backup, error)             { return models.Backup{}, nil }
+func (m *mockStore) ImportData(context.Context, models.Backup) error               { return nil }
+func (m *mockStore) GetSiteByName(context.Context, string) (models.Site, error) {
+	return models.Site{}, nil
+}
+func (m *mockStore) AddSiteReturningID(context.Context, models.Site) (int, error) { return 0, nil }
+func (m *mockStore) AddAlertReturningID(context.Context, string, string, map[string]string) (int, error) {
 	return 0, nil
 }
-func (m *mockStore) SaveCheckFromNode(int, string, int64, bool) error { return nil }
-func (m *mockStore) RegisterNode(models.ProbeNode) error              { return nil }
-func (m *mockStore) GetNode(string) (models.ProbeNode, error)         { return models.ProbeNode{}, nil }
-func (m *mockStore) GetAllNodes() ([]models.ProbeNode, error)         { return nil, nil }
-func (m *mockStore) UpdateNodeLastSeen(string) error                  { return nil }
-func (m *mockStore) DeleteNode(string) error                          { return nil }
-func (m *mockStore) LoadAlertHealth() (map[int]models.AlertHealthRecord, error) {
+func (m *mockStore) SaveCheckFromNode(context.Context, int, string, int64, bool) error { return nil }
+func (m *mockStore) RegisterNode(context.Context, models.ProbeNode) error              { return nil }
+func (m *mockStore) GetNode(context.Context, string) (models.ProbeNode, error) {
+	return models.ProbeNode{}, nil
+}
+func (m *mockStore) GetAllNodes(context.Context) ([]models.ProbeNode, error) { return nil, nil }
+func (m *mockStore) UpdateNodeLastSeen(context.Context, string) error        { return nil }
+func (m *mockStore) DeleteNode(context.Context, string) error                { return nil }
+func (m *mockStore) LoadAlertHealth(context.Context) (map[int]models.AlertHealthRecord, error) {
 	return nil, nil
 }
-func (m *mockStore) SaveAlertHealth(models.AlertHealthRecord) error { return nil }
-func (m *mockStore) GetActiveMaintenanceWindows() ([]models.MaintenanceWindow, error) {
+func (m *mockStore) SaveAlertHealth(context.Context, models.AlertHealthRecord) error { return nil }
+func (m *mockStore) GetActiveMaintenanceWindows(context.Context) ([]models.MaintenanceWindow, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var windows []models.MaintenanceWindow
@@ -77,23 +83,27 @@ func (m *mockStore) GetActiveMaintenanceWindows() ([]models.MaintenanceWindow, e
 	}
 	return windows, nil
 }
-func (m *mockStore) GetAllMaintenanceWindows(int) ([]models.MaintenanceWindow, error) {
+func (m *mockStore) GetAllMaintenanceWindows(context.Context, int) ([]models.MaintenanceWindow, error) {
 	return nil, nil
 }
-func (m *mockStore) AddMaintenanceWindow(models.MaintenanceWindow) error         { return nil }
-func (m *mockStore) EndMaintenanceWindow(int) error                              { return nil }
-func (m *mockStore) DeleteMaintenanceWindow(int) error                           { return nil }
-func (m *mockStore) PruneExpiredMaintenanceWindows(time.Duration) (int64, error) { return 0, nil }
-func (m *mockStore) GetPreference(string) (string, error)                        { return "", nil }
-func (m *mockStore) SetPreference(string, string) error                          { return nil }
-func (m *mockStore) SaveStateChange(int, string, string, string) error           { return nil }
-func (m *mockStore) GetStateChanges(int, int) ([]models.StateChange, error)      { return nil, nil }
-func (m *mockStore) GetStateChangesSince(int, time.Time) ([]models.StateChange, error) {
+func (m *mockStore) AddMaintenanceWindow(context.Context, models.MaintenanceWindow) error { return nil }
+func (m *mockStore) EndMaintenanceWindow(context.Context, int) error                      { return nil }
+func (m *mockStore) DeleteMaintenanceWindow(context.Context, int) error                   { return nil }
+func (m *mockStore) PruneExpiredMaintenanceWindows(context.Context, time.Duration) (int64, error) {
+	return 0, nil
+}
+func (m *mockStore) GetPreference(context.Context, string) (string, error)              { return "", nil }
+func (m *mockStore) SetPreference(context.Context, string, string) error                { return nil }
+func (m *mockStore) SaveStateChange(context.Context, int, string, string, string) error { return nil }
+func (m *mockStore) GetStateChanges(context.Context, int, int) ([]models.StateChange, error) {
+	return nil, nil
+}
+func (m *mockStore) GetStateChangesSince(context.Context, int, time.Time) ([]models.StateChange, error) {
 	return nil, nil
 }
 func (m *mockStore) Close() error { return nil }
 
-func (m *mockStore) GetAllAlerts() ([]models.AlertConfig, error) {
+func (m *mockStore) GetAllAlerts(context.Context) ([]models.AlertConfig, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var result []models.AlertConfig
@@ -103,7 +113,7 @@ func (m *mockStore) GetAllAlerts() ([]models.AlertConfig, error) {
 	return result, nil
 }
 
-func (m *mockStore) GetAlert(id int) (models.AlertConfig, error) {
+func (m *mockStore) GetAlert(_ context.Context, id int) (models.AlertConfig, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.getAlertCalls = append(m.getAlertCalls, id)
@@ -113,7 +123,7 @@ func (m *mockStore) GetAlert(id int) (models.AlertConfig, error) {
 	return models.AlertConfig{}, fmt.Errorf("alert %d not found", id)
 }
 
-func (m *mockStore) GetAlertByName(name string) (models.AlertConfig, error) {
+func (m *mockStore) GetAlertByName(_ context.Context, name string) (models.AlertConfig, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, a := range m.alerts {
@@ -124,37 +134,37 @@ func (m *mockStore) GetAlertByName(name string) (models.AlertConfig, error) {
 	return models.AlertConfig{}, fmt.Errorf("alert %q not found", name)
 }
 
-func (m *mockStore) IsMonitorInMaintenance(id int) (bool, error) {
+func (m *mockStore) IsMonitorInMaintenance(_ context.Context, id int) (bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.maintenance[id], nil
 }
 
-func (m *mockStore) SaveCheck(siteID int, latencyNs int64, isUp bool) error {
+func (m *mockStore) SaveCheck(_ context.Context, siteID int, latencyNs int64, isUp bool) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.savedChecks = append(m.savedChecks, savedCheck{siteID, latencyNs, isUp})
 	return nil
 }
 
-func (m *mockStore) SaveLog(msg string) error {
+func (m *mockStore) SaveLog(_ context.Context, msg string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.savedLogs = append(m.savedLogs, msg)
 	return nil
 }
 
-func (m *mockStore) LoadLogs(limit int) ([]string, error) {
+func (m *mockStore) LoadLogs(_ context.Context, limit int) ([]string, error) {
 	return m.logs, nil
 }
 
-func (m *mockStore) LoadAllHistory(limit int) (map[int][]models.CheckRecord, error) {
+func (m *mockStore) LoadAllHistory(_ context.Context, limit int) (map[int][]models.CheckRecord, error) {
 	return m.history, nil
 }
 
-func (m *mockStore) PruneLogs() error         { return nil }
-func (m *mockStore) PruneCheckHistory() error { return nil }
-func (m *mockStore) PruneStateChanges() error { return nil }
+func (m *mockStore) PruneLogs(context.Context) error         { return nil }
+func (m *mockStore) PruneCheckHistory(context.Context) error { return nil }
+func (m *mockStore) PruneStateChanges(context.Context) error { return nil }
 
 // --- Helpers ---
 
@@ -336,7 +346,7 @@ func TestHandleStatusChange_AlertSuppressedMaintenance(t *testing.T) {
 	e := newTestEngine(ms)
 	site := models.Site{ID: 1, Name: "test", Status: "UP", MaxRetries: 0, AlertID: 1}
 	injectSite(e, site)
-	e.refreshMaintenanceCache()
+	e.refreshMaintenanceCache(context.Background())
 
 	e.handleStatusChange(site, "DOWN", 0, 0, "test error")
 
@@ -368,7 +378,7 @@ func TestHandleStatusChange_RecoverySuppressedMaintenance(t *testing.T) {
 	e := newTestEngine(ms)
 	site := models.Site{ID: 1, Name: "test", Status: "DOWN", AlertID: 1}
 	injectSite(e, site)
-	e.refreshMaintenanceCache()
+	e.refreshMaintenanceCache(context.Background())
 
 	e.handleStatusChange(site, "UP", 200, 0, "")
 
@@ -456,7 +466,7 @@ func TestHandleStatusChange_SSLWarningSuppressedMaint(t *testing.T) {
 		CertExpiry: time.Now().Add(15 * 24 * time.Hour),
 	}
 	injectSite(e, site)
-	e.refreshMaintenanceCache()
+	e.refreshMaintenanceCache(context.Background())
 
 	e.handleStatusChange(site, "UP", 200, 0, "")
 
@@ -563,7 +573,7 @@ func TestCheckPush_DeadlineMissed(t *testing.T) {
 	}
 	injectSite(e, site)
 
-	e.checkPush(site)
+	e.checkPush(context.Background(), site)
 
 	s, _ := getSite(e, 1)
 	if s.Status != "DOWN" {
@@ -581,7 +591,7 @@ func TestCheckPush_OverdueBecomesLate(t *testing.T) {
 	}
 	injectSite(e, site)
 
-	e.checkPush(site)
+	e.checkPush(context.Background(), site)
 
 	s, _ := getSite(e, 1)
 	if s.Status != "LATE" {
@@ -601,7 +611,7 @@ func TestCheckPush_OverdueBecomesStale(t *testing.T) {
 	}
 	injectSite(e, site)
 
-	e.checkPush(site)
+	e.checkPush(context.Background(), site)
 
 	s, _ := getSite(e, 1)
 	if s.Status != "STALE" {
@@ -618,7 +628,7 @@ func TestCheckPush_WithinDeadline(t *testing.T) {
 	}
 	injectSite(e, site)
 
-	e.checkPush(site)
+	e.checkPush(context.Background(), site)
 
 	s, _ := getSite(e, 1)
 	if s.Status != "UP" {
@@ -635,7 +645,7 @@ func TestCheckPush_PendingStaysPending(t *testing.T) {
 	}
 	injectSite(e, site)
 
-	e.checkPush(site)
+	e.checkPush(context.Background(), site)
 
 	s, _ := getSite(e, 1)
 	if s.Status != "PENDING" {
@@ -655,7 +665,7 @@ func TestCheckGroup_AllChildrenUp(t *testing.T) {
 	injectSite(e, child1)
 	injectSite(e, child2)
 
-	e.checkGroup(group)
+	e.checkGroup(context.Background(), group)
 
 	s, _ := getSite(e, 1)
 	if s.Status != "UP" {
@@ -673,7 +683,7 @@ func TestCheckGroup_OneChildDown(t *testing.T) {
 	injectSite(e, child1)
 	injectSite(e, child2)
 
-	e.checkGroup(group)
+	e.checkGroup(context.Background(), group)
 
 	s, _ := getSite(e, 1)
 	if s.Status != "DOWN" {
@@ -691,7 +701,7 @@ func TestCheckGroup_PausedChildIgnored(t *testing.T) {
 	injectSite(e, child1)
 	injectSite(e, child2)
 
-	e.checkGroup(group)
+	e.checkGroup(context.Background(), group)
 
 	s, _ := getSite(e, 1)
 	if s.Status != "UP" {
@@ -709,9 +719,9 @@ func TestCheckGroup_MaintenanceChildIgnored(t *testing.T) {
 	injectSite(e, group)
 	injectSite(e, child1)
 	injectSite(e, child2)
-	e.refreshMaintenanceCache()
+	e.refreshMaintenanceCache(context.Background())
 
-	e.checkGroup(group)
+	e.checkGroup(context.Background(), group)
 
 	s, _ := getSite(e, 1)
 	if s.Status != "UP" {
@@ -725,7 +735,7 @@ func TestCheckGroup_NoChildren(t *testing.T) {
 	group := models.Site{ID: 1, Name: "group", Type: "group", Status: "UP"}
 	injectSite(e, group)
 
-	e.checkGroup(group)
+	e.checkGroup(context.Background(), group)
 
 	s, _ := getSite(e, 1)
 	if s.Status != "PENDING" {
@@ -1241,7 +1251,7 @@ func TestCheckGroup_AllPausedNoAutoFreeze(t *testing.T) {
 	injectSite(e, child1)
 	injectSite(e, child2)
 
-	e.checkGroup(group)
+	e.checkGroup(context.Background(), group)
 
 	s, _ := getSite(e, 1)
 	if s.Paused {
@@ -1361,7 +1371,7 @@ func TestIsInMaintenance_UsesCache(t *testing.T) {
 	child := models.Site{ID: 20, Name: "child", Type: "http", ParentID: 10, Status: "UP"}
 	injectSite(e, group)
 	injectSite(e, child)
-	e.refreshMaintenanceCache()
+	e.refreshMaintenanceCache(context.Background())
 
 	if !e.isInMaintenance(10) {
 		t.Error("group should be in maintenance (direct)")
@@ -1381,7 +1391,7 @@ func TestIsInMaintenance_GlobalMaintenance(t *testing.T) {
 	e := newTestEngine(ms)
 	site := models.Site{ID: 1, Name: "test", Type: "http", Status: "UP"}
 	injectSite(e, site)
-	e.refreshMaintenanceCache()
+	e.refreshMaintenanceCache(context.Background())
 
 	if !e.isInMaintenance(1) {
 		t.Error("all monitors should be in maintenance during global window")

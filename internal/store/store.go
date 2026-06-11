@@ -1,84 +1,85 @@
 package store
 
 import (
+	"context"
 	"time"
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 )
 
 type Store interface {
-	Init() error
+	Init(ctx context.Context) error
 
 	// Sites
-	GetSites() ([]models.Site, error)
-	AddSite(site models.Site) error
-	UpdateSite(site models.Site) error
-	UpdateSitePaused(id int, paused bool) error
-	DeleteSite(id int) error
+	GetSites(ctx context.Context) ([]models.Site, error)
+	AddSite(ctx context.Context, site models.Site) error
+	UpdateSite(ctx context.Context, site models.Site) error
+	UpdateSitePaused(ctx context.Context, id int, paused bool) error
+	DeleteSite(ctx context.Context, id int) error
 
 	// Alerts
-	GetAllAlerts() ([]models.AlertConfig, error)
-	GetAlert(id int) (models.AlertConfig, error)
-	AddAlert(name, aType string, settings map[string]string) error
-	UpdateAlert(id int, name, aType string, settings map[string]string) error
-	DeleteAlert(id int) error
+	GetAllAlerts(ctx context.Context) ([]models.AlertConfig, error)
+	GetAlert(ctx context.Context, id int) (models.AlertConfig, error)
+	AddAlert(ctx context.Context, name, aType string, settings map[string]string) error
+	UpdateAlert(ctx context.Context, id int, name, aType string, settings map[string]string) error
+	DeleteAlert(ctx context.Context, id int) error
 
 	// Declarative config support
-	GetSiteByName(name string) (models.Site, error)
-	GetAlertByName(name string) (models.AlertConfig, error)
-	AddSiteReturningID(site models.Site) (int, error)
-	AddAlertReturningID(name, aType string, settings map[string]string) (int, error)
+	GetSiteByName(ctx context.Context, name string) (models.Site, error)
+	GetAlertByName(ctx context.Context, name string) (models.AlertConfig, error)
+	AddSiteReturningID(ctx context.Context, site models.Site) (int, error)
+	AddAlertReturningID(ctx context.Context, name, aType string, settings map[string]string) (int, error)
 
 	// Users
-	GetAllUsers() ([]models.User, error)
-	AddUser(username, publicKey, role string) error
-	UpdateUser(id int, username, publicKey, role string) error
-	DeleteUser(id int) error
+	GetAllUsers(ctx context.Context) ([]models.User, error)
+	AddUser(ctx context.Context, username, publicKey, role string) error
+	UpdateUser(ctx context.Context, id int, username, publicKey, role string) error
+	DeleteUser(ctx context.Context, id int) error
 
 	// History
-	SaveCheck(siteID int, latencyNs int64, isUp bool) error
-	SaveCheckFromNode(siteID int, nodeID string, latencyNs int64, isUp bool) error
-	LoadAllHistory(limit int) (map[int][]models.CheckRecord, error)
-	PruneCheckHistory() error
+	SaveCheck(ctx context.Context, siteID int, latencyNs int64, isUp bool) error
+	SaveCheckFromNode(ctx context.Context, siteID int, nodeID string, latencyNs int64, isUp bool) error
+	LoadAllHistory(ctx context.Context, limit int) (map[int][]models.CheckRecord, error)
+	PruneCheckHistory(ctx context.Context) error
 
 	// State Changes
-	SaveStateChange(siteID int, fromStatus, toStatus, errorReason string) error
-	GetStateChanges(siteID int, limit int) ([]models.StateChange, error)
-	GetStateChangesSince(siteID int, since time.Time) ([]models.StateChange, error)
-	PruneStateChanges() error
+	SaveStateChange(ctx context.Context, siteID int, fromStatus, toStatus, errorReason string) error
+	GetStateChanges(ctx context.Context, siteID int, limit int) ([]models.StateChange, error)
+	GetStateChangesSince(ctx context.Context, siteID int, since time.Time) ([]models.StateChange, error)
+	PruneStateChanges(ctx context.Context) error
 
 	// Nodes
-	RegisterNode(node models.ProbeNode) error
-	GetNode(id string) (models.ProbeNode, error)
-	GetAllNodes() ([]models.ProbeNode, error)
-	UpdateNodeLastSeen(id string) error
-	DeleteNode(id string) error
+	RegisterNode(ctx context.Context, node models.ProbeNode) error
+	GetNode(ctx context.Context, id string) (models.ProbeNode, error)
+	GetAllNodes(ctx context.Context) ([]models.ProbeNode, error)
+	UpdateNodeLastSeen(ctx context.Context, id string) error
+	DeleteNode(ctx context.Context, id string) error
 
 	// Alert Health
-	LoadAlertHealth() (map[int]models.AlertHealthRecord, error)
-	SaveAlertHealth(h models.AlertHealthRecord) error
+	LoadAlertHealth(ctx context.Context) (map[int]models.AlertHealthRecord, error)
+	SaveAlertHealth(ctx context.Context, h models.AlertHealthRecord) error
 
 	// Logs
-	SaveLog(message string) error
-	LoadLogs(limit int) ([]string, error)
-	PruneLogs() error
+	SaveLog(ctx context.Context, message string) error
+	LoadLogs(ctx context.Context, limit int) ([]string, error)
+	PruneLogs(ctx context.Context) error
 
 	// Maintenance Windows
-	GetActiveMaintenanceWindows() ([]models.MaintenanceWindow, error)
-	GetAllMaintenanceWindows(limit int) ([]models.MaintenanceWindow, error)
-	AddMaintenanceWindow(mw models.MaintenanceWindow) error
-	EndMaintenanceWindow(id int) error
-	DeleteMaintenanceWindow(id int) error
-	PruneExpiredMaintenanceWindows(retention time.Duration) (int64, error)
-	IsMonitorInMaintenance(monitorID int) (bool, error)
+	GetActiveMaintenanceWindows(ctx context.Context) ([]models.MaintenanceWindow, error)
+	GetAllMaintenanceWindows(ctx context.Context, limit int) ([]models.MaintenanceWindow, error)
+	AddMaintenanceWindow(ctx context.Context, mw models.MaintenanceWindow) error
+	EndMaintenanceWindow(ctx context.Context, id int) error
+	DeleteMaintenanceWindow(ctx context.Context, id int) error
+	PruneExpiredMaintenanceWindows(ctx context.Context, retention time.Duration) (int64, error)
+	IsMonitorInMaintenance(ctx context.Context, monitorID int) (bool, error)
 
 	// Preferences
-	GetPreference(key string) (string, error)
-	SetPreference(key, value string) error
+	GetPreference(ctx context.Context, key string) (string, error)
+	SetPreference(ctx context.Context, key, value string) error
 
 	// Backup & Restore
-	ExportData() (models.Backup, error)
-	ImportData(data models.Backup) error
+	ExportData(ctx context.Context) (models.Backup, error)
+	ImportData(ctx context.Context, data models.Backup) error
 
 	// Lifecycle
 	Close() error

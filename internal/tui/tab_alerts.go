@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	neturl "net/url"
 	"sort"
@@ -528,10 +529,10 @@ func (m *Model) submitAlertForm() tea.Cmd {
 	m.state = stateDashboard
 	if id > 0 {
 		return writeCmd("Update alert", func() error {
-			return st.UpdateAlert(id, name, aType, settings)
+			return st.UpdateAlert(context.Background(), id, name, aType, settings)
 		})
 	}
 	return writeCmd("Add alert", func() error {
-		return st.AddAlert(name, aType, settings)
+		return st.AddAlert(context.Background(), name, aType, settings)
 	})
 }

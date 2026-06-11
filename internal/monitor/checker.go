@@ -35,7 +35,7 @@ type CheckResult struct {
 	ErrorReason string
 }
 
-func RunCheck(site models.Site, strict, insecure *http.Client, globalInsecure bool, allowPrivate ...bool) CheckResult {
+func RunCheck(ctx context.Context, site models.Site, strict, insecure *http.Client, globalInsecure bool, allowPrivate ...bool) CheckResult {
 	private := len(allowPrivate) > 0 && allowPrivate[0]
 
 	if site.Type != "http" && site.Type != "dns" && !private {
@@ -56,26 +56,26 @@ func RunCheck(site models.Site, strict, insecure *http.Client, globalInsecure bo
 
 	switch site.Type {
 	case "http":
-		return runHTTPCheck(site, strict, insecure, globalInsecure)
+		return runHTTPCheck(ctx, site, strict, insecure, globalInsecure)
 	case "ping":
-		return runPingCheck(site)
+		return runPingCheck(ctx, site)
 	case "port":
-		return runPortCheck(site)
+		return runPortCheck(ctx, site)
 	case "dns":
-		return runDNSCheck(site)
+		return runDNSCheck(ctx, site)
 	default:
 		return CheckResult{SiteID: site.ID, Status: "DOWN", ErrorReason: "unsupported monitor type: " + site.Type}
 	}
 }
 
-func runHTTPCheck(site models.Site, strict, insecure *http.Client, globalInsecure bool) CheckResult {
+func runHTTPCheck(ctx context.Context, site models.Site, strict, insecure *http.Client, globalInsecure bool) CheckResult {
 	method := site.Method
 	if method == "" {
 		method = "GET"
 	}
 
 	timeout := siteTimeout(site)
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, method, site.URL, nil)
@@ -128,7 +128,7 @@ func runHTTPCheck(site models.Site, strict, insecure *http.Client, globalInsecur
 	return result
 }
 
-func runPingCheck(site models.Site) CheckResult {
+func runPingCheck(_ context.Context, site models.Site) CheckResult {
 	host := site.Hostname
 	if host == "" {
 		host = site.URL
@@ -157,7 +157,7 @@ func runPingCheck(site models.Site) CheckResult {
 	return CheckResult{SiteID: site.ID, Status: "UP", LatencyNs: stats.AvgRtt.Nanoseconds()}
 }
 
-func runPortCheck(site models.Site) CheckResult {
+func runPortCheck(_ context.Context, site models.Site) CheckResult {
 	host := site.Hostname
 	if host == "" {
 		host = site.URL
@@ -176,7 +176,7 @@ func runPortCheck(site models.Site) CheckResult {
 	return CheckResult{SiteID: site.ID, Status: "UP", LatencyNs: latency.Nanoseconds()}
 }
 
-func runDNSCheck(site models.Site) CheckResult {
+func runDNSCheck(_ context.Context, site models.Site) CheckResult {
 	host := site.Hostname
 	if host == "" {
 		host = site.URL

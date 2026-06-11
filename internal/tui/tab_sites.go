@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -562,7 +563,7 @@ func (m *Model) submitSiteForm() tea.Cmd {
 		// follows in the Cmd. New sites enter the engine via its poll loop
 		// once the insert lands.
 		m.engine.UpdateSiteConfig(site)
-		return writeCmd("Update site", func() error { return st.UpdateSite(site) })
+		return writeCmd("Update site", func() error { return st.UpdateSite(context.Background(), site) })
 	}
-	return writeCmd("Add site", func() error { return st.AddSite(site) })
+	return writeCmd("Add site", func() error { return st.AddSite(context.Background(), site) })
 }

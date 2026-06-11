@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sort"
@@ -11,13 +12,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func Export(s store.Store) (*File, error) {
-	dbAlerts, err := s.GetAllAlerts()
+func Export(ctx context.Context, s store.Store) (*File, error) {
+	dbAlerts, err := s.GetAllAlerts(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load alerts: %w", err)
 	}
 
-	dbSites, err := s.GetSites()
+	dbSites, err := s.GetSites(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load sites: %w", err)
 	}

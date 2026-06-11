@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -78,17 +79,17 @@ func (m *Model) handleConfirmDelete(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		switch m.deleteTab {
 		case 0:
-			cmd = writeCmd("Delete site", func() error { return st.DeleteSite(id) })
+			cmd = writeCmd("Delete site", func() error { return st.DeleteSite(context.Background(), id) })
 			m.engine.RemoveSite(id)
 			m.adjustCursor(len(m.sites) - 1)
 		case 1:
-			cmd = writeCmd("Delete alert", func() error { return st.DeleteAlert(id) })
+			cmd = writeCmd("Delete alert", func() error { return st.DeleteAlert(context.Background(), id) })
 			m.adjustCursor(len(m.alerts) - 1)
 		case 4:
-			cmd = writeCmd("Delete maintenance window", func() error { return st.DeleteMaintenanceWindow(id) })
+			cmd = writeCmd("Delete maintenance window", func() error { return st.DeleteMaintenanceWindow(context.Background(), id) })
 			m.adjustCursor(len(m.maintenanceWindows) - 1)
 		case 5:
-			cmd = writeCmd("Delete user", func() error { return st.DeleteUser(id) })
+			cmd = writeCmd("Delete user", func() error { return st.DeleteUser(context.Background(), id) })
 			m.adjustCursor(len(m.users) - 1)
 		}
 		m.refreshLive()
@@ -566,7 +567,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			st := m.store
 			m.refreshLive()
 			return m, writeCmd("Save collapsed groups", func() error {
-				return st.SetPreference("collapsed_groups", payload)
+				return st.SetPreference(context.Background(), "collapsed_groups", payload)
 			})
 		}
 	case "p":
@@ -576,7 +577,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			st := m.store
 			m.refreshLive()
 			return m, writeCmd("Update pause state", func() error {
-				return st.UpdateSitePaused(id, paused)
+				return st.UpdateSitePaused(context.Background(), id, paused)
 			})
 		}
 	case "i":
@@ -596,7 +597,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				id := mw.ID
 				m.refreshLive()
 				return m, writeCmd("End maintenance", func() error {
-					return st.EndMaintenanceWindow(id)
+					return st.EndMaintenanceWindow(context.Background(), id)
 				})
 			}
 		}
@@ -607,7 +608,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		st := m.store
 		name := m.theme.Name
 		return m, writeCmd("Save theme", func() error {
-			return st.SetPreference("theme", name)
+			return st.SetPreference(context.Background(), "theme", name)
 		})
 	case "d", "backspace":
 		return m.handleDeleteItem()
