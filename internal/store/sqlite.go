@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 type SQLiteDialect struct{}
@@ -19,16 +19,16 @@ func NewSQLiteStore(path string) (*SQLStore, error) {
 	// these pragmas are no-ops or harmful for the in-memory test DB.)
 	dsn := path
 	if path != ":memory:" {
-		dsn = fmt.Sprintf("file:%s?_journal_mode=WAL&_busy_timeout=5000&_synchronous=NORMAL", path)
+		dsn = fmt.Sprintf("file:%s?_pragma=journal_mode(wal)&_pragma=busy_timeout(5000)&_pragma=synchronous(normal)", path)
 	}
-	s, err := NewSQLStore("sqlite3", dsn, &SQLiteDialect{})
+	s, err := NewSQLStore("sqlite", dsn, &SQLiteDialect{})
 	if err != nil {
 		return nil, err
 	}
 	return s, nil
 }
 
-func (d *SQLiteDialect) DriverName() string { return "sqlite3" }
+func (d *SQLiteDialect) DriverName() string { return "sqlite" }
 func (d *SQLiteDialect) BoolFalse() string  { return "0" }
 
 func (d *SQLiteDialect) CreateTablesSQL() []string {

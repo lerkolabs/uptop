@@ -13,11 +13,14 @@ builds:
   - main: ./cmd/uptop
     binary: uptop
     env:
-      - CGO_ENABLED=1
+      - CGO_ENABLED=0
     goos:
       - linux
+      - darwin
+      - windows
     goarch:
       - amd64
+      - arm64
     ldflags:
       - -s -w
       - -X main.version={{ .Version }}
@@ -29,6 +32,9 @@ builds:
 archives:
   - formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
 
 checksum:
   name_template: checksums.txt
@@ -51,23 +57,6 @@ nfpms:
       - src: ./LICENSE
         dst: /usr/share/doc/uptop/LICENSE
         type: doc
-
-homebrew_casks:
-  - name: uptop
-    homepage: https://gitea.lerkolabs.com/lerkolabs/uptop
-    description: Self-hosted uptime monitoring with a TUI over SSH
-    directory: Casks
-    skip_upload: true
-    commit_msg_template: "update uptop to {{ .Tag }}"
-    url:
-      template: "https://gitea.lerkolabs.com/lerkolabs/uptop/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-    repository:
-      owner: lerkolabs
-      name: homebrew-tap
-      git:
-        url: "ssh://git@gitea.lerkolabs.com:2222/lerkolabs/homebrew-tap.git"
-        private_key: "{{ if index .Env \"TAP_SSH_KEY\" }}{{ .Env.TAP_SSH_KEY }}{{ end }}"
-        ssh_command: "ssh -o StrictHostKeyChecking=accept-new"
 
 changelog:
   disable: true

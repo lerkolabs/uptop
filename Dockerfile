@@ -1,12 +1,11 @@
 # --- Stage 1: Builder ---
 FROM golang:1.26-alpine3.23@sha256:91eda9776261207ea25fd06b5b7fed8d397dd2c0a283e77f2ab6e91bfa71079d AS builder
-RUN apk add --no-cache gcc musl-dev
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 COPY . .
-ENV CGO_ENABLED=1
+ENV CGO_ENABLED=0
 ARG VERSION=dev
 ARG COMMIT=none
 ARG BUILD_DATE=unknown

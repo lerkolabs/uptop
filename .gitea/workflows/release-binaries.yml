@@ -13,7 +13,7 @@ jobs:
         shell: sh
     steps:
       - name: Install build tools
-        run: apk add --no-cache git gcc musl-dev
+        run: apk add --no-cache git
 
       - uses: actions/checkout@v4
         with:
