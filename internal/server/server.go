@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"sort"
@@ -64,11 +64,11 @@ func Start(cfg ServerConfig, s store.Store, eng *monitor.Engine) *http.Server {
 
 func (s *Server) Start() *http.Server {
 	if s.cfg.ClusterKey == "" {
-		fmt.Println("WARNING: No UPTOP_CLUSTER_SECRET set. Cluster API endpoints are unauthenticated.")
+		slog.Warn("no UPTOP_CLUSTER_SECRET set, cluster API endpoints are unauthenticated")
 	}
 
 	if s.cfg.ClusterMode != "" && s.cfg.ClusterMode != "leader" && s.cfg.TLSCert == "" {
-		fmt.Println("WARNING: Cluster mode active without TLS. Secrets transmitted in cleartext.")
+		slog.Warn("cluster mode active without TLS, secrets transmitted in cleartext")
 	}
 
 	handler := s.routes()
@@ -84,14 +84,14 @@ func (s *Server) Start() *http.Server {
 	}
 	go func() {
 		if s.cfg.TLSCert != "" && s.cfg.TLSKey != "" {
-			fmt.Printf("HTTPS Server listening on %s\n", addr)
+			slog.Info("HTTPS server listening", "addr", addr)
 			if err := httpSrv.ListenAndServeTLS(s.cfg.TLSCert, s.cfg.TLSKey); err != nil && err != http.ErrServerClosed {
-				log.Printf("HTTPS server error: %v", err)
+				slog.Error("HTTPS server failed", "err", err)
 			}
 		} else {
-			fmt.Printf("HTTP Server listening on %s\n", addr)
+			slog.Info("HTTP server listening", "addr", addr)
 			if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Printf("HTTP server error: %v", err)
+				slog.Error("HTTP server failed", "err", err)
 			}
 		}
 	}()
@@ -139,7 +139,7 @@ func (s *Server) handlePush(w http.ResponseWriter, r *http.Request) {
 	if token == "" {
 		if qt := r.URL.Query().Get("token"); qt != "" {
 			token = qt
-			log.Printf("DEPRECATED: push token in query string — use Authorization: Bearer header instead")
+			slog.Warn("push token in query string is deprecated, use Authorization: Bearer header")
 		}
 	}
 	if token == "" {
@@ -174,7 +174,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := s.store.ExportData(r.Context())
 	if err != nil {
-		log.Printf("Export failed: %v", err)
+		slog.Error("export failed", "err", err)
 		http.Error(w, "Export failed", http.StatusInternalServerError)
 		return
 	}
@@ -202,7 +202,7 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.ImportData(r.Context(), data); err != nil {
-		log.Printf("Import failed: %v", err)
+		slog.Error("import failed", "err", err)
 		http.Error(w, "Import failed", http.StatusInternalServerError)
 		return
 	}
@@ -221,13 +221,13 @@ func (s *Server) handleKumaImport(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
 	var kb importer.KumaBackup
 	if err := json.NewDecoder(r.Body).Decode(&kb); err != nil {
-		log.Printf("Invalid Kuma JSON: %v", err)
+		slog.Error("invalid Kuma JSON", "err", err)
 		http.Error(w, "Invalid Kuma JSON", http.StatusBadRequest)
 		return
 	}
 	backup := importer.ConvertKuma(&kb)
 	if err := s.store.ImportData(r.Context(), backup); err != nil {
-		log.Printf("Kuma import failed: %v", err)
+		slog.Error("Kuma import failed", "err", err)
 		http.Error(w, "Import failed", http.StatusInternalServerError)
 		return
 	}
@@ -261,7 +261,7 @@ func (s *Server) handleProbeRegister(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.RegisterNode(r.Context(), models.ProbeNode{
 		ID: req.ID, Name: req.Name, Region: req.Region, Version: req.Version,
 	}); err != nil {
-		log.Printf("Probe register failed: %v", err)
+		slog.Error("probe registration failed", "err", err)
 		http.Error(w, "Registration failed", http.StatusInternalServerError)
 		return
 	}
@@ -340,7 +340,7 @@ func (s *Server) handleProbeResults(w http.ResponseWriter, r *http.Request) {
 		s.eng.IngestProbeResult(req.NodeID, result.SiteID, result.LatencyNs, result.IsUp, result.ErrorReason)
 	}
 	if err := s.store.UpdateNodeLastSeen(r.Context(), req.NodeID); err != nil {
-		log.Printf("Failed to update node last seen: %v", err)
+		slog.Error("node last-seen update failed", "err", err)
 	}
 	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true}) //nolint:errcheck
 }
@@ -444,7 +444,7 @@ func loggingMiddleware(trusted []*net.IPNet, next http.Handler) http.Handler {
 		sw := &statusWriter{ResponseWriter: w, code: 200}
 		next.ServeHTTP(sw, r)
 		path := strings.ReplaceAll(strings.ReplaceAll(r.URL.Path, "\n", ""), "\r", "")
-		log.Printf("%s %s %d %s %s", r.Method, path, sw.code, time.Since(start).Round(time.Millisecond), clientIP(r, trusted)) //nolint:gosec // path sanitized above
+		slog.Info("http request", "method", r.Method, "path", path, "status", sw.code, "duration", time.Since(start).Round(time.Millisecond), "ip", clientIP(r, trusted)) //nolint:gosec // structured slog, not format string
 	})
 }
 
@@ -485,7 +485,7 @@ func renderStatusPage(w http.ResponseWriter, title string, eng *monitor.Engine) 
 		Sites []models.Site
 	}{Title: title, Sites: sites}
 	if err := statusTpl.Execute(w, data); err != nil {
-		log.Printf("Failed to render status page: %v", err)
+		slog.Error("status page render failed", "err", err)
 	}
 }
 

@@ -3,7 +3,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 
 	_ "modernc.org/sqlite"
 )
@@ -141,44 +141,44 @@ func (d *SQLiteDialect) ResetSequenceOnEmpty(db *sql.DB, table string) {
 	_ = db.QueryRow("SELECT COUNT(*) FROM " + table).Scan(&count) //nolint:errcheck
 	if count == 0 {
 		if _, err := db.Exec("DELETE FROM sqlite_sequence WHERE name=?", table); err != nil {
-			log.Printf("sequence cleanup error: %v", err)
+			slog.Debug("sequence cleanup failed", "table", table, "err", err)
 		}
 	}
 }
 
 func (d *SQLiteDialect) ImportWipe(tx *sql.Tx) {
 	if _, err := tx.Exec("DELETE FROM sites"); err != nil {
-		log.Printf("import wipe error: %v", err)
+		slog.Debug("import wipe failed", "table", "sites", "err", err)
 	}
 	if _, err := tx.Exec("DELETE FROM sqlite_sequence WHERE name='sites'"); err != nil {
-		log.Printf("import wipe error: %v", err)
+		slog.Debug("import wipe failed", "table", "sqlite_sequence(sites)", "err", err)
 	}
 	if _, err := tx.Exec("DELETE FROM alerts"); err != nil {
-		log.Printf("import wipe error: %v", err)
+		slog.Debug("import wipe failed", "table", "alerts", "err", err)
 	}
 	if _, err := tx.Exec("DELETE FROM sqlite_sequence WHERE name='alerts'"); err != nil {
-		log.Printf("import wipe error: %v", err)
+		slog.Debug("import wipe failed", "table", "sqlite_sequence(alerts)", "err", err)
 	}
 	if _, err := tx.Exec("DELETE FROM users"); err != nil {
-		log.Printf("import wipe error: %v", err)
+		slog.Debug("import wipe failed", "table", "users", "err", err)
 	}
 	if _, err := tx.Exec("DELETE FROM sqlite_sequence WHERE name='users'"); err != nil {
-		log.Printf("import wipe error: %v", err)
+		slog.Debug("import wipe failed", "table", "sqlite_sequence(users)", "err", err)
 	}
 	if _, err := tx.Exec("DELETE FROM maintenance_windows"); err != nil {
-		log.Printf("import wipe error: %v", err)
+		slog.Debug("import wipe failed", "table", "maintenance_windows", "err", err)
 	}
 	if _, err := tx.Exec("DELETE FROM sqlite_sequence WHERE name='maintenance_windows'"); err != nil {
-		log.Printf("import wipe error: %v", err)
+		slog.Debug("import wipe failed", "table", "sqlite_sequence(maintenance_windows)", "err", err)
 	}
 	if _, err := tx.Exec("DELETE FROM check_history"); err != nil {
-		log.Printf("import wipe error: %v", err)
+		slog.Debug("import wipe failed", "table", "check_history", "err", err)
 	}
 	if _, err := tx.Exec("DELETE FROM state_changes"); err != nil {
-		log.Printf("import wipe error: %v", err)
+		slog.Debug("import wipe failed", "table", "state_changes", "err", err)
 	}
 	if _, err := tx.Exec("DELETE FROM alert_health"); err != nil {
-		log.Printf("import wipe error: %v", err)
+		slog.Debug("import wipe failed", "table", "alert_health", "err", err)
 	}
 }
 

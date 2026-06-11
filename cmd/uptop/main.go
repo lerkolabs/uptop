@@ -6,7 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/url"
 	"os"
@@ -40,7 +40,9 @@ var (
 )
 
 func main() {
-	log.SetOutput(os.Stderr)
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})))
 
 	if len(os.Args) >= 2 {
 		switch os.Args[1] {
@@ -110,7 +112,7 @@ func parseTrustedProxies(raw string) []*net.IPNet {
 		}
 		_, ipnet, err := net.ParseCIDR(part)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "WARNING: ignoring invalid UPTOP_TRUSTED_PROXIES entry %q: %v\n", part, err)
+			slog.Warn("ignoring invalid UPTOP_TRUSTED_PROXIES entry", "entry", part, "err", err) //nolint:gosec // structured slog, not format string
 			continue
 		}
 		cidrs = append(cidrs, ipnet)
@@ -127,21 +129,21 @@ func openStore(dbType, dsn string) store.Store {
 		ss, err = store.NewSQLiteStore(dsn)
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "database error: %v\n", err)
+		slog.Error("database connection failed", "err", err)
 		os.Exit(1)
 	}
 	if encKey := os.Getenv("UPTOP_ENCRYPTION_KEY"); encKey != "" {
 		enc, err := store.NewEncryptor(encKey)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "encryption key error: %v\n", err)
+			slog.Error("encryption key invalid", "err", err)
 			os.Exit(1)
 		}
 		ss.SetEncryptor(enc)
 	} else {
-		fmt.Println("WARNING: No UPTOP_ENCRYPTION_KEY set. Alert credentials stored unencrypted.")
+		slog.Warn("no UPTOP_ENCRYPTION_KEY set, alert credentials stored unencrypted")
 	}
 	if err := ss.Init(context.Background()); err != nil {
-		fmt.Fprintf(os.Stderr, "database init error: %v\n", err)
+		slog.Error("database init failed", "err", err)
 		os.Exit(1)
 	}
 	return ss
@@ -166,7 +168,7 @@ func runApply(args []string) {
 
 	f, err := config.LoadFile(*filePath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		slog.Error("config load failed", "err", err)
 		os.Exit(1)
 	}
 
@@ -175,7 +177,7 @@ func runApply(args []string) {
 		Prune:  *prune,
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		slog.Error("config apply failed", "err", err)
 		os.Exit(1)
 	}
 
@@ -193,12 +195,12 @@ func runExport(args []string) {
 
 	f, err := config.Export(context.Background(), s)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		slog.Error("export failed", "err", err)
 		os.Exit(1)
 	}
 
 	if err := config.WriteFile(f, *outPath); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		slog.Error("export write failed", "err", err)
 		os.Exit(1)
 	}
 }
@@ -216,7 +218,7 @@ func runMigrateSecrets(args []string) {
 	}
 	enc, err := store.NewEncryptor(encKey)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		slog.Error("encryption key invalid", "err", err)
 		os.Exit(1)
 	}
 
@@ -227,17 +229,17 @@ func runMigrateSecrets(args []string) {
 		ss, err = store.NewSQLiteStore(*dsn)
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "database error: %v\n", err)
+		slog.Error("database connection failed", "err", err)
 		os.Exit(1)
 	}
 	if err := ss.Init(context.Background()); err != nil {
-		fmt.Fprintf(os.Stderr, "database init error: %v\n", err)
+		slog.Error("database init failed", "err", err)
 		os.Exit(1)
 	}
 
 	alerts, err := ss.GetAllAlerts(context.Background())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error loading alerts: %v\n", err)
+		slog.Error("failed to load alerts", "err", err)
 		os.Exit(1)
 	}
 
@@ -245,7 +247,7 @@ func runMigrateSecrets(args []string) {
 	migrated := 0
 	for _, a := range alerts {
 		if err := ss.UpdateAlert(context.Background(), a.ID, a.Name, a.Type, a.Settings); err != nil {
-			fmt.Fprintf(os.Stderr, "error migrating alert %q: %v\n", a.Name, err)
+			slog.Error("alert migration failed", "alert", a.Name, "err", err)
 			os.Exit(1)
 		}
 		migrated++
@@ -278,7 +280,7 @@ func runServe(args []string) {
 		}()
 
 		if cfg.AllowPrivateTargets {
-			fmt.Println("WARNING: Private target blocking disabled. Monitor URLs can reach internal networks.")
+			slog.Warn("private target blocking disabled, monitor URLs can reach internal networks")
 		}
 
 		if err := cluster.RunProbe(ctx, cluster.ProbeConfig{
@@ -290,7 +292,7 @@ func runServe(args []string) {
 			Interval:            30,
 			AllowPrivateTargets: cfg.AllowPrivateTargets,
 		}); err != nil {
-			fmt.Fprintf(os.Stderr, "Probe error: %v\n", err)
+			slog.Error("probe failed", "err", err)
 		}
 		return
 	}
@@ -307,13 +309,13 @@ func runServe(args []string) {
 	var dbErr error
 	if *flagDBType == "postgres" {
 		ss, dbErr = store.NewPostgresStore(*flagDSN)
-		fmt.Printf("Using PostgreSQL: %s\n", redactDSN(*flagDSN))
+		slog.Info("database connected", "type", "postgres", "dsn", redactDSN(*flagDSN))
 	} else {
 		ss, dbErr = store.NewSQLiteStore(*flagDSN)
-		fmt.Printf("Using SQLite: %s\n", *flagDSN)
+		slog.Info("database connected", "type", "sqlite", "dsn", *flagDSN)
 	}
 	if dbErr != nil {
-		fmt.Fprintf(os.Stderr, "database connection error: %v\n", dbErr)
+		slog.Error("database connection failed", "err", dbErr)
 		os.Exit(1)
 	}
 	defer ss.Close()
@@ -321,18 +323,18 @@ func runServe(args []string) {
 	if cfg.EncryptionKey != "" {
 		enc, err := store.NewEncryptor(cfg.EncryptionKey)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "encryption key error: %v\n", err)
+			slog.Error("encryption key invalid", "err", err)
 			os.Exit(1)
 		}
 		ss.SetEncryptor(enc)
 	} else {
-		fmt.Println("WARNING: No UPTOP_ENCRYPTION_KEY set. Alert credentials stored unencrypted.")
+		slog.Warn("no UPTOP_ENCRYPTION_KEY set, alert credentials stored unencrypted")
 	}
 
 	kc := newKeyCache(ss)
 	var s store.Store = &userInvalidatingStore{Store: ss, kc: kc}
 	if err := s.Init(context.Background()); err != nil {
-		fmt.Fprintf(os.Stderr, "database init error: %v\n", err)
+		slog.Error("database init failed", "err", err)
 		os.Exit(1)
 	}
 	if *demo {
@@ -344,19 +346,19 @@ func runServe(args []string) {
 	if *importKuma != "" {
 		kb, err := importer.LoadKumaFile(*importKuma)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "kuma import error: %v\n", err)
+			slog.Error("kuma import failed", "err", err)
 			os.Exit(1)
 		}
 		backup := importer.ConvertKuma(kb)
 		if err := s.ImportData(context.Background(), backup); err != nil {
-			fmt.Fprintf(os.Stderr, "import failed: %v\n", err)
+			slog.Error("import failed", "err", err)
 			os.Exit(1)
 		}
 		fmt.Printf("Imported %d monitors and %d alerts from Uptime Kuma v%s\n", len(backup.Sites), len(backup.Alerts), kb.Version)
 	}
 
 	if cfg.AllowPrivateTargets {
-		fmt.Println("WARNING: Private target blocking disabled. Monitor URLs can reach internal networks.")
+		slog.Warn("private target blocking disabled, monitor URLs can reach internal networks")
 	}
 
 	eng := monitor.NewEngineWithOpts(s, cfg.AllowPrivateTargets)
@@ -391,7 +393,7 @@ func runServe(args []string) {
 	if localTUI {
 		p := tea.NewProgram(tui.InitialModel(true, s, eng, version), tea.WithAltScreen(), tea.WithMouseCellMotion())
 		if _, err := p.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			slog.Error("TUI failed", "err", err)
 		}
 	} else {
 		fmt.Println("uptop running in HEADLESS mode")
@@ -408,12 +410,12 @@ func runServe(args []string) {
 	defer shutdownCancel()
 	if httpSrv != nil {
 		if err := httpSrv.Shutdown(shutdownCtx); err != nil {
-			log.Printf("HTTP shutdown error: %v", err)
+			slog.Error("HTTP shutdown failed", "err", err)
 		}
 	}
 	if sshSrv != nil {
 		if err := sshSrv.Shutdown(shutdownCtx); err != nil {
-			log.Printf("SSH shutdown error: %v", err)
+			slog.Error("SSH shutdown failed", "err", err)
 		}
 	}
 }
@@ -432,12 +434,12 @@ func startSSHServer(port int, db store.Store, eng *monitor.Engine, kc *keyCache)
 		),
 	)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "SSH server error: %v\n", err)
+		slog.Error("SSH server failed", "err", err)
 		return nil
 	}
 	go func() {
 		if err := s.ListenAndServe(); err != nil && !errors.Is(err, ssh.ErrServerClosed) {
-			log.Printf("SSH server error: %v", err)
+			slog.Error("SSH server failed", "err", err)
 		}
 	}()
 	return s
@@ -452,11 +454,11 @@ func seedDemoData(s store.Store) {
 	fmt.Println("Seeding demo data...")
 
 	if err := s.AddAlert(ctx, "Discord Ops", "discord", map[string]string{"url": "https://discord.com/api/webhooks/demo/token"}); err != nil {
-		log.Printf("demo seed: add alert: %v", err)
+		slog.Error("demo seed failed", "step", "add alert", "err", err)
 		return
 	}
 	if err := s.AddAlert(ctx, "Slack Infra", "slack", map[string]string{"url": "https://hooks.slack.com/services/DEMO/WEBHOOK"}); err != nil {
-		log.Printf("demo seed: add alert: %v", err)
+		slog.Error("demo seed failed", "step", "add alert", "err", err)
 		return
 	}
 	if err := s.AddAlert(ctx, "Email Oncall", "email", map[string]string{
@@ -464,7 +466,7 @@ func seedDemoData(s store.Store) {
 		"user": "oncall@example.com", "pass": "replace-me",
 		"from": "oncall@example.com", "to": "team@example.com",
 	}); err != nil {
-		log.Printf("demo seed: add alert: %v", err)
+		slog.Error("demo seed failed", "step", "add alert", "err", err)
 		return
 	}
 
@@ -488,7 +490,7 @@ func seedDemoData(s store.Store) {
 	}
 	for _, site := range demoSites {
 		if err := s.AddSite(ctx, site); err != nil {
-			log.Printf("demo seed: add site %q: %v", site.Name, err)
+			slog.Error("demo seed failed", "step", "add site", "site", site.Name, "err", err)
 		}
 	}
 }
@@ -511,7 +513,7 @@ func (c *keyCache) refresh() {
 		// Keep the previous key set: a transient DB error must not lock every
 		// admin out. Revocation still fails closed because Invalidate clears
 		// the set immediately.
-		log.Printf("SSH key cache refresh failed: %v", err)
+		slog.Error("SSH key cache refresh failed", "err", err)
 		return
 	}
 	keys := make([]ssh.PublicKey, 0, len(users))
@@ -620,7 +622,7 @@ func seedKeysFromEnv(s store.Store) {
 
 	existing, err := s.GetAllUsers(ctx)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: could not check existing users: %v\n", err)
+		slog.Warn("could not check existing users", "err", err)
 		return
 	}
 
@@ -637,7 +639,7 @@ func seedKeysFromEnv(s store.Store) {
 
 		username := usernameFromKey(key, i, len(existing)+added)
 		if err := s.AddUser(ctx, username, key, "admin"); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: failed to seed user %q: %v\n", username, err)
+			slog.Warn("failed to seed user", "user", username, "err", err) //nolint:gosec // structured slog, not format string
 			continue
 		}
 		fmt.Printf("Seeded admin user %q from %s\n", username, seedSource(i, len(keys), os.Getenv("UPTOP_ADMIN_KEY") != ""))

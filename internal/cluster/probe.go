@@ -6,7 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"sync"
@@ -47,7 +47,7 @@ func RunProbe(ctx context.Context, cfg ProbeConfig) error {
 	}
 
 	if err := probeRegister(ctx, apiClient, cfg); err != nil {
-		log.Printf("Probe: initial registration failed: %v (will retry)", err)
+		slog.Error("probe initial registration failed", "err", err)
 	}
 
 	for {
@@ -59,7 +59,7 @@ func RunProbe(ctx context.Context, cfg ProbeConfig) error {
 
 		sites, err := probeFetchAssignments(ctx, apiClient, cfg)
 		if err != nil {
-			log.Printf("Probe: failed to fetch assignments: %v", err)
+			slog.Error("probe failed to fetch assignments", "err", err)
 			sleepCtx(ctx, 10*time.Second)
 			continue
 		}
@@ -73,7 +73,7 @@ func RunProbe(ctx context.Context, cfg ProbeConfig) error {
 
 		if len(results) > 0 {
 			if err := probeReportResults(ctx, apiClient, cfg, results); err != nil {
-				log.Printf("Probe: failed to report results: %v", err)
+				slog.Error("probe failed to report results", "err", err)
 			}
 		}
 
@@ -189,7 +189,7 @@ func probeReportResults(ctx context.Context, client *http.Client, cfg ProbeConfi
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("results returned %d", resp.StatusCode)
 	}
-	fmt.Printf("Probe: reported %d check results\n", len(results))
+	slog.Info("probe reported check results", "count", len(results))
 	return nil
 }
 
