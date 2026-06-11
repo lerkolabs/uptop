@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -255,64 +254,19 @@ func runMigrateSecrets(args []string) {
 }
 
 func runServe(args []string) {
-	portVal := 23234
-	dbType := "sqlite"
-	dbDSN := "uptop.db"
-	httpPort := 8080
-	enableStatus := false
-	statusTitle := "System Status"
-	clusterMode := "leader"
-	clusterPeer := ""
-	clusterKey := ""
+	cfg := parseConfig()
 
-	if v := os.Getenv("UPTOP_PORT"); v != "" {
-		if p, err := strconv.Atoi(v); err == nil {
-			portVal = p
-		}
-	}
-	if v := os.Getenv("UPTOP_DB_TYPE"); v != "" {
-		dbType = v
-	}
-	if v := os.Getenv("UPTOP_DB_DSN"); v != "" {
-		dbDSN = v
-	}
-	if v := os.Getenv("UPTOP_HTTP_PORT"); v != "" {
-		if p, err := strconv.Atoi(v); err == nil {
-			httpPort = p
-		}
-	}
-	if v := os.Getenv("UPTOP_STATUS_ENABLED"); v == "true" {
-		enableStatus = true
-	}
-	if v := os.Getenv("UPTOP_STATUS_TITLE"); v != "" {
-		statusTitle = v
-	}
-	if v := os.Getenv("UPTOP_CLUSTER_MODE"); v != "" {
-		clusterMode = v
-	}
-	if v := os.Getenv("UPTOP_PEER_URL"); v != "" {
-		clusterPeer = v
-	}
-	if v := os.Getenv("UPTOP_CLUSTER_SECRET"); v != "" {
-		clusterKey = v
-	}
-
-	nodeID := os.Getenv("UPTOP_NODE_ID")
-	nodeName := os.Getenv("UPTOP_NODE_NAME")
-	nodeRegion := os.Getenv("UPTOP_NODE_REGION")
-	aggStrategy := os.Getenv("UPTOP_AGG_STRATEGY")
-
-	if clusterMode == "probe" {
-		if nodeID == "" {
+	if cfg.ClusterMode == "probe" {
+		if cfg.NodeID == "" {
 			fmt.Fprintln(os.Stderr, "UPTOP_NODE_ID is required for probe mode")
 			os.Exit(1)
 		}
-		if clusterPeer == "" {
+		if cfg.PeerURL == "" {
 			fmt.Fprintln(os.Stderr, "UPTOP_PEER_URL is required for probe mode")
 			os.Exit(1)
 		}
 
-		fmt.Printf("Cluster: Running as PROBE (node=%s, region=%s)\n", nodeID, nodeRegion)
+		fmt.Printf("Cluster: Running as PROBE (node=%s, region=%s)\n", cfg.NodeID, cfg.NodeRegion)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -323,19 +277,18 @@ func runServe(args []string) {
 			cancel()
 		}()
 
-		probeAllowPrivate := os.Getenv("UPTOP_ALLOW_PRIVATE_TARGETS") == "true"
-		if probeAllowPrivate {
+		if cfg.AllowPrivateTargets {
 			fmt.Println("WARNING: Private target blocking disabled. Monitor URLs can reach internal networks.")
 		}
 
 		if err := cluster.RunProbe(ctx, cluster.ProbeConfig{
-			NodeID:              nodeID,
-			NodeName:            nodeName,
-			Region:              nodeRegion,
-			LeaderURL:           clusterPeer,
-			SharedKey:           clusterKey,
+			NodeID:              cfg.NodeID,
+			NodeName:            cfg.NodeName,
+			Region:              cfg.NodeRegion,
+			LeaderURL:           cfg.PeerURL,
+			SharedKey:           cfg.ClusterSecret,
 			Interval:            30,
-			AllowPrivateTargets: probeAllowPrivate,
+			AllowPrivateTargets: cfg.AllowPrivateTargets,
 		}); err != nil {
 			fmt.Fprintf(os.Stderr, "Probe error: %v\n", err)
 		}
@@ -343,9 +296,9 @@ func runServe(args []string) {
 	}
 
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
-	port := fs.Int("port", portVal, "SSH Port")
-	flagDBType := fs.String("db-type", dbType, "Database type")
-	flagDSN := fs.String("dsn", dbDSN, "Database DSN")
+	port := fs.Int("port", cfg.Port, "SSH Port")
+	flagDBType := fs.String("db-type", cfg.DBType, "Database type")
+	flagDSN := fs.String("dsn", cfg.DBDSN, "Database DSN")
 	demo := fs.Bool("demo", false, "Seed demo data")
 	importKuma := fs.String("import-kuma", "", "Import Uptime Kuma backup JSON file")
 	_ = fs.Parse(args) // ExitOnError: parse errors exit before returning
@@ -365,8 +318,8 @@ func runServe(args []string) {
 	}
 	defer ss.Close()
 
-	if encKey := os.Getenv("UPTOP_ENCRYPTION_KEY"); encKey != "" {
-		enc, err := store.NewEncryptor(encKey)
+	if cfg.EncryptionKey != "" {
+		enc, err := store.NewEncryptor(cfg.EncryptionKey)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "encryption key error: %v\n", err)
 			os.Exit(1)
@@ -402,23 +355,18 @@ func runServe(args []string) {
 		fmt.Printf("Imported %d monitors and %d alerts from Uptime Kuma v%s\n", len(backup.Sites), len(backup.Alerts), kb.Version)
 	}
 
-	allowPrivate := os.Getenv("UPTOP_ALLOW_PRIVATE_TARGETS") == "true"
-	if allowPrivate {
+	if cfg.AllowPrivateTargets {
 		fmt.Println("WARNING: Private target blocking disabled. Monitor URLs can reach internal networks.")
 	}
 
-	eng := monitor.NewEngineWithOpts(s, allowPrivate)
-	if os.Getenv("UPTOP_INSECURE_SKIP_VERIFY") == "true" {
+	eng := monitor.NewEngineWithOpts(s, cfg.AllowPrivateTargets)
+	if cfg.InsecureSkipVerify {
 		eng.SetInsecureSkipVerify(true)
 	}
-	if aggStrategy != "" {
-		eng.SetAggStrategy(monitor.AggregationStrategy(aggStrategy))
+	if cfg.AggStrategy != "" {
+		eng.SetAggStrategy(monitor.AggregationStrategy(cfg.AggStrategy))
 	}
-	if v := os.Getenv("UPTOP_MAINT_RETENTION"); v != "" {
-		if d, err := time.ParseDuration(v); err == nil && d > 0 {
-			eng.SetMaintRetention(d)
-		}
-	}
+	eng.SetMaintRetention(cfg.MaintRetention)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -428,31 +376,14 @@ func runServe(args []string) {
 	eng.InitAlertHealth()
 	eng.Start(ctx)
 
-	tlsCert := os.Getenv("UPTOP_TLS_CERT")
-	tlsKey := os.Getenv("UPTOP_TLS_KEY")
-
-	// When the local TUI owns the terminal, per-request HTTP logs to stderr
-	// would scribble over the alt screen.
 	localTUI := isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
 
-	httpSrv := server.Start(server.ServerConfig{
-		Port:           httpPort,
-		EnableStatus:   enableStatus,
-		Title:          statusTitle,
-		ClusterKey:     clusterKey,
-		TLSCert:        tlsCert,
-		TLSKey:         tlsKey,
-		ClusterMode:    clusterMode,
-		MetricsPublic:  os.Getenv("UPTOP_METRICS_PUBLIC") == "true",
-		CORSOrigin:     os.Getenv("UPTOP_CORS_ORIGIN"),
-		TrustedProxies: parseTrustedProxies(os.Getenv("UPTOP_TRUSTED_PROXIES")),
-		QuietHTTPLog:   localTUI,
-	}, s, eng)
+	httpSrv := server.Start(cfg.serverConfig(localTUI), s, eng)
 
 	cluster.Start(ctx, cluster.Config{
-		Mode:      clusterMode,
-		PeerURL:   clusterPeer,
-		SharedKey: clusterKey,
+		Mode:      cfg.ClusterMode,
+		PeerURL:   cfg.PeerURL,
+		SharedKey: cfg.ClusterSecret,
 	}, eng)
 
 	sshSrv := startSSHServer(*port, s, eng, kc)
@@ -471,8 +402,6 @@ func runServe(args []string) {
 	}
 	cancel()
 
-	// Drain pending DB writes before the deferred ss.Close() runs, so no
-	// write races a closed database.
 	eng.Stop()
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
