@@ -16,6 +16,11 @@ A follower is a standby replica that takes over if the leader goes down.
 - When the leader recovers, the follower detects it and goes back to standby
 - Both nodes have their own database — they do not share state
 
+**Limitations:**
+- During a network partition where both nodes are healthy, both will run checks and fire alerts independently. There is no leader fencing — the follower has no way to confirm the leader is actually down vs. unreachable from its perspective. This window lasts until the partition heals, at which point the follower detects the leader and steps down.
+- Expect duplicate alerts and doubled check history entries during a split-brain event. Alerts are idempotent for most providers (a second "site is down" notification is noisy but not harmful).
+- Failover takeover time is ~15 seconds (3 missed polls × 5 second interval). This is not configurable.
+
 **Required env vars:**
 
 | Node | Variable | Value |
