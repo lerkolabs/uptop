@@ -122,7 +122,7 @@ Groups can't nest inside other groups. A group is healthy when all its children 
 
 ## Alert types
 
-All 9 providers work in the YAML. The `settings` map is different per type.
+All 10 providers work in the YAML. The `settings` map is different per type.
 
 ```yaml
 # Discord / Slack / Generic Webhook — just a URL
@@ -149,6 +149,9 @@ All 9 providers work in the YAML. The `settings` map is different per type.
     url: https://ntfy.sh
     topic: my-alerts
     priority: "4"
+    # for protected topics:
+    # username: user
+    # password: pass
 
 # Telegram
 - name: Telegram Ops
@@ -178,6 +181,14 @@ All 9 providers work in the YAML. The `settings` map is different per type.
     url: https://gotify.example.com
     token: app-token
     priority: "8"
+
+# Opsgenie
+- name: Opsgenie
+  type: opsgenie
+  settings:
+    api_key: your-api-key
+    priority: P2        # P1–P5, default P3
+    # eu: "true"        # use the EU API endpoint
 ```
 
 ## Commands
@@ -224,7 +235,25 @@ Monitors and alerts are matched by **name**. Names must be unique across the ent
 
 Apply is idempotent. Run it twice with the same file, second run changes nothing.
 
-If something fails mid-apply, just fix the issue and run it again. It picks up where it left off.
+Apply is **not atomic** — items are written one at a time, so an error mid-apply (bad value, lost DB connection, ctrl-C) leaves the items already written in place. That's safe to recover from: apply diffs against the database by name, so fix the issue and run it again — it converges the rest. Just don't run two applies against the same database at once.
+
+## Backups and secrets
+
+`uptop export` writes alert credentials (SMTP passwords, API tokens, webhook URLs) into the YAML in clear text — that's what makes the file restorable. Treat it like a secrets file.
+
+The HTTP export endpoint redacts those same fields **by default**:
+
+```bash
+# secrets show as ***REDACTED*** — fine for sharing or review
+curl -H "X-Uptop-Secret: your-secret" \
+  "http://localhost:8080/api/backup/export"
+
+# full backup you can actually restore from
+curl -H "X-Uptop-Secret: your-secret" \
+  "http://localhost:8080/api/backup/export?redact_secrets=false"
+```
+
+Restoring a redacted export imports the literal string `***REDACTED***` as your credentials. For real backups, pass `redact_secrets=false` or run `uptop export` on the host.
 
 ## Typical workflow
 

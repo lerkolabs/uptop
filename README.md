@@ -30,6 +30,8 @@ Built on [RDGames/go-upkeep](https://github.com/RDGames/go-upkeep). Rewritten fo
 - **SQLite or Postgres** — SQLite for single-node, Postgres for production
 - **Uptime Kuma import** — migrate from Kuma with one command
 
+> Group monitors roll up child status for display but don't fire their own alerts yet — attach alerts to the children.
+
 ## Screenshots
 
 <table>
@@ -79,9 +81,13 @@ services:
       # - UPTOP_ADMIN_KEY=ssh-ed25519 AAAA... you@host
     volumes:
       - ./data:/data
+    sysctls:
+      - net.ipv4.ping_group_range=0 2147483647
 ```
 
 First run: set `UPTOP_ADMIN_KEY` to your SSH public key, or attach to the container and add it in the Users tab.
+
+The `sysctls` line enables unprivileged ICMP inside the container — without it, ping monitors get no response and silently report DOWN.
 
 </details>
 
@@ -161,6 +167,19 @@ Set `UPTOP_ENCRYPTION_KEY` to encrypt alert credentials (SMTP passwords, webhook
     openssl rand -hex 32
 
 Without this, credentials are stored as plaintext in the database. uptop warns on startup if unset. To encrypt credentials on an existing install, run `uptop migrate-secrets` with the key set.
+
+### Data retention
+
+uptop prunes its own history in the background — no external cleanup jobs needed:
+
+| Data | Kept |
+|---|---|
+| Check history | newest 1,000 checks per monitor |
+| State changes (UP/DOWN transitions) | newest 5,000 per monitor |
+| Logs | newest 200 entries |
+| Maintenance windows | 7 days after they end (configurable) |
+
+Sparklines, uptime percentages, and SLA reports are computed from these windows, so very long-horizon stats aren't retained. Export to Prometheus via `/metrics` if you need unlimited history.
 
 ## Clustering
 
