@@ -39,7 +39,7 @@ commit_parsers = [
     { message = "^perf", group = "Changed" },
     { message = "^refactor", group = "Changed" },
     { message = "^security", group = "Security" },
-    { body = ".*security", group = "Security" },
+    { message = "^polish", group = "Changed" },
     { body = "BREAKING", group = "Breaking" },
     { footer = "BREAKING.CHANGE", group = "Breaking" },
     { message = "^docs", skip = true },
