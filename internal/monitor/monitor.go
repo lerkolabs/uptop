@@ -115,10 +115,14 @@ func newEngine(s store.Store, allowPrivateTargets bool) *Engine {
 	}
 }
 
+// SetInsecureSkipVerify must be called before Start: the field is read by
+// checker goroutines without synchronization.
 func (e *Engine) SetInsecureSkipVerify(skip bool) {
 	e.insecureSkipVerify = skip
 }
 
+// SetMaintRetention must be called before Start: the field is read by the
+// maintenance prune goroutine without synchronization.
 func (e *Engine) SetMaintRetention(d time.Duration) {
 	e.maintRetention = d
 }
@@ -1043,6 +1047,8 @@ func (e *Engine) EnqueueProbeCheck(siteID int, nodeID string, latencyNs int64, i
 	e.enqueueWrite(writeProbeCheck{siteID: siteID, nodeID: nodeID, latencyNs: latencyNs, isUp: isUp})
 }
 
+// SetAggStrategy must be called before Start: the field is read by the probe
+// aggregation path without synchronization.
 func (e *Engine) SetAggStrategy(strategy AggregationStrategy) {
 	e.aggStrategy = strategy
 }
