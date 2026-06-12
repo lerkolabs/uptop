@@ -19,22 +19,29 @@ jobs:
         run: |
           API="https://gitea.lerkolabs.com/api/v1/repos/lerkolabs/uptop/releases/tags/${TAG}"
 
-          for i in $(seq 1 20); do
+          # 40 x 30s = 20 min: the Gitea release can queue behind the ~18-min
+          # Docker job on the single runner. Asset count must hold steady for
+          # two consecutive polls — GoReleaser uploads one file at a time, and
+          # mirroring mid-upload would publish a partial asset set.
+          PREV_COUNT=0
+          ASSET_COUNT=0
+          for i in $(seq 1 40); do
             if RESPONSE=$(curl -sf "$API" 2>/dev/null); then
               ASSET_COUNT=$(echo "$RESPONSE" | jq '.assets | length')
-              if [ "$ASSET_COUNT" -gt 0 ]; then
-                echo "Found release with $ASSET_COUNT assets"
+              if [ "$ASSET_COUNT" -gt 0 ] && [ "$ASSET_COUNT" -eq "$PREV_COUNT" ]; then
+                echo "Found release with $ASSET_COUNT assets (stable)"
                 break
               fi
-              echo "Release exists but no assets yet... attempt $i/20"
+              echo "Release has $ASSET_COUNT assets (was $PREV_COUNT)... attempt $i/40"
+              PREV_COUNT="$ASSET_COUNT"
             else
-              echo "Waiting for Gitea release... attempt $i/20"
+              echo "Waiting for Gitea release... attempt $i/40"
             fi
             sleep 30
           done
 
           if [ -z "$RESPONSE" ] || [ "$ASSET_COUNT" -eq 0 ]; then
-            echo "::error::Gitea release for ${TAG} not found or has no assets after 10 minutes"
+            echo "::error::Gitea release for ${TAG} not found or has no assets after 20 minutes"
             exit 1
           fi
 

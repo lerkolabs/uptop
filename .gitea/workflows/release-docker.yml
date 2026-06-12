@@ -35,8 +35,12 @@ jobs:
 
           TAGS="lerkolabs/uptop:${TAG}"
           TAGS="${TAGS},lerkolabs/uptop:sha-${SHORT_SHA}"
+          # :latest only for real releases — rc rehearsal tags must not move it
           if [ "${{ github.ref_type }}" = "tag" ]; then
-            TAGS="${TAGS},lerkolabs/uptop:latest"
+            case "$TAG" in
+              *-*) ;;
+              *) TAGS="${TAGS},lerkolabs/uptop:latest" ;;
+            esac
           fi
           echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
 
@@ -52,6 +56,26 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # Scan must gate the push: build amd64 locally, scan it, and only then run
+      # the multi-arch push (amd64 layers come from the builder cache, so the
+      # second build only adds the arm64 work).
+      - name: Build for scan (amd64, local)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          load: true
+          platforms: linux/amd64
+          tags: uptop-scan:${{ steps.meta.outputs.tag }}
+          build-args: |
+            VERSION=${{ steps.meta.outputs.tag }}
+            COMMIT=${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+
+      - name: Scan image for CVEs
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin v0.114.0
+          grype uptop-scan:${{ steps.meta.outputs.tag }} --fail-on critical --output table
+
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
@@ -65,11 +89,6 @@ jobs:
             VERSION=${{ steps.meta.outputs.tag }}
             COMMIT=${{ github.sha }}
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
-
-      - name: Scan image for CVEs
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin v0.114.0
-          grype lerkolabs/uptop:${{ steps.meta.outputs.tag }} --fail-on critical --output table
 
       - name: Update Docker Hub description
         uses: peter-evans/dockerhub-description@v4
