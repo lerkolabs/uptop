@@ -100,5 +100,7 @@ jobs:
       - name: Cleanup Docker artifacts
         if: always()
         run: |
+          # the scan image is tagged, so image prune won't catch it
+          docker image rm "uptop-scan:${{ steps.meta.outputs.tag }}" 2>/dev/null || true
           docker image prune -f
           docker builder prune -f --keep-storage=2GB
