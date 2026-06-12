@@ -8,6 +8,7 @@ release:
   gitea:
     owner: lerkolabs
     name: uptop
+  prerelease: auto
 
 builds:
   - main: ./cmd/uptop
@@ -58,5 +59,7 @@ nfpms:
         dst: /usr/share/doc/uptop/LICENSE
         type: doc
 
-changelog:
-  disable: true
+# Changelog generation must stay enabled: the --release-notes flag is consumed
+# by the changelog pipe, so disabling it silently drops the git-cliff notes
+# (empty release body on v0.1.0-rc.1). With --release-notes set, GoReleaser
+# skips its own generation and uses the file.
