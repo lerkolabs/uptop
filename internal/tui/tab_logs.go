@@ -82,18 +82,15 @@ func (m Model) renderLogLine(line string) string {
 	return fmt.Sprintf("  %s  %s", tag, msg)
 }
 
-func (m Model) viewLogsTab() string {
-	content := m.logViewport.View()
-	if strings.TrimSpace(content) == "" || content == "Waiting for logs..." {
-		return m.emptyState("No log entries yet.", "Logs appear as monitors run checks")
-	}
-
-	lines := strings.Split(content, "\n")
+// refreshLogContent rebuilds the log viewport from the full engine log list,
+// filtering before windowing so the entry count and "(n hidden)" reflect all
+// logs, not just the visible viewport slice.
+func (m *Model) refreshLogContent() {
 	var rendered []string
 	total := 0
 	shown := 0
 
-	for _, line := range lines {
+	for _, line := range m.engine.GetLogs() {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
@@ -106,18 +103,27 @@ func (m Model) viewLogsTab() string {
 		rendered = append(rendered, m.renderLogLine(line))
 	}
 
+	m.logTotal = total
+	m.logShown = shown
+	m.logViewport.SetContent(strings.Join(rendered, "\n"))
+}
+
+func (m Model) viewLogsTab() string {
+	if m.logTotal == 0 {
+		return m.emptyState("No log entries yet.", "Logs appear as monitors run checks")
+	}
+
 	filterLabel := "All"
 	if m.logFilterImportant {
 		filterLabel = "Important"
 	}
 
 	header := m.st.subtleStyle.Render(fmt.Sprintf(
-		"  %d entries  Filter: %s", shown, filterLabel))
+		"  %d entries  Filter: %s", m.logShown, filterLabel))
 
-	if m.logFilterImportant && shown < total {
-		header += m.st.subtleStyle.Render(fmt.Sprintf("  (%d hidden)", total-shown))
+	if m.logFilterImportant && m.logShown < m.logTotal {
+		header += m.st.subtleStyle.Render(fmt.Sprintf("  (%d hidden)", m.logTotal-m.logShown))
 	}
 
-	m.logViewport.SetContent(strings.Join(rendered, "\n"))
 	return "\n" + header + "\n\n" + m.logViewport.View()
 }

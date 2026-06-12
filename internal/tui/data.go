@@ -104,7 +104,7 @@ func (m *Model) refreshLive() {
 		ordered = filterSites(ordered, m.filterText)
 	}
 	m.sites = ordered
-	m.logViewport.SetContent(strings.Join(m.engine.GetLogs(), "\n"))
+	m.refreshLogContent()
 
 	if m.currentTab == 0 && m.selectedID != 0 {
 		for i, s := range m.sites {

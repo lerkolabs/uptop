@@ -527,6 +527,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "f":
 		if m.state == stateLogs {
 			m.logFilterImportant = !m.logFilterImportant
+			m.refreshLogContent()
 			return m, nil
 		}
 	case "tab":

@@ -121,6 +121,8 @@ type Model struct {
 
 	logViewport        viewport.Model
 	logFilterImportant bool
+	logTotal           int
+	logShown           int
 
 	historyViewport viewport.Model
 	historyChanges  []models.StateChange
