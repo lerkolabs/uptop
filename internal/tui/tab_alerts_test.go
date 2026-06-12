@@ -44,10 +44,7 @@ func TestAlertDetailPanel_MasksSecretsStableOrder(t *testing.T) {
 func TestFmtAlertConfig_MasksSecrets(t *testing.T) {
 	m := newTestModel(&tuiMockStore{})
 
-	webhook := m.fmtAlertConfig(struct {
-		Type     string
-		Settings map[string]string
-	}{"discord", map[string]string{"url": "https://discord.com/api/webhooks/123456/SeCrEtToKeN"}})
+	webhook := m.fmtAlertConfig(models.AlertConfig{Type: "discord", Settings: map[string]string{"url": "https://discord.com/api/webhooks/123456/SeCrEtToKeN"}})
 	if strings.Contains(webhook, "SeCrEtToKeN") || strings.Contains(webhook, "123456") {
 		t.Errorf("webhook URL path (the credential) rendered in table: %q", webhook)
 	}
@@ -55,10 +52,7 @@ func TestFmtAlertConfig_MasksSecrets(t *testing.T) {
 		t.Errorf("webhook host missing from table config: %q", webhook)
 	}
 
-	pd := m.fmtAlertConfig(struct {
-		Type     string
-		Settings map[string]string
-	}{"pagerduty", map[string]string{"routing_key": "R0123456789ABCDEFGHIJ"}})
+	pd := m.fmtAlertConfig(models.AlertConfig{Type: "pagerduty", Settings: map[string]string{"routing_key": "R0123456789ABCDEFGHIJ"}})
 	if strings.Contains(pd, "R0123456789ABCDEFGHIJ") {
 		t.Errorf("pagerduty routing key rendered raw in table: %q", pd)
 	}

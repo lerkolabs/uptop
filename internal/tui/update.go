@@ -110,10 +110,6 @@ func (m *Model) handleConfirmDelete(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleFormMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if wsm, ok := msg.(tea.WindowSizeMsg); ok {
-		m.termWidth = wsm.Width
-		m.termHeight = wsm.Height
-	}
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		if keyMsg.String() == "ctrl+c" {
 			return m, tea.Quit
@@ -609,7 +605,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, writeCmd("Save theme", func() error {
 			return st.SetPreference(context.Background(), "theme", name)
 		})
-	case "d", "backspace":
+	case "d":
 		return m.handleDeleteItem()
 	}
 	return m, nil

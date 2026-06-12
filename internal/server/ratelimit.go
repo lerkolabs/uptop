@@ -25,6 +25,7 @@ type RateLimiter struct {
 	rate     float64
 	burst    float64
 	trusted  []*net.IPNet
+	stop     chan struct{}
 }
 
 func NewRateLimiter(requestsPerMinute int, trusted []*net.IPNet) *RateLimiter {
@@ -33,9 +34,14 @@ func NewRateLimiter(requestsPerMinute int, trusted []*net.IPNet) *RateLimiter {
 		rate:     float64(requestsPerMinute) / 60.0,
 		burst:    float64(requestsPerMinute),
 		trusted:  trusted,
+		stop:     make(chan struct{}),
 	}
 	go rl.cleanup()
 	return rl
+}
+
+func (rl *RateLimiter) Stop() {
+	close(rl.stop)
 }
 
 func (rl *RateLimiter) Allow(ip string) bool {
@@ -84,16 +90,22 @@ func (rl *RateLimiter) evictOldest() {
 }
 
 func (rl *RateLimiter) cleanup() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
 	for {
-		time.Sleep(5 * time.Minute)
-		rl.mu.Lock()
-		cutoff := time.Now().Add(-10 * time.Minute)
-		for ip, v := range rl.visitors {
-			if v.lastSeen.Before(cutoff) {
-				delete(rl.visitors, ip)
+		select {
+		case <-ticker.C:
+			rl.mu.Lock()
+			cutoff := time.Now().Add(-10 * time.Minute)
+			for ip, v := range rl.visitors {
+				if v.lastSeen.Before(cutoff) {
+					delete(rl.visitors, ip)
+				}
 			}
+			rl.mu.Unlock()
+		case <-rl.stop:
+			return
 		}
-		rl.mu.Unlock()
 	}
 }
 

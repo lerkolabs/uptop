@@ -75,10 +75,7 @@ func fmtAlertType(t string) string {
 	}
 }
 
-func (m Model) fmtAlertConfig(alert struct {
-	Type     string
-	Settings map[string]string
-}) string {
+func (m Model) fmtAlertConfig(alert models.AlertConfig) string {
 	switch alert.Type {
 	case "email":
 		host := alert.Settings["host"]
@@ -201,10 +198,7 @@ func (m Model) viewAlertsTab() string {
 					m.fmtAlertHealth(h),
 					m.zones.Mark(fmt.Sprintf("alert-%d", i), limitStr(a.Name, nameW-2)),
 					fmtAlertType(a.Type),
-					limitStr(m.fmtAlertConfig(struct {
-						Type     string
-						Settings map[string]string
-					}{a.Type, a.Settings}), cfgW-2),
+					limitStr(m.fmtAlertConfig(a), cfgW-2),
 					m.fmtAlertLastSent(h),
 				})
 			}

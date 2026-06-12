@@ -131,13 +131,10 @@ func ComputeDailyBreakdown(changes []models.StateChange, currentStatus models.St
 	reports := make([]DayReport, days)
 
 	for i := 0; i < days; i++ {
-		dayEnd := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Add(-time.Duration(i) * 24 * time.Hour)
+		dayStart := time.Date(now.Year(), now.Month(), now.Day()-i, 0, 0, 0, 0, now.Location())
+		dayEnd := time.Date(now.Year(), now.Month(), now.Day()-i+1, 0, 0, 0, 0, now.Location())
 		if i == 0 {
 			dayEnd = now
-		}
-		dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Add(-time.Duration(i) * 24 * time.Hour)
-		if i > 0 {
-			dayEnd = dayStart.Add(24 * time.Hour)
 		}
 
 		windowChanges := filterChangesForWindow(changes, dayStart, dayEnd)

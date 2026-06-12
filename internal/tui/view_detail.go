@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -163,8 +164,14 @@ func (m Model) viewDetailPanel() string {
 
 	probeResults := m.engine.GetProbeResults(site.ID)
 	if len(probeResults) > 0 {
+		nodeIDs := make([]string, 0, len(probeResults))
+		for id := range probeResults {
+			nodeIDs = append(nodeIDs, id)
+		}
+		sort.Strings(nodeIDs)
 		b.WriteString("\n" + m.st.subtleStyle.Render("  PROBE RESULTS") + "\n")
-		for nodeID, result := range probeResults {
+		for _, nodeID := range nodeIDs {
+			result := probeResults[nodeID]
 			status := m.st.specialStyle.Render("UP")
 			if !result.IsUp {
 				status = m.st.dangerStyle.Render("DN")
