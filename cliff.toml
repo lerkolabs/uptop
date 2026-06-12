@@ -23,11 +23,13 @@ filter_unconventional = true
 split_commits = false
 protect_breaking_commits = false
 filter_commits = false
-tag_pattern = "v[0-9].*"
-# rc tags are pipeline rehearsals, not releases — without this, the final
-# tag's notes would only cover commits since the last rc (near-empty for
-# v0.1.0). Ignored tags fold their commits into the next real release.
-ignore_tags = "v.*-rc.*"
+# Only final tags count as releases — rc rehearsal tags must not become
+# section boundaries, or the final tag's notes would cover only
+# commits-since-last-rc (v0.1.0 rendered 0 commits with ignore_tags, which
+# drops rc-tagged commits instead of folding them forward). With rc tags
+# outside the pattern, finals render the full span and rc tags render
+# [Unreleased] with everything pending. Verified empirically on both.
+tag_pattern = 'v[0-9]+\.[0-9]+\.[0-9]+$'
 topo_order = false
 sort_commits = "oldest"
 
