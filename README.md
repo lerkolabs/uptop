@@ -19,6 +19,8 @@ An uptime monitor you manage entirely from the terminal. It runs as a server, ex
 
 Built on [RDGames/go-upkeep](https://github.com/RDGames/go-upkeep). Rewritten for clustering, config-as-code, and a proper dashboard.
 
+Canonical repo: [gitea.lerkolabs.com/lerkolabs/uptop](https://gitea.lerkolabs.com/lerkolabs/uptop) — [GitHub](https://github.com/lerkolabs/uptop) is a mirror; releases are published to both.
+
 ## Features
 
 - **6 check types** — HTTP, Push (heartbeat), Ping, Port, DNS, Groups
@@ -51,14 +53,14 @@ Built on [RDGames/go-upkeep](https://github.com/RDGames/go-upkeep). Rewritten fo
 ## Quick start
 
 ```bash
-go run cmd/uptop/main.go
+go run ./cmd/uptop
 ssh -p 23234 localhost
 ```
 
 Want some data to look at first:
 
 ```bash
-go run cmd/uptop/main.go -demo
+go run ./cmd/uptop -demo
 ```
 
 ## Install
@@ -85,16 +87,16 @@ services:
       - net.ipv4.ping_group_range=0 2147483647
 ```
 
-First run: set `UPTOP_ADMIN_KEY` to your SSH public key, or attach to the container and add it in the Users tab.
+First run: set `UPTOP_ADMIN_KEY` to your SSH public key.
 
 The `sysctls` line enables unprivileged ICMP inside the container — without it, ping monitors get no response and silently report DOWN.
 
 </details>
 
 <details>
-<summary><strong>Binary (Linux amd64)</strong></summary>
+<summary><strong>Binary (Linux, macOS, Windows)</strong></summary>
 
-Download from [Releases](https://github.com/lerkolabs/uptop/releases).
+Download from [Releases](https://github.com/lerkolabs/uptop/releases) — amd64 and arm64 tarballs (zip for Windows), plus `.deb`/`.rpm` packages and `checksums.txt`.
 
 </details>
 
