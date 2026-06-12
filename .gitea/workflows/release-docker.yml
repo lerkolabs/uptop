@@ -3,11 +3,11 @@ name: Release Docker
 on:
   push:
     tags:
-      - "[0-9]*"
+      - "v[0-9]*"
   workflow_dispatch:
     inputs:
       tag:
-        description: "Image tag (e.g. 2026.06.1). Defaults to latest commit SHA."
+        description: "Image tag (e.g. 1.0.0, no v prefix). Defaults to latest commit SHA."
         required: false
 
 jobs:
@@ -27,7 +27,9 @@ jobs:
               TAG="${{ github.sha }}"
             fi
           else
+            # Docker convention: git tag v1.2.3 -> image tag 1.2.3
             TAG="${{ github.ref_name }}"
+            TAG="${TAG#v}"
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
