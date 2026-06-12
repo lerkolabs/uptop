@@ -5,6 +5,13 @@ services:
       dockerfile: Dockerfile
     container_name: uptop
     restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
     ports:
       - "23234:23234"
       - "8080:8080"

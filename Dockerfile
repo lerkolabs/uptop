@@ -31,6 +31,8 @@ ENV UPTOP_SSH_HOST_KEY=/data/.ssh/id_ed25519
 ENV UPTOP_PORT=23234
 
 EXPOSE 23234
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost:8080/api/health || exit 1
 USER uptop
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["./uptop"]

@@ -237,13 +237,13 @@ func runMigrateSecrets(args []string) {
 		os.Exit(1)
 	}
 
+	ss.SetEncryptor(enc)
+
 	alerts, err := ss.GetAllAlerts(context.Background())
 	if err != nil {
 		slog.Error("failed to load alerts", "err", err)
 		os.Exit(1)
 	}
-
-	ss.SetEncryptor(enc)
 	migrated := 0
 	for _, a := range alerts {
 		if err := ss.UpdateAlert(context.Background(), a.ID, a.Name, a.Type, a.Settings); err != nil {

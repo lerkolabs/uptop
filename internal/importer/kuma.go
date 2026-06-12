@@ -1,6 +1,8 @@
 package importer
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -156,10 +158,18 @@ func convertKumaMonitor(m KumaMonitor, alertMap map[int]int) models.SiteConfig {
 	site.DNSResolveType = m.DNSResolveType
 	site.DNSServer = m.DNSResolveServer
 
+	site.Paused = !m.Active
+
 	switch m.Type {
 	case "http":
 		site.URL = m.URL
 		site.CheckSSL = m.ExpiryNotif
+	case "push":
+		site.Type = "push"
+		b := make([]byte, 16)
+		if _, err := rand.Read(b); err == nil {
+			site.Token = hex.EncodeToString(b)
+		}
 	case "ping":
 		if m.Hostname != "" {
 			site.Hostname = m.Hostname
