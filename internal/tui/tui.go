@@ -80,6 +80,8 @@ const (
 	chromeFooter = 2 // footer: "\n" prefix + text line
 	chromeTable  = 3 // renderTable "\n" prefix + top border + header + bottom border (lipgloss collapses two into three rendered lines)
 	chromeBase   = chromePadV + chromeHeader + chromeGaps + chromeFooter + chromeTable
+
+	detailSparkWidth = 40
 )
 
 type sessionState int

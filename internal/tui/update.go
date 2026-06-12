@@ -162,7 +162,7 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.historyViewport.Height = msg.Height - 10
 	m.slaViewport.Width = msg.Width - chromePadH
 	m.slaViewport.Height = msg.Height - 16
-	return m, tea.ClearScreen
+	return m, nil
 }
 
 func (m *Model) handleTick(t time.Time) (tea.Model, tea.Cmd) {
@@ -392,16 +392,14 @@ func (m *Model) handleSparklineClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	site := m.sites[m.cursor]
 	hist, _ := m.engine.GetHistory(site.ID)
 
-	const sparkWidth = 40
-
 	if zi := m.zones.Get("spark-latency"); zi != nil && !zi.IsZero() && zi.InBounds(msg) {
 		x, _ := zi.Pos(msg)
-		m.sparkTooltipIdx = resolveSparklineIndex(x, sparkWidth, len(hist.Latencies))
+		m.sparkTooltipIdx = resolveSparklineIndex(x, detailSparkWidth, len(hist.Latencies))
 		return m, nil
 	}
 	if zi := m.zones.Get("spark-heartbeat"); zi != nil && !zi.IsZero() && zi.InBounds(msg) {
 		x, _ := zi.Pos(msg)
-		m.sparkTooltipIdx = resolveSparklineIndex(x, sparkWidth, len(hist.Statuses))
+		m.sparkTooltipIdx = resolveSparklineIndex(x, detailSparkWidth, len(hist.Statuses))
 		return m, nil
 	}
 

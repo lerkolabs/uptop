@@ -207,9 +207,8 @@ func (m Model) viewDetailPanel() string {
 	}
 
 	b.WriteString(m.divider() + "\n")
-	const sparkWidth = 40
 	if site.Type == "push" {
-		b.WriteString("  " + m.zones.Mark("spark-heartbeat", m.heartbeatSparkline(hist.Statuses, sparkWidth, "")))
+		b.WriteString("  " + m.zones.Mark("spark-heartbeat", m.heartbeatSparkline(hist.Statuses, detailSparkWidth, "")))
 		if len(hist.Statuses) > 0 {
 			up := 0
 			for _, s := range hist.Statuses {
@@ -222,7 +221,7 @@ func (m Model) viewDetailPanel() string {
 				up, len(hist.Statuses))
 		}
 	} else {
-		b.WriteString("  " + m.zones.Mark("spark-latency", m.latencySparkline(hist.Latencies, hist.Statuses, sparkWidth, "")))
+		b.WriteString("  " + m.zones.Mark("spark-latency", m.latencySparkline(hist.Latencies, hist.Statuses, detailSparkWidth, "")))
 		var minL, maxL, total time.Duration
 		count := 0
 		for i, l := range hist.Latencies {
@@ -249,7 +248,7 @@ func (m Model) viewDetailPanel() string {
 	}
 
 	if m.sparkTooltipIdx >= 0 {
-		b.WriteString("\n" + m.renderSparkTooltip(site, hist, sparkWidth))
+		b.WriteString("\n" + m.renderSparkTooltip(site, hist, detailSparkWidth))
 	}
 
 	b.WriteString("\n")
