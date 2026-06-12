@@ -276,6 +276,31 @@ func TestImportData_WipesHistory(t *testing.T) {
 	}
 }
 
+func TestImportData_NilUsersPreservesExisting(t *testing.T) {
+	s := newTestStore(t)
+
+	if err := s.AddUser(context.Background(), "admin", "ssh-ed25519 ADMINKEY", "admin"); err != nil {
+		t.Fatalf("AddUser: %v", err)
+	}
+
+	backup := models.Backup{
+		Sites:  []models.SiteConfig{{ID: 1, Name: "New", URL: "https://new.com", Type: "http", Interval: 30}},
+		Alerts: []models.AlertConfig{{ID: 1, Name: "a", Type: "webhook", Settings: map[string]string{"url": "https://h.com"}}},
+		Users:  nil,
+	}
+	if err := s.ImportData(context.Background(), backup); err != nil {
+		t.Fatalf("ImportData: %v", err)
+	}
+
+	users, err := s.GetAllUsers(context.Background())
+	if err != nil {
+		t.Fatalf("GetAllUsers: %v", err)
+	}
+	if len(users) != 1 || users[0].Username != "admin" {
+		t.Errorf("expected existing admin user preserved, got %d users", len(users))
+	}
+}
+
 func TestCheckHistory(t *testing.T) {
 	s := newTestStore(t)
 

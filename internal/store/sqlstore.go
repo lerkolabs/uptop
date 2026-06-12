@@ -742,9 +742,14 @@ func (s *SQLStore) ImportData(ctx context.Context, data models.Backup) error {
 
 	s.dialect.ImportWipe(tx)
 
-	for _, u := range data.Users {
-		if _, err := tx.ExecContext(ctx, s.q("INSERT INTO users (username, public_key, role) VALUES (?, ?, ?)"), u.Username, u.PublicKey, u.Role); err != nil {
-			return err
+	// Only wipe+replace users when callers explicitly provide them (CLI
+	// full restore). API/Kuma imports pass nil — existing users preserved.
+	if data.Users != nil {
+		s.dialect.ImportWipeUsers(tx)
+		for _, u := range data.Users {
+			if _, err := tx.ExecContext(ctx, s.q("INSERT INTO users (username, public_key, role) VALUES (?, ?, ?)"), u.Username, u.PublicKey, u.Role); err != nil {
+				return err
+			}
 		}
 	}
 	for _, a := range data.Alerts {

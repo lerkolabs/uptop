@@ -167,12 +167,6 @@ func (d *SQLiteDialect) ImportWipe(tx *sql.Tx) {
 	if _, err := tx.Exec("DELETE FROM sqlite_sequence WHERE name='alerts'"); err != nil {
 		slog.Debug("import wipe failed", "table", "sqlite_sequence(alerts)", "err", err)
 	}
-	if _, err := tx.Exec("DELETE FROM users"); err != nil {
-		slog.Debug("import wipe failed", "table", "users", "err", err)
-	}
-	if _, err := tx.Exec("DELETE FROM sqlite_sequence WHERE name='users'"); err != nil {
-		slog.Debug("import wipe failed", "table", "sqlite_sequence(users)", "err", err)
-	}
 	if _, err := tx.Exec("DELETE FROM maintenance_windows"); err != nil {
 		slog.Debug("import wipe failed", "table", "maintenance_windows", "err", err)
 	}
@@ -187,6 +181,15 @@ func (d *SQLiteDialect) ImportWipe(tx *sql.Tx) {
 	}
 	if _, err := tx.Exec("DELETE FROM alert_health"); err != nil {
 		slog.Debug("import wipe failed", "table", "alert_health", "err", err)
+	}
+}
+
+func (d *SQLiteDialect) ImportWipeUsers(tx *sql.Tx) {
+	if _, err := tx.Exec("DELETE FROM users"); err != nil {
+		slog.Debug("import wipe failed", "table", "users", "err", err)
+	}
+	if _, err := tx.Exec("DELETE FROM sqlite_sequence WHERE name='users'"); err != nil {
+		slog.Debug("import wipe failed", "table", "sqlite_sequence(users)", "err", err)
 	}
 }
 

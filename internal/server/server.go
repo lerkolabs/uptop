@@ -205,12 +205,15 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
+	// API import never modifies users — cluster-secret holder shouldn't be
+	// able to replace admin accounts. CLI restore still does full import.
+	data.Users = nil
 	if err := s.store.ImportData(r.Context(), data); err != nil {
 		slog.Error("import failed", "err", err)
 		http.Error(w, "Import failed", http.StatusInternalServerError)
 		return
 	}
-	_, _ = w.Write([]byte("Import Successful"))
+	_, _ = w.Write([]byte("Import Successful (users excluded — manage via CLI or UPTOP_KEYS)"))
 }
 
 func (s *Server) handleKumaImport(w http.ResponseWriter, r *http.Request) {

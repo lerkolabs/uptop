@@ -18,6 +18,7 @@ type Dialect interface {
 	BoolFalse() string
 	ResetSequenceOnEmpty(db *sql.DB, table string)
 	ImportWipe(tx *sql.Tx)
+	ImportWipeUsers(tx *sql.Tx)
 	ImportResetSequences(tx *sql.Tx)
 	UpsertNodeSQL() string
 	UpsertAlertHealthSQL() string

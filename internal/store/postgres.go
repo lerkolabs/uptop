@@ -138,9 +138,6 @@ func (d *PostgresDialect) ImportWipe(tx *sql.Tx) {
 	if _, err := tx.Exec("TRUNCATE TABLE alerts RESTART IDENTITY CASCADE"); err != nil {
 		slog.Debug("import wipe failed", "table", "alerts", "err", err)
 	}
-	if _, err := tx.Exec("TRUNCATE TABLE users RESTART IDENTITY CASCADE"); err != nil {
-		slog.Debug("import wipe failed", "table", "users", "err", err)
-	}
 	if _, err := tx.Exec("TRUNCATE TABLE maintenance_windows RESTART IDENTITY CASCADE"); err != nil {
 		slog.Debug("import wipe failed", "table", "maintenance_windows", "err", err)
 	}
@@ -152,6 +149,12 @@ func (d *PostgresDialect) ImportWipe(tx *sql.Tx) {
 	}
 	if _, err := tx.Exec("TRUNCATE TABLE alert_health RESTART IDENTITY CASCADE"); err != nil {
 		slog.Debug("import wipe failed", "table", "alert_health", "err", err)
+	}
+}
+
+func (d *PostgresDialect) ImportWipeUsers(tx *sql.Tx) {
+	if _, err := tx.Exec("TRUNCATE TABLE users RESTART IDENTITY CASCADE"); err != nil {
+		slog.Debug("import wipe failed", "table", "users", "err", err)
 	}
 }
 
