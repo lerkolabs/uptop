@@ -161,6 +161,43 @@ func TestRunCheck_Port_Closed(t *testing.T) {
 	}
 }
 
+func TestRunPortCheck_UsesPinnedIP(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+
+	_, portStr, _ := net.SplitHostPort(ln.Addr().String())
+	port, _ := strconv.Atoi(portStr)
+
+	// Pass a pinned IP — runPortCheck should dial it instead of resolving Hostname.
+	site := models.SiteConfig{ID: 1, Type: "port", Hostname: "will-not-resolve.invalid", Port: port, Timeout: 2}
+	result := runPortCheck(context.Background(), site, net.ParseIP("127.0.0.1"))
+
+	if result.Status != "UP" {
+		t.Errorf("expected UP when pinned IP used, got %s: %s", result.Status, result.ErrorReason)
+	}
+}
+
+func TestRunPortCheck_NilPinnedIP_UsesHostname(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+
+	_, portStr, _ := net.SplitHostPort(ln.Addr().String())
+	port, _ := strconv.Atoi(portStr)
+
+	site := models.SiteConfig{ID: 1, Type: "port", Hostname: "127.0.0.1", Port: port, Timeout: 2}
+	result := runPortCheck(context.Background(), site, nil)
+
+	if result.Status != "UP" {
+		t.Errorf("expected UP with nil pinnedIP fallback, got %s: %s", result.Status, result.ErrorReason)
+	}
+}
+
 func TestRunCheck_Port_BlocksPrivateByDefault(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

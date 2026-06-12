@@ -37,19 +37,26 @@ type CheckResult struct {
 }
 
 func RunCheck(ctx context.Context, site models.SiteConfig, strict, insecure *http.Client, globalInsecure, allowPrivate bool) CheckResult {
+	// Resolve + validate once for non-HTTP types to prevent DNS-rebind TOCTOU:
+	// a second resolve in the check function could return a different (private) IP.
+	// HTTP is safe — SafeDialContext resolves and validates at dial time.
+	var pinnedIP net.IP
 	if site.Type != "http" && site.Type != "dns" && !allowPrivate {
 		host := site.Hostname
 		if host == "" {
 			host = site.URL
 		}
 		if host != "" {
-			if ips, err := net.LookupIP(host); err == nil {
-				for _, ip := range ips {
-					if isPrivateIP(ip) {
-						return CheckResult{SiteID: site.ID, Status: string(models.StatusDown), ErrorReason: "target resolves to private IP"}
-					}
+			ips, err := net.LookupIP(host)
+			if err != nil {
+				return CheckResult{SiteID: site.ID, Status: string(models.StatusDown), ErrorReason: "resolve failed: " + err.Error()}
+			}
+			for _, ip := range ips {
+				if isPrivateIP(ip) {
+					return CheckResult{SiteID: site.ID, Status: string(models.StatusDown), ErrorReason: "target resolves to private IP"}
 				}
 			}
+			pinnedIP = ips[0]
 		}
 	}
 
@@ -57,9 +64,9 @@ func RunCheck(ctx context.Context, site models.SiteConfig, strict, insecure *htt
 	case "http":
 		return runHTTPCheck(ctx, site, strict, insecure, globalInsecure)
 	case "ping":
-		return runPingCheck(ctx, site)
+		return runPingCheck(ctx, site, pinnedIP)
 	case "port":
-		return runPortCheck(ctx, site)
+		return runPortCheck(ctx, site, pinnedIP)
 	case "dns":
 		return runDNSCheck(ctx, site, allowPrivate)
 	default:
@@ -130,7 +137,7 @@ func runHTTPCheck(ctx context.Context, site models.SiteConfig, strict, insecure 
 	return result
 }
 
-func runPingCheck(_ context.Context, site models.SiteConfig) CheckResult {
+func runPingCheck(_ context.Context, site models.SiteConfig, pinnedIP net.IP) CheckResult {
 	host := site.Hostname
 	if host == "" {
 		host = site.URL
@@ -139,6 +146,9 @@ func runPingCheck(_ context.Context, site models.SiteConfig) CheckResult {
 	pinger, err := probing.NewPinger(host)
 	if err != nil {
 		return CheckResult{SiteID: site.ID, Status: string(models.StatusDown), ErrorReason: "ping setup: " + err.Error()}
+	}
+	if pinnedIP != nil {
+		pinger.SetIPAddr(&net.IPAddr{IP: pinnedIP})
 	}
 	pinger.Count = 1
 	pinger.Timeout = siteTimeout(site)
@@ -159,10 +169,13 @@ func runPingCheck(_ context.Context, site models.SiteConfig) CheckResult {
 	return CheckResult{SiteID: site.ID, Status: string(models.StatusUp), LatencyNs: stats.AvgRtt.Nanoseconds()}
 }
 
-func runPortCheck(_ context.Context, site models.SiteConfig) CheckResult {
+func runPortCheck(_ context.Context, site models.SiteConfig, pinnedIP net.IP) CheckResult {
 	host := site.Hostname
 	if host == "" {
 		host = site.URL
+	}
+	if pinnedIP != nil {
+		host = pinnedIP.String()
 	}
 	addr := net.JoinHostPort(host, strconv.Itoa(site.Port))
 	timeout := siteTimeout(site)
