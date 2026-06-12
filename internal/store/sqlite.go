@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"os"
 
 	_ "modernc.org/sqlite"
 )
@@ -24,6 +25,13 @@ func NewSQLiteStore(path string) (*SQLStore, error) {
 	s, err := NewSQLStore("sqlite", dsn, &SQLiteDialect{})
 	if err != nil {
 		return nil, err
+	}
+	if path != ":memory:" {
+		for _, suffix := range []string{"", "-wal", "-shm"} {
+			if err := os.Chmod(path+suffix, 0600); err != nil && !os.IsNotExist(err) {
+				slog.Warn("failed to chmod database file", "path", path+suffix, "err", err)
+			}
+		}
 	}
 	return s, nil
 }
