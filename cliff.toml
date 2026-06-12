@@ -24,6 +24,10 @@ split_commits = false
 protect_breaking_commits = false
 filter_commits = false
 tag_pattern = "v[0-9].*"
+# rc tags are pipeline rehearsals, not releases — without this, the final
+# tag's notes would only cover commits since the last rc (near-empty for
+# v0.1.0). Ignored tags fold their commits into the next real release.
+ignore_tags = "v.*-rc.*"
 topo_order = false
 sort_commits = "oldest"
 

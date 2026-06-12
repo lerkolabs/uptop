@@ -1,6 +1,11 @@
 ignore:
-  # CVE-2026-41589: SCP path traversal in charmbracelet/wish.
+  # SCP path traversal in charmbracelet/wish — same flaw, two ids: grype has
+  # matched it as CVE-2026-41589 and as GHSA-xjvp-7243-rg9h depending on db
+  # version, and ignore matching is exact-id, so both stay listed.
   # We only import wish/bubbletea for the SSH TUI server — the vulnerable
-  # scp.Middleware / scp.NewFileSystemHandler symbols are never compiled in.
-  # No fix available for wish v1; v2 (charm.land/wish/v2) patched in 2.0.1.
+  # scp.Middleware / scp.NewFileSystemHandler symbols are never compiled in
+  # (govulncheck reachability agrees). No fix for wish v1; v2
+  # (charm.land/wish/v2 >= 2.0.1) requires the bubbletea-v2 stack migration,
+  # tracked in issue #126. Remove both entries when that lands.
   - vulnerability: CVE-2026-41589
+  - vulnerability: GHSA-xjvp-7243-rg9h
