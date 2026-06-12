@@ -60,6 +60,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_MIRROR_TOKEN }}
         run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "GH_MIRROR_TOKEN not set — skipping GitHub release relay"
+            exit 0
+          fi
           apk add --no-cache github-cli
           TAG="${{ github.ref_name }}"
 
