@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"syscall"
@@ -39,6 +40,30 @@ var (
 	date    = "unknown"
 )
 
+// GoReleaser stamps the vars above via ldflags, but `go install module@tag`
+// compiles without them and would report "dev". The module version and any
+// vcs stamps are embedded in every binary, so fall back to those.
+func init() {
+	if version != "dev" {
+		return
+	}
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return
+	}
+	if mv := info.Main.Version; mv != "" && mv != "(devel)" {
+		version = strings.TrimPrefix(mv, "v")
+	}
+	for _, s := range info.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			commit = s.Value
+		case "vcs.time":
+			date = s.Value
+		}
+	}
+}
+
 func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
@@ -64,11 +89,18 @@ func main() {
 }
 
 func printVersion() {
-	if version == "dev" {
-		fmt.Println("uptop dev")
-	} else {
-		fmt.Printf("uptop %s (%s, %s)\n", version, commit, date)
+	out := "uptop " + version
+	var meta []string
+	if commit != "none" {
+		meta = append(meta, commit)
 	}
+	if date != "unknown" {
+		meta = append(meta, date)
+	}
+	if len(meta) > 0 {
+		out += " (" + strings.Join(meta, ", ") + ")"
+	}
+	fmt.Println(out)
 }
 
 func envOrDefault(key, fallback string) string {
