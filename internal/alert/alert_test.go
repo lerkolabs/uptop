@@ -1,14 +1,18 @@
 package alert
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 )
@@ -328,5 +332,118 @@ func TestSanitizeError(t *testing.T) {
 	}
 	if sanitizeError(nil) != nil {
 		t.Error("nil should stay nil")
+	}
+}
+
+func TestEmailProvider_ContextTimeout(t *testing.T) {
+	// Listener that accepts but never speaks — simulates a blackholed SMTP server.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			// Hold connection open, never send banner.
+			go func(c net.Conn) {
+				time.Sleep(30 * time.Second)
+				c.Close()
+			}(conn)
+		}
+	}()
+
+	_, portStr, _ := net.SplitHostPort(ln.Addr().String())
+	provider := &EmailProvider{
+		Host: "127.0.0.1", Port: portStr,
+		From: "test@test.com", To: "dest@test.com",
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	err = provider.Send(ctx, "test", "body")
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected error from stalled SMTP")
+	}
+	if elapsed > 2*time.Second {
+		t.Errorf("Send took %v — context deadline not respected", elapsed)
+	}
+}
+
+func TestSendMailContext_HappyPath(t *testing.T) {
+	// Minimal fake SMTP server that accepts one message.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+
+	received := make(chan string, 1)
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+
+		fmt.Fprintf(conn, "220 localhost ESMTP\r\n")
+		scanner := bufio.NewScanner(conn)
+		var dataMode bool
+		var body strings.Builder
+		for scanner.Scan() {
+			line := scanner.Text()
+			if dataMode {
+				if line == "." {
+					dataMode = false
+					fmt.Fprintf(conn, "250 OK\r\n")
+					continue
+				}
+				body.WriteString(line + "\n")
+				continue
+			}
+			switch {
+			case strings.HasPrefix(line, "EHLO"):
+				fmt.Fprintf(conn, "250-localhost\r\n250 OK\r\n")
+			case strings.HasPrefix(line, "MAIL FROM"):
+				fmt.Fprintf(conn, "250 OK\r\n")
+			case strings.HasPrefix(line, "RCPT TO"):
+				fmt.Fprintf(conn, "250 OK\r\n")
+			case line == "DATA":
+				fmt.Fprintf(conn, "354 Go ahead\r\n")
+				dataMode = true
+			case line == "QUIT":
+				fmt.Fprintf(conn, "221 Bye\r\n")
+				received <- body.String()
+				return
+			default:
+				fmt.Fprintf(conn, "250 OK\r\n")
+			}
+		}
+	}()
+
+	_, portStr, _ := net.SplitHostPort(ln.Addr().String())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = sendMailContext(ctx, "127.0.0.1", portStr, "", "", "from@test.com", []string{"to@test.com"}, []byte("Subject: test\r\n\r\nhello"))
+	if err != nil {
+		t.Fatalf("sendMailContext: %v", err)
+	}
+
+	select {
+	case body := <-received:
+		if !strings.Contains(body, "hello") {
+			t.Errorf("expected body to contain 'hello', got: %s", body)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for fake SMTP to receive message")
 	}
 }

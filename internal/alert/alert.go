@@ -3,9 +3,11 @@ package alert
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/smtp"
 	"net/url"
@@ -244,7 +246,6 @@ func (e *EmailProvider) Send(ctx context.Context, title, message string) error {
 		return ctx.Err()
 	default:
 	}
-	auth := smtp.PlainAuth("", e.User, e.Pass, e.Host)
 	to := sanitizeHeader(e.To)
 	from := sanitizeHeader(e.From)
 	subject := sanitizeHeader(title)
@@ -256,7 +257,67 @@ func (e *EmailProvider) Send(ctx context.Context, title, message string) error {
 		"Content-Type: text/plain; charset=utf-8\r\n" +
 		"\r\n" +
 		body + "\r\n")
-	return smtp.SendMail(e.Host+":"+e.Port, auth, from, []string{to}, msg)
+	return sendMailContext(ctx, e.Host, e.Port, e.User, e.Pass, from, []string{to}, msg)
+}
+
+// sendMailContext is a ctx-aware replacement for smtp.SendMail.
+// smtp.SendMail ignores context entirely — a blackholed SMTP server hangs for
+// the OS TCP timeout (minutes). This dials with the context deadline and sets
+// connection deadlines so cancellation is respected throughout.
+func sendMailContext(ctx context.Context, host, port, user, pass, from string, rcpt []string, msg []byte) error {
+	addr := host + ":" + port
+
+	dialer := net.Dialer{}
+	conn, err := dialer.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return fmt.Errorf("smtp dial: %w", err)
+	}
+
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = conn.SetDeadline(deadline)
+	}
+
+	c, err := smtp.NewClient(conn, host)
+	if err != nil {
+		_ = conn.Close()
+		return fmt.Errorf("smtp client: %w", err)
+	}
+	defer c.Close()
+
+	if ok, _ := c.Extension("STARTTLS"); ok {
+		if err := c.StartTLS(&tls.Config{ServerName: host}); err != nil {
+			return fmt.Errorf("smtp starttls: %w", err)
+		}
+	}
+
+	if user != "" || pass != "" {
+		auth := smtp.PlainAuth("", user, pass, host)
+		if err := c.Auth(auth); err != nil {
+			return fmt.Errorf("smtp auth: %w", err)
+		}
+	}
+
+	if err := c.Mail(from); err != nil {
+		return fmt.Errorf("smtp mail: %w", err)
+	}
+	for _, r := range rcpt {
+		if err := c.Rcpt(r); err != nil {
+			return fmt.Errorf("smtp rcpt: %w", err)
+		}
+	}
+
+	w, err := c.Data()
+	if err != nil {
+		return fmt.Errorf("smtp data: %w", err)
+	}
+	if _, err := w.Write(msg); err != nil {
+		return fmt.Errorf("smtp write: %w", err)
+	}
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("smtp data close: %w", err)
+	}
+
+	return c.Quit()
 }
 
 type NtfyProvider struct {
