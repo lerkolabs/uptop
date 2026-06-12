@@ -1,129 +1,179 @@
 # Changelog
 
-## [2026.06.2] — 2026-06-02 (infrastructure)
+## [v0.1.0] — 2026-06-12
+
+### Added
+
+- initial commit — uptime monitor (forked from go-upkeep)
+- enhanced dashboard with lipgloss tables, huh forms, mouse support, and animations
+- upgrade users tab with lipgloss table, edit support, role select
+- upgrade alerts tab with lipgloss table, click zones, colored types
+- widen Site struct and DB schema for ping, port, dns, group monitor types
+- add ping, port, and DNS check routines
+- add ntfy notification provider with TUI support
+- add Uptime Kuma backup converter with CLI and API
+- add mouse wheel scrolling for all tabs
+- add per-site pause, fix viewport, polish status page
+- add monitor groups with collapse/expand and tree view
+- add Telegram, PagerDuty, Pushover, Gotify providers
+- add Prometheus /metrics endpoint
+- expose HTTP method and accepted status codes in monitor form
+- add config-as-code YAML import/export
+- add distributed probing foundation — schema, models, and probe APIs
+- add probe execution mode, check extraction, and result aggregation
+- add region affinity, Nodes TUI tab, and probe metrics
+- add status bar, tab badges, and detail panel
+- bordered modals, welcome state, and dynamic name width
+- DOWN-first sort, health pulse, and site filter
+- split available width evenly between NAME and HISTORY columns
+- add type icons to sites table
+- persist logs to DB, load on startup
+- add incident management and maintenance windows
+- zebra striping, detail breadcrumb, sparkline stats, collapse persistence
+- add --version flag with build metadata injection
+- add theme system with 4 curated palettes
+- swap light theme for Tokyo Night and Gruvbox
+- seed SSH users from env var and authorized_keys file (#31)
+- show error reason when monitors go DOWN
+- proper push monitor lifecycle — PENDING, LATE, DOWN states
+- logs tab overhaul — severity tags, filtering, recovery durations
+- alert channel health indicator + test alerts
+- add GitHub release relay workflow
+- classify error reasons on DOWN monitors
+- add state change history view with outage duration
+- add Opsgenie provider
+- add STALE state for push monitors
+- add SLA reporting view
+- overhaul latency sparkline scaling, color, and layout
+- auto-prune expired maintenance windows
+- click-to-inspect sparkline tooltips in detail view
 
 ### Changed
-- Split release pipeline into separate binary and Docker workflows (#45)
-- Pin Docker base images by digest (#45)
-- Add GitHub release relay — mirrors Gitea releases to GitHub (#49)
-- Add Grype CVE scanning to Docker pipeline (#45)
-- Make CVE scan non-blocking for non-exploitable wish SCP vulnerability (#48)
+
+- replace database ID column with row counter
+- unify SQLite and Postgres into dialect-based SQLStore
+- add error returns to all Store interface methods
+- remove store global singleton, thread store explicitly
+- extract shared HTTPProvider for webhook-based alerts
+- extract shared table rendering, fix cursor bounds
+- encapsulate engine state, add graceful shutdown and tests
+- split release pipeline, add nfpm/homebrew/git-cliff
+- decompose god files into single-concern modules
+- consistent chrome across all views
+- status icons, clean STATUS column, relative time
+- extract magic numbers into named constants
+- check all discarded errors in sqlstore_test.go
+- overhaul tab bar — consistent counts, active highlight, colored alerts
+- responsive column hiding — 3-tier priority-based layout
+- swap mattn/go-sqlite3 for modernc.org/sqlite
+- propagate context.Context through all Store methods
+- typed Status constants with IsBroken() predicate
+- schema_version migration table + DeleteAlert FK fix
+- shared storetest.BaseMock replaces 5 duplicated mocks
+- consolidate env parsing into appConfig struct
+- extract Server type with named handler methods
+- split Site into SiteConfig + SiteState
+- unify logging with log/slog
 
 ### Fixed
-- git-cliff install in CI — resolve download URL dynamically, extract to /tmp (#46, #47)
 
-## [2026.06.1] — 2026-06-01
+- forward all msg types to huh forms, improve row selection UX
+- harden TLS, timeouts, validation, logging, and token generation
+- add delete confirm, input validation, XSS fix, history persistence
+- correctness and robustness fixes across all subsystems
+- make status bar and tab badges visible
+- use stable sort to prevent site list shuffling each tick
+- sort children by ID before status to prevent map-order shuffling
+- sparkline now spans full column width
+- sparkline right-aligned — current time at right edge, dots fill left
+- increase history buffer to 60 so sparkline fills completely
+- compute uptime from windowed statuses, not running counters
+- seed status and latency from DB history on startup
+- strip push tokens from /status/json response
+- correct viewport sizing and dynamic chrome calculation
+- constrain form height to terminal and forward resize events
+- skip children in maintenance when computing group status
+- exclude maintenance'd monitors from down count and pulse
+- group selection highlight, layout constants, group history graphs
+- stable monitor count and universal group icons
+- replace panic with error return, handle unmarshal errors
+- add context to Provider.Send, log alert failures
+- constant-time secret comparison, request size limits
+- graceful shutdown for HTTP, SSH servers and database
+- add jitter to check intervals and stagger startup
+- use sh instead of bash for runner compatibility
+- enable CGO for race detector, use lint-action v7
+- install gcc for race detector support
+- skip irrelevant field validation by monitor type
+- guard max retries validator for group type
+- tighten zebra row contrast for Tokyo Night and Gruvbox
+- phase 1 critical fixes for public release
+- phase 2 high-severity hardening
+- phase 3 medium reliability and hardening
+- phase 4 code quality and low-severity fixes
+- rename GITEA_TOKEN to RELEASE_TOKEN
+- remove explicit container, use sh shell
+- bump golang.org/x/crypto v0.47.0 → v0.52.0
+- install git and gcc for GoReleaser in release pipeline
+- use internal Gitea URL for GoReleaser API calls
+- use docker-builder runner for Docker image builds
+- patch Docker Scout CVEs and remove unused openssh-client (#41)
+- non-root user, supply chain attestations, build cleanup
+- move SSH host key path into /data for non-root user
+- create .ssh dir explicitly, ensure entrypoint is executable
+- resolve git-cliff download URL dynamically
+- extract git-cliff to /tmp to avoid dirty worktree
+- make Grype CVE scan non-blocking for known wish vuln
+- bump Go 1.26.3 → 1.26.4
+- remove error truncation from detail panel
+- classify safedial "failed to connect" as TCP
+- resolve staticcheck lint errors in history view
+- trigger immediate recheck after site config edit
+- broken tick chain after form/dialog + retries off-by-one
+- wire up [e] edit key in detail panel
+- show push token and URL in detail panel
+- show correct push heartbeat curl command in detail panel
+- propagate STALE/LATE child status to group
+- quick wins batch — version footer, column widths, zebra, sparkline
+- logs tab use viewport for scrollable content
+- pin footer to bottom of terminal
+- normalize content whitespace for consistent footer position
+- clip overflowing content to keep footer pinned
+- remove extra blank lines above footer
+- expand log viewport to fill content area
+- log STALE recovery in push heartbeat handler
+- check fmt.Sscanf return value (errcheck lint)
+- inject time into ComputeDailyBreakdown for testability
+- cascade delete related rows when removing a site
+- merge check results into live state, never overwrite
+- serialize DB writes through a single drained writer
+- close XFF bypass and three secret-leak paths
+- move blocking DB IO out of Update/View into tea.Cmds
+- move theme styles onto the Model to end cross-session races
+- finish moving keypress DB reads into tea.Cmds
+- move all store writes out of Update into tea.Cmds
+- mask alert secrets in the TUI detail panel and table
+- serve /status/json through a public DTO
+- make SSH key revocation fail closed
+- six correctness fixes for the state machine
+- migrate Postgres timestamps to TIMESTAMPTZ
+- seven quick-win bug fixes across engine, server, TUI, CLI
+- SSRF guard gaps + DNS port restriction + metrics auth
+- track selection by site ID + q means back everywhere
+- apply convergence + push/group check history
+- Kuma import tokens/paused, Docker hardening, migrate-secrets idempotency
+- six small fixes — rate limiter leak, DST SLA, probe sort, TUI cleanup
+- seven fixes — token scan, variadic cleanup, TUI layout, compose secrets
+- chmod SQLite DB files to 0600 on open
+- close DNS-rebind TOCTOU on ping/port checks
+- API import no longer replaces user accounts
+- email send respects context deadline
+- rename X-Upkeep-Secret header to X-Uptop-Secret
+- apply log filter to full log list, not viewport window
+- repair pipeline defects found in v0.1.0-rc.1 rehearsal
+- suppress wish GHSA alias in grype, fold rc tags into launch notes
+- scan gates docker push, rc tags spare :latest, mirror waits for stable assets
+- remove tagged scan image in cleanup step
+- exclude rc tags from cliff tag_pattern so launch notes span full history
+- fall back to embedded build info when ldflags absent
 
-### Changed
-- Container runs as non-root user `uptop` (UID/GID 1000) instead of root (#44)
-- SSH host key relocated to `/data/.ssh/id_ed25519` for non-root compatibility (#44)
-- Release workflow prunes dangling images and build cache after Docker push (#44)
-
-### Added
-- SBOM and provenance attestations on Docker images for supply chain compliance (#44)
-- Entrypoint script with volume writability check and migration guidance (#44)
-
-### Breaking
-- Existing Docker volumes with root-owned files require migration before upgrading:
-  `docker run --rm -v <volume>:/data alpine chown -R 1000:1000 /data`
-
-## [2026.05.6] — 2026-05-30 (infrastructure)
-
-### Changed
-- Sync README to Docker Hub on release (#43)
-
-### Security
-- Patch Docker Scout CVEs, remove unused openssh-client (#41)
-
-## [2026.05.5] — 2026-05-29
-
-### Added
-- Error reason display when monitors go DOWN (#33)
-- Push monitor lifecycle — PENDING, LATE, DOWN states (#34)
-- Logs tab overhaul — severity tags, filtering, recovery durations (#35)
-- Alert channel health indicator and test alerts (#36)
-- TUI screenshots in `assets/` (#32)
-- CI status badge in README
-
-### Changed
-- Visual polish — detail sections, column headers, alert detail (#37)
-- README rewritten with hero image, badges, collapsible install sections (#32)
-- Changelog rewritten to match actual CalVer tag history
-- Migrated to `lerkolabs` org namespace (#38)
-- Docker-compose files moved to `deploy/`
-
-## [2026.05.4] — 2026-05-27
-
-### Added
-- SSH user seeding from `UPTOP_ADMIN_KEY` env var and `UPTOP_KEYS` file (#31)
-- GoReleaser for binary releases
-- govulncheck in CI pipeline
-- Multi-arch Docker builds (amd64 + arm64)
-
-### Changed
-- CI overhaul — Go 1.26, build caching, streamlined pipeline (#30)
-- Bumped golang.org/x/crypto v0.47.0 → v0.52.0
-- Bumped Alpine 3.21 → 3.23
-
-### Security
-- Phase 1: SSRF protection, input validation, safe dial (#26)
-- Phase 2: TLS hardening, auth bypass fixes, rate limiting (#27)
-- Phase 3: Graceful degradation, connection limits, timeout enforcement (#28)
-- Phase 4: Code quality, error handling, linter fixes (#29)
-
-## [2026.05.3] — 2026-05-25
-
-### Added
-- Theme system with 5 dark palettes — Default, Dracula, Nord, Tokyo Night, Gruvbox (#24)
-- `--version` flag with build metadata injection
-- Gitea Actions CI pipeline — test + lint (#20)
-- golangci-lint configuration
-- Comprehensive test suite — 94 tests across monitor, server, cluster (#19)
-- CONTRIBUTING.md and SECURITY.md
-
-### Changed
-- Renamed project from go-upkeep to uptop (#25)
-- Updated LICENSE with dual copyright for independent fork
-
-### Fixed
-- Form validators scoped to relevant monitor types (#23)
-- Graceful shutdown for HTTP, SSH servers and database (#19)
-- Constant-time secret comparison, request size limits (#19)
-- Check interval jitter to prevent thundering herd (#19)
-- TUI visual polish — zebra striping, group icons, sparkline stats (#18)
-
-## [2026.05.2] — 2026-05-22
-
-### Added
-- Incident management and maintenance windows (#17)
-- Production docker-compose.yml
-
-### Fixed
-- Viewport sizing and dynamic chrome calculation (#16)
-- Form height constrained to terminal with resize forwarding
-- Maintenance'd monitors excluded from down count and pulse
-- Group status correctly skips children in maintenance
-
-## [2026.05.1] — 2026-05-16
-
-### Added
-- Distributed probing with leader + probe nodes
-- Config-as-code — YAML apply/export with dry-run and prune
-- TUI polish — status bar, tab badges, detail panel, modals
-- DOWN-first sort, health pulse, site filter
-- Type icons in sites table
-- Sparkline history graphs
-- Persistent state — uptime, status, latency, and logs survive restarts
-- Push token stripping from /status/json response
-
-## [2026.04.1] — 2026-04-01
-
-### Added
-- SSH-accessible TUI built on Bubble Tea + Wish
-- 6 check types — HTTP, Push, Ping, Port, DNS, Group
-- 9 alert providers — Discord, Slack, Email, Ntfy, Telegram, PagerDuty, Pushover, Gotify, Webhook
-- SQLite and PostgreSQL support
-- HA clustering with automatic failover
-- Prometheus /metrics endpoint
-- Public status page (HTML + JSON)
-- Uptime Kuma backup import
