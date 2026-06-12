@@ -141,7 +141,7 @@ func authReq(method, url, secret string, body []byte) (*http.Response, error) {
 		return nil, err
 	}
 	if secret != "" {
-		req.Header.Set("X-Upkeep-Secret", secret)
+		req.Header.Set("X-Uptop-Secret", secret)
 	}
 	return http.DefaultClient.Do(req)
 }

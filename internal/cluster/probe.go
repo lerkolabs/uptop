@@ -90,7 +90,7 @@ func probeRegister(ctx context.Context, client *http.Client, cfg ProbeConfig) er
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Upkeep-Secret", cfg.SharedKey)
+	req.Header.Set("X-Uptop-Secret", cfg.SharedKey)
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
@@ -108,7 +108,7 @@ func probeFetchAssignments(ctx context.Context, client *http.Client, cfg ProbeCo
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("X-Upkeep-Secret", cfg.SharedKey)
+	req.Header.Set("X-Uptop-Secret", cfg.SharedKey)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -180,7 +180,7 @@ func probeReportResults(ctx context.Context, client *http.Client, cfg ProbeConfi
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Upkeep-Secret", cfg.SharedKey)
+	req.Header.Set("X-Uptop-Secret", cfg.SharedKey)
 	resp, err := client.Do(req)
 	if err != nil {
 		return err

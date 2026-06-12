@@ -174,7 +174,7 @@ Export your Kuma backup JSON, then:
 
 ```bash
 curl -X POST http://localhost:8080/api/import/kuma \
-  -H "X-Upkeep-Secret: your-secret" \
+  -H "X-Uptop-Secret: your-secret" \
   -H "Content-Type: application/json" \
   -d @kuma-backup.json
 ```

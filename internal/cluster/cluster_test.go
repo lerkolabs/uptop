@@ -113,7 +113,7 @@ func TestFollowerLoop_SendsSecret(t *testing.T) {
 	var receivedSecret string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
-		receivedSecret = r.Header.Get("X-Upkeep-Secret")
+		receivedSecret = r.Header.Get("X-Uptop-Secret")
 		mu.Unlock()
 		w.WriteHeader(200)
 		w.Write([]byte("OK"))

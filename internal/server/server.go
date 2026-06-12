@@ -127,7 +127,7 @@ func (s *Server) routes() http.Handler {
 }
 
 func (s *Server) requireAuth(r *http.Request) bool {
-	return s.cfg.ClusterKey != "" && checkSecret(r.Header.Get("X-Upkeep-Secret"), s.cfg.ClusterKey)
+	return s.cfg.ClusterKey != "" && checkSecret(r.Header.Get("X-Uptop-Secret"), s.cfg.ClusterKey)
 }
 
 func (s *Server) handlePush(w http.ResponseWriter, r *http.Request) {
@@ -159,7 +159,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if s.cfg.ClusterKey != "" && !checkSecret(r.Header.Get("X-Upkeep-Secret"), s.cfg.ClusterKey) {
+	if s.cfg.ClusterKey != "" && !checkSecret(r.Header.Get("X-Uptop-Secret"), s.cfg.ClusterKey) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}

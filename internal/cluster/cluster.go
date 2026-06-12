@@ -52,7 +52,7 @@ func runFollowerLoop(ctx context.Context, cfg Config, eng *monitor.Engine) {
 
 		req, _ := http.NewRequest("GET", cfg.PeerURL+"/api/health", nil)
 		if cfg.SharedKey != "" {
-			req.Header.Set("X-Upkeep-Secret", cfg.SharedKey)
+			req.Header.Set("X-Uptop-Secret", cfg.SharedKey)
 		}
 
 		resp, err := client.Do(req)

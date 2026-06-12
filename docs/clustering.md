@@ -81,5 +81,5 @@ Set via `UPTOP_AGG_STRATEGY` on the leader.
 ## Security
 
 - Set `UPTOP_CLUSTER_SECRET` on all nodes. Without it, cluster API endpoints are unauthenticated.
-- Secrets are sent in HTTP headers (`X-Upkeep-Secret`). Use TLS or a reverse proxy for production.
+- Secrets are sent in HTTP headers (`X-Uptop-Secret`). Use TLS or a reverse proxy for production.
 - uptop warns on startup if the cluster secret is missing or if cluster mode is active without TLS.
