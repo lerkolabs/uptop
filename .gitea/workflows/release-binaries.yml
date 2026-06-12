@@ -52,3 +52,34 @@ jobs:
           GORELEASER_FORCE_TOKEN: gitea
           GITEA_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           GITEA_API_URL: http://gitea:3000/api/v1
+
+      # GoReleaser publishes to exactly one SCM (Gitea). The push mirror
+      # carries git refs but not release artifacts, so relay the release to
+      # the GitHub mirror — README install links point there.
+      - name: Mirror release to GitHub
+        env:
+          GH_TOKEN: ${{ secrets.GH_MIRROR_TOKEN }}
+        run: |
+          apk add --no-cache github-cli
+          TAG="${{ github.ref_name }}"
+
+          # Nudge the push mirror, then wait for the tag to land on GitHub.
+          curl -sf -X POST \
+            -H "Authorization: token ${{ secrets.RELEASE_TOKEN }}" \
+            "http://gitea:3000/api/v1/repos/lerkolabs/uptop/push_mirrors-sync" || true
+          for i in $(seq 1 30); do
+            if gh api "repos/lerkolabs/uptop/git/ref/tags/${TAG}" >/dev/null 2>&1; then
+              break
+            fi
+            sleep 10
+          done
+
+          PRERELEASE=""
+          case "$TAG" in *-*) PRERELEASE="--prerelease";; esac
+          gh release create "$TAG" \
+            --repo lerkolabs/uptop \
+            --verify-tag \
+            --title "$TAG" \
+            --notes-file /tmp/release-notes.md \
+            $PRERELEASE \
+            dist/*.tar.gz dist/*.zip dist/*.deb dist/*.rpm dist/checksums.txt
