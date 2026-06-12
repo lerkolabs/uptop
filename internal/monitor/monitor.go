@@ -375,6 +375,8 @@ func (e *Engine) RecordHeartbeat(token string) bool {
 		go e.triggerAlert(alertID, "✅ RECOVERY", fmt.Sprintf("Push Monitor '%s' is receiving heartbeats.%s", name, downDur))
 	}
 
+	e.recordCheck(targetID, 0, true)
+
 	if prevStatus != models.StatusUp && prevStatus != models.StatusPending {
 		e.enqueueWrite(writeStateChange{siteID: targetID, fromStatus: string(prevStatus), toStatus: string(models.StatusUp)})
 	}
@@ -428,9 +430,11 @@ func (e *Engine) Start(ctx context.Context) {
 				}
 				continue
 			}
+			dbIDs := make(map[int]bool, len(configs))
 			for _, cfg := range configs {
+				dbIDs[cfg.ID] = true
 				e.mu.RLock()
-				_, exists := e.liveState[cfg.ID]
+				existing, exists := e.liveState[cfg.ID]
 				e.mu.RUnlock()
 				if !exists {
 					e.mu.Lock()
@@ -453,7 +457,22 @@ func (e *Engine) Start(ctx context.Context) {
 						defer e.checkerWG.Done()
 						e.monitorRoutine(ctx, id)
 					}(cfg.ID)
+				} else if existing.SiteConfig != cfg {
+					e.UpdateSiteConfig(cfg)
 				}
+			}
+
+			e.mu.RLock()
+			var vanished []int
+			for id := range e.liveState {
+				if !dbIDs[id] {
+					vanished = append(vanished, id)
+				}
+			}
+			e.mu.RUnlock()
+			for _, id := range vanished {
+				e.RemoveSite(id)
+				e.AddLog(fmt.Sprintf("Monitor removed (no longer in DB): ID %d", id))
 			}
 
 			select {
@@ -1017,6 +1036,7 @@ func (e *Engine) checkGroup(_ context.Context, site models.Site) {
 	e.applyState(site.ID, func(s *models.Site) {
 		s.Status = status
 	})
+	e.recordCheck(site.ID, 0, !status.IsBroken())
 }
 
 func (e *Engine) EnqueueProbeCheck(siteID int, nodeID string, latencyNs int64, isUp bool) {
