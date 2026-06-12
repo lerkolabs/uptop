@@ -3,7 +3,7 @@ services:
     build: .
     environment:
       - UPTOP_CLUSTER_MODE=leader
-      - UPTOP_CLUSTER_SECRET=changeme
+      - UPTOP_CLUSTER_SECRET=changeme  # EXAMPLE ONLY — rotate before use
       - UPTOP_AGG_STRATEGY=any-down
       - UPTOP_STATUS_ENABLED=true
     ports:
@@ -18,7 +18,7 @@ services:
       - UPTOP_NODE_NAME=US East Probe
       - UPTOP_NODE_REGION=us-east
       - UPTOP_PEER_URL=http://leader:8080
-      - UPTOP_CLUSTER_SECRET=changeme
+      - UPTOP_CLUSTER_SECRET=changeme  # EXAMPLE ONLY — rotate before use
     depends_on:
       - leader
 
@@ -30,6 +30,6 @@ services:
       - UPTOP_NODE_NAME=EU West Probe
       - UPTOP_NODE_REGION=eu-west
       - UPTOP_PEER_URL=http://leader:8080
-      - UPTOP_CLUSTER_SECRET=changeme
+      - UPTOP_CLUSTER_SECRET=changeme  # EXAMPLE ONLY — rotate before use
     depends_on:
       - leader

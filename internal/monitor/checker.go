@@ -36,10 +36,8 @@ type CheckResult struct {
 	ErrorReason string
 }
 
-func RunCheck(ctx context.Context, site models.SiteConfig, strict, insecure *http.Client, globalInsecure bool, allowPrivate ...bool) CheckResult {
-	private := len(allowPrivate) > 0 && allowPrivate[0]
-
-	if site.Type != "http" && site.Type != "dns" && !private {
+func RunCheck(ctx context.Context, site models.SiteConfig, strict, insecure *http.Client, globalInsecure, allowPrivate bool) CheckResult {
+	if site.Type != "http" && site.Type != "dns" && !allowPrivate {
 		host := site.Hostname
 		if host == "" {
 			host = site.URL
@@ -63,7 +61,7 @@ func RunCheck(ctx context.Context, site models.SiteConfig, strict, insecure *htt
 	case "port":
 		return runPortCheck(ctx, site)
 	case "dns":
-		return runDNSCheck(ctx, site, private)
+		return runDNSCheck(ctx, site, allowPrivate)
 	default:
 		return CheckResult{SiteID: site.ID, Status: string(models.StatusDown), ErrorReason: "unsupported monitor type: " + site.Type}
 	}

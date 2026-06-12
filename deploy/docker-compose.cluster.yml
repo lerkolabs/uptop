@@ -18,7 +18,7 @@ services:
       
       # Cluster Config
       - UPTOP_CLUSTER_MODE=leader
-      - UPTOP_CLUSTER_SECRET=mysecret
+      - UPTOP_CLUSTER_SECRET=mysecret  # EXAMPLE ONLY — rotate before use
     depends_on:
       - leader-db
     stdin_open: true
@@ -53,7 +53,7 @@ services:
       
       # Cluster Config
       - UPTOP_CLUSTER_MODE=follower
-      - UPTOP_CLUSTER_SECRET=mysecret
+      - UPTOP_CLUSTER_SECRET=mysecret  # EXAMPLE ONLY — rotate before use
       # IMPORTANT: Uses the Service Name "leader" to connect internally
       - UPTOP_PEER_URL=http://leader:8080
     depends_on:

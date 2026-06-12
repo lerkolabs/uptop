@@ -17,7 +17,6 @@ const (
 	maxLogRows             = 200
 	maxStateChangesPerSite = 5000
 	maxMaintenanceExport   = 1000
-	maxRequestBody         = 1 << 20
 )
 
 type SQLStore struct {
@@ -154,7 +153,9 @@ func (s *SQLStore) AddSite(ctx context.Context, site models.SiteConfig) error {
 
 func (s *SQLStore) UpdateSite(ctx context.Context, site models.SiteConfig) error {
 	var existingToken string
-	_ = s.db.QueryRowContext(ctx, s.q("SELECT token FROM sites WHERE id=?"), site.ID).Scan(&existingToken) //nolint:errcheck
+	if err := s.db.QueryRowContext(ctx, s.q("SELECT token FROM sites WHERE id=?"), site.ID).Scan(&existingToken); err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("read existing token: %w", err)
+	}
 	if site.Type == "push" && existingToken == "" {
 		var err error
 		existingToken, err = generateToken()

@@ -141,23 +141,34 @@ func (m *Model) handleFormMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
-	m.termWidth = msg.Width
-	m.termHeight = msg.Height
+func (m *Model) recalcLayout() {
 	chrome := chromeBase
 	if m.filterMode || m.filterText != "" {
 		chrome++
 	}
-	m.maxTableRows = msg.Height - chrome
+	m.maxTableRows = m.termHeight - chrome
 	if m.maxTableRows < 1 {
 		m.maxTableRows = 1
 	}
+}
+
+func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
+	m.termWidth = msg.Width
+	m.termHeight = msg.Height
+	m.recalcLayout()
 	m.logViewport.Width = msg.Width - chromePadH
 	m.logViewport.Height = msg.Height - (chromePadV + chromeHeader + chromeFooter + 2)
 	m.historyViewport.Width = msg.Width - chromePadH
 	m.historyViewport.Height = msg.Height - 10
 	m.slaViewport.Width = msg.Width - chromePadH
 	m.slaViewport.Height = msg.Height - 16
+	if m.huhForm != nil {
+		formHeight := msg.Height - 7
+		if formHeight < 5 {
+			formHeight = 5
+		}
+		m.huhForm.WithHeight(formHeight)
+	}
 	return m, nil
 }
 
@@ -320,9 +331,11 @@ func (m *Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.filterText = ""
 		m.cursor = 0
 		m.tableOffset = 0
+		m.recalcLayout()
 		m.refreshLive()
 	case "enter":
 		m.filterMode = false
+		m.recalcLayout()
 	case "backspace":
 		if len(m.filterText) > 0 {
 			m.filterText = m.filterText[:len(m.filterText)-1]
@@ -508,6 +521,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		if m.currentTab == 0 {
 			m.filterMode = true
+			m.recalcLayout()
 			return m, nil
 		}
 	case "f":
@@ -740,16 +754,8 @@ func (m *Model) switchTab(idx int) {
 	}
 }
 
-func (m *Model) adjustCursor(newLen int) {
-	if m.cursor >= newLen && m.cursor > 0 {
-		m.cursor--
-	}
-	if m.cursor < m.tableOffset {
-		m.tableOffset = m.cursor
-		if m.tableOffset < 0 {
-			m.tableOffset = 0
-		}
-	}
+func (m *Model) adjustCursor(_ int) {
+	m.clampCursor()
 }
 
 func (m *Model) submitForm() tea.Cmd {

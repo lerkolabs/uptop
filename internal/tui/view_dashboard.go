@@ -85,11 +85,6 @@ func (m Model) View() string {
 			case stateFormMaint:
 				title = "New Maintenance Window"
 			}
-			formHeight := m.termHeight - 7
-			if formHeight < 5 {
-				formHeight = 5
-			}
-			m.huhForm.WithHeight(formHeight)
 			header := m.st.titleStyle.Render(title)
 			footer := m.st.subtleStyle.Render("\n[Esc] Cancel")
 			return lipgloss.NewStyle().Padding(1, 2).Render(header + "\n\n" + m.huhForm.View() + "\n" + footer)
@@ -270,7 +265,7 @@ func (m Model) renderFooter(stats dashboardStats) string {
 	var keys string
 	switch m.currentTab {
 	case 0:
-		keys = "[/]Filter [n]New [e]Edit [i]Info [d]Del [p]Pause [T]Theme [Tab]Switch [q]Quit"
+		keys = "[/]Filter [n]New [e]Edit [i]Info [d]Del [p]Pause [Space]Collapse [T]Theme [Tab]Switch [q]Quit"
 	case 1:
 		keys = "[n]New [e]Edit [i]Info [d]Del [t]Test [T]Theme [Tab]Switch [q]Quit"
 	case 2:
