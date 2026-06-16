@@ -326,101 +326,104 @@ func (m *Model) initSiteHuhForm() tea.Cmd {
 		}
 	}
 
-	// m.alerts is the tab-data cache (≤5s stale) — no store IO in Update.
-	alertOpts := []huh.Option[string]{huh.NewOption("None", "0")}
+	return m.rebuildSiteForm()
+}
+
+func (m *Model) rebuildSiteForm() tea.Cmd {
+	groups := m.buildSiteFormGroups()
+	m.huhForm = huh.NewForm(groups...).WithTheme(m.theme.HuhTheme())
+	if m.termWidth > 0 {
+		m.huhForm.WithWidth(m.termWidth)
+	}
+	formHeight := m.termHeight - 7
+	if formHeight < 5 {
+		formHeight = 5
+	}
+	m.huhForm.WithHeight(formHeight)
+	m.lastSiteType = m.siteFormData.SiteType
+	return m.huhForm.Init()
+}
+
+func (m *Model) siteFormOptions() (alertOpts, groupOpts []huh.Option[string]) {
+	alertOpts = []huh.Option[string]{huh.NewOption("None", "0")}
 	for _, a := range m.alerts {
 		alertOpts = append(alertOpts, huh.NewOption(
 			fmt.Sprintf("%s (%s)", a.Name, a.Type),
 			strconv.Itoa(a.ID),
 		))
 	}
-
-	groupOpts := []huh.Option[string]{huh.NewOption("None", "0")}
+	groupOpts = []huh.Option[string]{huh.NewOption("None", "0")}
 	for _, s := range m.sites {
 		if s.Type == "group" && s.ID != m.editID {
 			groupOpts = append(groupOpts, huh.NewOption(s.Name, strconv.Itoa(s.ID)))
 		}
 	}
+	return
+}
 
-	m.huhForm = huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().Title("Monitor Name").
-				Placeholder("My Service").
-				Value(&m.siteFormData.Name).
-				Validate(func(s string) error {
-					if s == "" {
-						return fmt.Errorf("name is required")
-					}
-					return nil
-				}),
-			huh.NewSelect[string]().Title("Monitor Type").
-				Options(
-					huh.NewOption("HTTP/HTTPS", "http"),
-					huh.NewOption("Push / Heartbeat", "push"),
-					huh.NewOption("Ping (ICMP)", "ping"),
-					huh.NewOption("TCP Port", "port"),
-					huh.NewOption("DNS", "dns"),
-					huh.NewOption("Group", "group"),
-				).Value(&m.siteFormData.SiteType),
-			huh.NewSelect[string]().Title("Alert Channel").
-				Options(alertOpts...).
-				Value(&m.siteFormData.AlertID),
-		).Title("Monitor Settings"),
-		huh.NewGroup(
-			huh.NewInput().Title("URL").
-				Placeholder("https://example.com").
-				Description("Required for HTTP monitors").
-				Value(&m.siteFormData.URL).
-				Validate(func(s string) error {
-					if m.siteFormData.SiteType != "http" {
-						return nil
-					}
-					if s == "" {
-						return fmt.Errorf("URL is required for HTTP monitors")
-					}
-					u, err := url.Parse(s)
-					if err != nil {
-						return fmt.Errorf("invalid URL")
-					}
-					if u.Scheme != "http" && u.Scheme != "https" {
-						return fmt.Errorf("URL must start with http:// or https://")
-					}
-					if u.Host == "" {
-						return fmt.Errorf("URL must include a host")
-					}
-					return nil
-				}),
-			huh.NewInput().Title("Check Interval (seconds)").
-				Placeholder("60").
-				Value(&m.siteFormData.Interval).
-				Validate(func(s string) error {
-					if m.siteFormData.SiteType == "group" {
-						return nil
-					}
-					v, err := strconv.Atoi(s)
-					if err != nil {
-						return fmt.Errorf("must be a number")
-					}
-					if v < 5 {
-						return fmt.Errorf("minimum interval is 5 seconds")
-					}
-					return nil
-				}),
-			huh.NewSelect[string]().Title("Parent Group").
-				Options(groupOpts...).
-				Value(&m.siteFormData.GroupID),
+func (m *Model) buildSiteFormGroups() []*huh.Group {
+	d := m.siteFormData
+	alertOpts, groupOpts := m.siteFormOptions()
+
+	// Page 1 — Monitor Setup: core fields + type-specific target
+	setup := []huh.Field{
+		huh.NewInput().Title("Monitor Name").
+			Placeholder("My Service").
+			Value(&d.Name).
+			Validate(func(s string) error {
+				if s == "" {
+					return fmt.Errorf("name is required")
+				}
+				return nil
+			}),
+		huh.NewSelect[string]().Title("Monitor Type").
+			Options(
+				huh.NewOption("HTTP/HTTPS", "http"),
+				huh.NewOption("Push / Heartbeat", "push"),
+				huh.NewOption("Ping (ICMP)", "ping"),
+				huh.NewOption("TCP Port", "port"),
+				huh.NewOption("DNS", "dns"),
+				huh.NewOption("Group", "group"),
+			).Value(&d.SiteType),
+		huh.NewSelect[string]().Title("Alert Channel").
+			Options(alertOpts...).
+			Value(&d.AlertID),
+	}
+
+	switch d.SiteType {
+	case "http":
+		setup = append(setup, huh.NewInput().Title("URL").
+			Placeholder("https://example.com").
+			Value(&d.URL).
+			Validate(func(s string) error {
+				if s == "" {
+					return fmt.Errorf("URL is required")
+				}
+				u, err := url.Parse(s)
+				if err != nil {
+					return fmt.Errorf("invalid URL")
+				}
+				if u.Scheme != "http" && u.Scheme != "https" {
+					return fmt.Errorf("URL must start with http:// or https://")
+				}
+				if u.Host == "" {
+					return fmt.Errorf("URL must include a host")
+				}
+				return nil
+			}))
+	case "ping", "dns":
+		setup = append(setup, huh.NewInput().Title("Hostname / IP").
+			Placeholder("10.0.0.1").
+			Value(&d.Hostname))
+	case "port":
+		setup = append(setup,
 			huh.NewInput().Title("Hostname / IP").
 				Placeholder("10.0.0.1").
-				Description("Target for ping/port/DNS monitors").
-				Value(&m.siteFormData.Hostname),
+				Value(&d.Hostname),
 			huh.NewInput().Title("Port").
-				Placeholder("0").
-				Description("Target port for TCP port monitors").
-				Value(&m.siteFormData.Port).
+				Placeholder("443").
+				Value(&d.Port).
 				Validate(func(s string) error {
-					if m.siteFormData.SiteType != "port" {
-						return nil
-					}
 					v, err := strconv.Atoi(s)
 					if err != nil {
 						return fmt.Errorf("must be a number")
@@ -429,34 +432,20 @@ func (m *Model) initSiteHuhForm() tea.Cmd {
 						return fmt.Errorf("port must be 1-65535")
 					}
 					return nil
-				}),
-			huh.NewInput().Title("Timeout (seconds)").
-				Placeholder("5").
-				Value(&m.siteFormData.Timeout).
-				Validate(func(s string) error {
-					if m.siteFormData.SiteType == "group" {
-						return nil
-					}
-					v, err := strconv.Atoi(s)
-					if err != nil {
-						return fmt.Errorf("must be a number")
-					}
-					if v < 1 || v > 300 {
-						return fmt.Errorf("timeout must be 1-300 seconds")
-					}
-					return nil
-				}),
-			huh.NewInput().Title("Description").
-				Placeholder("Optional description").
-				Value(&m.siteFormData.Description),
-			huh.NewInput().Title("Probe Regions").
-				Placeholder("us-east, eu-west (empty = all)").
-				Description("Comma-separated regions for distributed probing").
-				Value(&m.siteFormData.Regions),
-		).Title("Connection").WithHideFunc(func() bool {
-			return m.siteFormData.SiteType == "group"
-		}),
-		huh.NewGroup(
+				}))
+	}
+
+	groups := []*huh.Group{huh.NewGroup(setup...).Title("Monitor Setup")}
+
+	if d.SiteType == "group" {
+		return groups
+	}
+
+	// Page 2 — Configuration: type-specific options + shared defaults
+	var config []huh.Field
+
+	if d.SiteType == "http" {
+		config = append(config,
 			huh.NewSelect[string]().Title("HTTP Method").
 				Options(
 					huh.NewOption("GET", "GET"),
@@ -466,22 +455,75 @@ func (m *Model) initSiteHuhForm() tea.Cmd {
 					huh.NewOption("DELETE", "DELETE"),
 					huh.NewOption("HEAD", "HEAD"),
 					huh.NewOption("OPTIONS", "OPTIONS"),
-				).Value(&m.siteFormData.Method),
+				).Value(&d.Method),
 			huh.NewInput().Title("Accepted Status Codes").
 				Placeholder("200-299").
 				Description("Ranges (200-299) and singles (301) separated by commas").
-				Value(&m.siteFormData.AcceptedCodes),
-		).Title("HTTP Settings").WithHideFunc(func() bool {
-			return m.siteFormData.SiteType != "http"
-		}),
-		huh.NewGroup(
+				Value(&d.AcceptedCodes),
+		)
+	}
+
+	config = append(config,
+		huh.NewInput().Title("Check Interval (seconds)").
+			Placeholder("60").
+			Value(&d.Interval).
+			Validate(func(s string) error {
+				v, err := strconv.Atoi(s)
+				if err != nil {
+					return fmt.Errorf("must be a number")
+				}
+				if v < 5 {
+					return fmt.Errorf("minimum interval is 5 seconds")
+				}
+				return nil
+			}),
+		huh.NewInput().Title("Timeout (seconds)").
+			Placeholder("5").
+			Value(&d.Timeout).
+			Validate(func(s string) error {
+				v, err := strconv.Atoi(s)
+				if err != nil {
+					return fmt.Errorf("must be a number")
+				}
+				if v < 1 || v > 300 {
+					return fmt.Errorf("timeout must be 1-300 seconds")
+				}
+				return nil
+			}),
+		huh.NewInput().Title("Max Retries Before Alert").
+			Placeholder("0").
+			Value(&d.Retries).
+			Validate(func(s string) error {
+				v, err := strconv.Atoi(s)
+				if err != nil {
+					return fmt.Errorf("must be a number")
+				}
+				if v < 0 {
+					return fmt.Errorf("retries cannot be negative")
+				}
+				return nil
+			}),
+		huh.NewSelect[string]().Title("Parent Group").
+			Options(groupOpts...).
+			Value(&d.GroupID),
+		huh.NewInput().Title("Description").
+			Placeholder("Optional description").
+			Value(&d.Description),
+		huh.NewInput().Title("Probe Regions").
+			Placeholder("us-east, eu-west (empty = all)").
+			Description("Comma-separated regions for distributed probing").
+			Value(&d.Regions),
+	)
+
+	if d.SiteType == "http" {
+		config = append(config,
 			huh.NewConfirm().Title("Monitor SSL Certificate?").
-				Value(&m.siteFormData.CheckSSL),
+				Value(&d.CheckSSL),
 			huh.NewInput().Title("SSL Warning Threshold (days)").
 				Placeholder("7").
-				Value(&m.siteFormData.Threshold).
+				Value(&d.Threshold).
 				Validate(func(s string) error {
-					if !m.siteFormData.CheckSSL {
+					if !d.CheckSSL {
 						return nil
 					}
 					v, err := strconv.Atoi(s)
@@ -493,30 +535,13 @@ func (m *Model) initSiteHuhForm() tea.Cmd {
 					}
 					return nil
 				}),
-			huh.NewInput().Title("Max Retries Before Alert").
-				Placeholder("0").
-				Value(&m.siteFormData.Retries).
-				Validate(func(s string) error {
-					if m.siteFormData.SiteType == "group" {
-						return nil
-					}
-					v, err := strconv.Atoi(s)
-					if err != nil {
-						return fmt.Errorf("must be a number")
-					}
-					if v < 0 {
-						return fmt.Errorf("retries cannot be negative")
-					}
-					return nil
-				}),
 			huh.NewConfirm().Title("Ignore TLS Errors?").
-				Value(&m.siteFormData.IgnoreTLS),
-		).Title("Advanced").WithHideFunc(func() bool {
-			return m.siteFormData.SiteType == "group"
-		}),
-	).WithTheme(m.theme.HuhTheme())
+				Value(&d.IgnoreTLS),
+		)
+	}
 
-	return m.huhForm.Init()
+	groups = append(groups, huh.NewGroup(config...).Title("Configuration"))
+	return groups
 }
 
 func (m *Model) submitSiteForm() tea.Cmd {

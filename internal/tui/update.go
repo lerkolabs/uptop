@@ -128,6 +128,13 @@ func (m *Model) handleFormMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if f, ok := form.(*huh.Form); ok {
 			m.huhForm = f
 		}
+		if m.state == stateFormSite && m.siteFormData != nil &&
+			m.siteFormData.SiteType != m.lastSiteType {
+			rebuildCmd := m.rebuildSiteForm()
+			// Advance to Type select — user just changed it.
+			skipName := m.huhForm.NextField()
+			return m, tea.Batch(rebuildCmd, skipName)
+		}
 		if m.huhForm.State == huh.StateCompleted {
 			// The store write runs in the returned Cmd; its writeDoneMsg
 			// triggers the tab-data reload once the row actually exists.

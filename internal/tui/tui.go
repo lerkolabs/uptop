@@ -115,6 +115,7 @@ type Model struct {
 
 	huhForm       *huh.Form
 	siteFormData  *siteFormData
+	lastSiteType  string
 	alertFormData *alertFormData
 	userFormData  *userFormData
 	maintFormData *maintFormData
