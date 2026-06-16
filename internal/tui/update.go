@@ -727,6 +727,7 @@ func (m *Model) handleClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	for i := m.tableOffset; i < end; i++ {
 		if m.zones.Get(fmt.Sprintf("%s-%d", prefix, i)).InBounds(msg) {
 			m.cursor = i
+			m.syncSelectedID()
 			return m, nil
 		}
 	}
