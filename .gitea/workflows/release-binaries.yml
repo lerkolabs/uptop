@@ -49,6 +49,7 @@ jobs:
           version: "~> v2"
           args: release --clean --release-notes=/tmp/release-notes.md
         env:
+          GORELEASER_CURRENT_TAG: ${{ github.ref_name }}
           GORELEASER_FORCE_TOKEN: gitea
           GITEA_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           GITEA_API_URL: http://gitea:3000/api/v1
