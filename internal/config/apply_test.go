@@ -266,6 +266,74 @@ func TestApplyDuplicateNames(t *testing.T) {
 	}
 }
 
+func TestApplyDryRunNewAlertAndMonitor(t *testing.T) {
+	s := newTestStore(t)
+	f := &File{
+		Alerts: []Alert{
+			{Name: "Discord", Type: "discord", Settings: map[string]string{"url": "https://example.com"}},
+		},
+		Monitors: []Monitor{
+			{Name: "Web", Type: "http", URL: "https://example.com", Interval: 30, Alert: "Discord"},
+		},
+	}
+
+	changes, err := Apply(context.Background(), s, f, ApplyOpts{DryRun: true})
+	if err != nil {
+		t.Fatalf("dry-run with new alert+monitor should not error: %v", err)
+	}
+
+	creates := 0
+	for _, c := range changes {
+		if c.Action == "create" {
+			creates++
+		}
+	}
+	if creates != 2 {
+		t.Fatalf("expected 2 creates (alert+monitor), got %d: %+v", creates, changes)
+	}
+
+	sites, _ := s.GetSites(context.Background())
+	alerts, _ := s.GetAllAlerts(context.Background())
+	if len(sites) != 0 {
+		t.Fatalf("dry-run should not persist sites, got %d", len(sites))
+	}
+	if len(alerts) != 0 {
+		t.Fatalf("dry-run should not persist alerts, got %d", len(alerts))
+	}
+}
+
+func TestApplyDryRunNewGroupWithChildren(t *testing.T) {
+	s := newTestStore(t)
+	f := &File{
+		Alerts: []Alert{
+			{Name: "Slack", Type: "slack", Settings: map[string]string{"url": "https://hooks.example.com"}},
+		},
+		Monitors: []Monitor{
+			{
+				Name: "Prod", Type: "group", Alert: "Slack",
+				Monitors: []Monitor{
+					{Name: "API", Type: "http", URL: "https://api.example.com", Interval: 15, Alert: "Slack"},
+				},
+			},
+		},
+	}
+
+	changes, err := Apply(context.Background(), s, f, ApplyOpts{DryRun: true})
+	if err != nil {
+		t.Fatalf("dry-run with new group+alert should not error: %v", err)
+	}
+
+	creates := 0
+	for _, c := range changes {
+		if c.Action == "create" {
+			creates++
+		}
+	}
+	if creates != 3 {
+		t.Fatalf("expected 3 creates (alert+group+child), got %d: %+v", creates, changes)
+	}
+}
+
 func TestApplyExistingAlertReference(t *testing.T) {
 	s := newTestStore(t)
 	s.AddAlert(context.Background(), "Existing", "webhook", map[string]string{"url": "https://example.com"})

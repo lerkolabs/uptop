@@ -1,6 +1,6 @@
 services:
   leader:
-    build: .
+    image: lerkolabs/uptop:latest
     environment:
       - UPTOP_CLUSTER_MODE=leader
       - UPTOP_CLUSTER_SECRET=changeme  # EXAMPLE ONLY — rotate before use
@@ -11,7 +11,7 @@ services:
       - "23234:23234"
 
   probe-us-east:
-    build: .
+    image: lerkolabs/uptop:latest
     environment:
       - UPTOP_CLUSTER_MODE=probe
       - UPTOP_NODE_ID=us-east-1
@@ -23,7 +23,7 @@ services:
       - leader
 
   probe-eu-west:
-    build: .
+    image: lerkolabs/uptop:latest
     environment:
       - UPTOP_CLUSTER_MODE=probe
       - UPTOP_NODE_ID=eu-west-1

@@ -1,8 +1,8 @@
 services:
   # The Application
   app:
-    build: 
-      context: .
+    build:
+      context: ..
       dockerfile: Dockerfile
     container_name: uptop-dev
     ports:

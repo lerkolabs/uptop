@@ -1,8 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: lerkolabs/uptop:latest
     container_name: uptop
     restart: unless-stopped
     read_only: true

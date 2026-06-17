@@ -54,6 +54,7 @@ func Apply(ctx context.Context, s store.Store, f *File, opts ApplyOpts) ([]Chang
 		alertMap[ea.Name] = ea.ID
 	}
 
+	nextPlaceholderID := -1
 	desiredAlertNames := make(map[string]bool, len(f.Alerts))
 	for _, a := range f.Alerts {
 		desiredAlertNames[a.Name] = true
@@ -66,6 +67,9 @@ func Apply(ctx context.Context, s store.Store, f *File, opts ApplyOpts) ([]Chang
 					return changes, fmt.Errorf("create alert %q: %w", a.Name, err)
 				}
 				alertMap[a.Name] = id
+			} else {
+				alertMap[a.Name] = nextPlaceholderID
+				nextPlaceholderID--
 			}
 		} else {
 			alertMap[a.Name] = existing.ID
@@ -109,6 +113,9 @@ func Apply(ctx context.Context, s store.Store, f *File, opts ApplyOpts) ([]Chang
 					return changes, fmt.Errorf("create group %q: %w", g.Name, err)
 				}
 				groupMap[g.Name] = id
+			} else {
+				groupMap[g.Name] = nextPlaceholderID
+				nextPlaceholderID--
 			}
 		} else {
 			groupMap[g.Name] = existing.ID

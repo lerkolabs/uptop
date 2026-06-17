@@ -3,7 +3,7 @@
 ## Development
 
 ```sh
-go run cmd/uptop/main.go -demo  # starts with sample data
+go run ./cmd/uptop -demo        # starts with sample data
 ssh -p 23234 localhost              # connect to TUI
 ```
 

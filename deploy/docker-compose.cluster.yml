@@ -3,7 +3,7 @@ services:
   # LEADER NODE
   # -------------------------
   leader:
-    build: .
+    image: lerkolabs/uptop:latest
     container_name: uptop-leader
     ports:
       - "23234:23234" # SSH
@@ -38,7 +38,7 @@ services:
   # FOLLOWER NODE
   # -------------------------
   follower:
-    build: .
+    image: lerkolabs/uptop:latest
     container_name: uptop-follower
     ports:
       - "23233:23234" # SSH (Mapped to different host port)

@@ -53,14 +53,14 @@ Canonical repo: [gitea.lerkolabs.com/lerkolabs/uptop](https://gitea.lerkolabs.co
 ## Quick start
 
 ```bash
-go run ./cmd/uptop
+UPTOP_ADMIN_KEY="$(cat ~/.ssh/id_ed25519.pub)" go run ./cmd/uptop
 ssh -p 23234 localhost
 ```
 
 Want some data to look at first:
 
 ```bash
-go run ./cmd/uptop -demo
+UPTOP_ADMIN_KEY="$(cat ~/.ssh/id_ed25519.pub)" go run ./cmd/uptop -demo
 ```
 
 ## Install
