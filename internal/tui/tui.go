@@ -46,14 +46,14 @@ type styles struct {
 
 func newStyles(t Theme) *styles {
 	return &styles{
-		subtleStyle:  lipgloss.NewStyle().Foreground(t.Subtle),
+		subtleStyle:  lipgloss.NewStyle().Foreground(t.Subtle).Faint(true),
 		specialStyle: lipgloss.NewStyle().Foreground(t.Success),
-		warnStyle:    lipgloss.NewStyle().Foreground(t.Warning),
-		staleStyle:   lipgloss.NewStyle().Foreground(t.Stale),
-		dangerStyle:  lipgloss.NewStyle().Foreground(t.Danger),
+		warnStyle:    lipgloss.NewStyle().Foreground(t.Warning).Bold(true),
+		staleStyle:   lipgloss.NewStyle().Foreground(t.Stale).Faint(true),
+		dangerStyle:  lipgloss.NewStyle().Foreground(t.Danger).Bold(true),
 		titleStyle:   lipgloss.NewStyle().Foreground(t.Accent).Bold(true),
 		activeTab:    lipgloss.NewStyle().Background(t.Surface).Foreground(t.Accent).Bold(true).Padding(0, 1),
-		inactiveTab:  lipgloss.NewStyle().Padding(0, 1).Foreground(t.Muted),
+		inactiveTab:  lipgloss.NewStyle().Padding(0, 1).Foreground(t.Muted).Faint(true),
 
 		sparkSuccess: t.Success,
 		sparkWarning: t.Warning,
@@ -62,7 +62,7 @@ func newStyles(t Theme) *styles {
 		tableHeaderStyle:   lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Padding(0, 1),
 		tableCellStyle:     lipgloss.NewStyle().Padding(0, 1),
 		tableSelectedStyle: lipgloss.NewStyle().Padding(0, 1).Bold(true).Foreground(t.SelectedFg).Background(t.SelectedBg),
-		tableBorderStyle:   lipgloss.NewStyle().Foreground(t.Border),
+		tableBorderStyle:   lipgloss.NewStyle().Foreground(t.Border).Faint(true),
 		tableZebraStyle:    lipgloss.NewStyle().Padding(0, 1).Background(t.ZebraBg),
 
 		siteGroupStyle: lipgloss.NewStyle().Padding(0, 1).Bold(true).Foreground(t.Accent),
