@@ -1,6 +1,6 @@
 # Changelog
 
-## [v0.1.0] — 2026-06-12
+## [Unreleased]
 
 ### Added
 
@@ -74,6 +74,7 @@
 - extract Server type with named handler methods
 - split Site into SiteConfig + SiteState
 - unify logging with log/slog
+- restructure site form to 2 type-aware pages
 
 ### Fixed
 
@@ -176,4 +177,7 @@
 - remove tagged scan image in cleanup step
 - exclude rc tags from cliff tag_pattern so launch notes span full history
 - fall back to embedded build info when ldflags absent
+- drop body-grep Security grouping, map polish type in cliff
+- sync selectedID on click so refreshLive doesn't revert cursor
+- resolve 4 tag-blocking issues for v0.1.0
 
