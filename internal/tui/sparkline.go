@@ -17,6 +17,17 @@ func parseHex(hex string) (r, g, b uint8) {
 	return
 }
 
+func trueColorHex(c lipgloss.TerminalColor) string {
+	switch v := c.(type) {
+	case lipgloss.CompleteColor:
+		return v.TrueColor
+	case lipgloss.Color:
+		return string(v)
+	default:
+		return ""
+	}
+}
+
 func dimColor(hex string, brightness float64) lipgloss.Color {
 	r, g, b := parseHex(hex)
 	f := 0.3 + brightness*0.7
@@ -27,35 +38,36 @@ func dimColor(hex string, brightness float64) lipgloss.Color {
 	))
 }
 
-func withBg(s lipgloss.Style, bg lipgloss.Color) lipgloss.Style {
-	if bg != "" {
+func withBg(s lipgloss.Style, bg lipgloss.TerminalColor) lipgloss.Style {
+	if bg != nil {
 		return s.Background(bg)
 	}
 	return s
 }
 
-func (m Model) latencyStyle(ms int64, bg lipgloss.Color) lipgloss.Style {
-	var hex string
+func (m Model) latencyStyle(ms int64, bg lipgloss.TerminalColor) lipgloss.Style {
+	var base lipgloss.TerminalColor
 	var t float64
 	switch {
 	case ms < 200:
-		hex = m.st.sparkSuccess
+		base = m.st.sparkSuccess
 		t = float64(ms) / 200
 	case ms < 500:
-		hex = m.st.sparkWarning
+		base = m.st.sparkWarning
 		t = float64(ms-200) / 300
 	default:
-		hex = m.st.sparkDanger
+		base = m.st.sparkDanger
 		t = float64(ms-500) / 1500
 		if t > 1 {
 			t = 1
 		}
 	}
+	hex := trueColorHex(base)
 	s := lipgloss.NewStyle().Foreground(dimColor(hex, t))
 	return withBg(s, bg)
 }
 
-func (m Model) latencySparkline(latencies []time.Duration, statuses []bool, width int, bg lipgloss.Color) string {
+func (m Model) latencySparkline(latencies []time.Duration, statuses []bool, width int, bg lipgloss.TerminalColor) string {
 	if len(latencies) == 0 {
 		return withBg(m.st.subtleStyle, bg).Render(strings.Repeat("·", width))
 	}
@@ -103,7 +115,7 @@ func (m Model) latencySparkline(latencies []time.Duration, statuses []bool, widt
 	return sb.String()
 }
 
-func (m Model) heartbeatSparkline(statuses []bool, width int, bg lipgloss.Color) string {
+func (m Model) heartbeatSparkline(statuses []bool, width int, bg lipgloss.TerminalColor) string {
 	if len(statuses) == 0 {
 		return withBg(m.st.subtleStyle, bg).Render(strings.Repeat("·", width))
 	}
@@ -143,7 +155,7 @@ func resolveSparklineIndex(x, sparkWidth, dataLen int) int {
 	return offset + (x - padding)
 }
 
-func (m Model) groupSparkline(groupID int, width int, bg lipgloss.Color) string {
+func (m Model) groupSparkline(groupID int, width int, bg lipgloss.TerminalColor) string {
 	allSites := m.engine.GetAllSites()
 	var childStatuses [][]bool
 	for _, s := range allSites {

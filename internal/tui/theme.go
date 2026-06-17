@@ -5,35 +5,43 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+func cc(hex, ansi string) lipgloss.CompleteColor {
+	return lipgloss.CompleteColor{
+		TrueColor: hex,
+		ANSI256:   hex,
+		ANSI:      ansi,
+	}
+}
+
 type Theme struct {
 	Name string
 
 	// Base layers
-	Bg      lipgloss.Color
-	Surface lipgloss.Color
-	Panel   lipgloss.Color
-	Border  lipgloss.Color
+	Bg      lipgloss.TerminalColor
+	Surface lipgloss.TerminalColor
+	Panel   lipgloss.TerminalColor
+	Border  lipgloss.TerminalColor
 
 	// Text
-	Fg     lipgloss.Color
-	Muted  lipgloss.Color
-	Subtle lipgloss.Color
+	Fg     lipgloss.TerminalColor
+	Muted  lipgloss.TerminalColor
+	Subtle lipgloss.TerminalColor
 
 	// Semantic
-	Success lipgloss.Color
-	Warning lipgloss.Color
-	Stale   lipgloss.Color
-	Danger  lipgloss.Color
-	Info    lipgloss.Color
-	Accent  lipgloss.Color
-	Purple  lipgloss.Color
+	Success lipgloss.TerminalColor
+	Warning lipgloss.TerminalColor
+	Stale   lipgloss.TerminalColor
+	Danger  lipgloss.TerminalColor
+	Info    lipgloss.TerminalColor
+	Accent  lipgloss.TerminalColor
+	Purple  lipgloss.TerminalColor
 
 	// Table
-	ZebraBg lipgloss.Color
+	ZebraBg lipgloss.TerminalColor
 
 	// Selection
-	SelectedFg lipgloss.Color
-	SelectedBg lipgloss.Color
+	SelectedFg lipgloss.TerminalColor
+	SelectedBg lipgloss.TerminalColor
 }
 
 var themes = []Theme{
@@ -46,107 +54,107 @@ var themes = []Theme{
 
 var themeFlexokiDark = Theme{
 	Name:       "Flexoki Dark",
-	Bg:         "#1C1B1A",
-	Surface:    "#282726",
-	Panel:      "#343331",
-	Border:     "#575653",
-	Fg:         "#CECDC3",
-	Muted:      "#878580",
-	Subtle:     "#6F6E69",
-	Success:    "#879A39",
-	Warning:    "#D0A215",
-	Stale:      "#DA702C",
-	Danger:     "#D14D41",
-	Info:       "#4385BE",
-	Accent:     "#3AA99F",
-	Purple:     "#8B7EC8",
-	ZebraBg:    "#222120",
-	SelectedFg: "#FFFCF0",
-	SelectedBg: "#403E3C",
+	Bg:         cc("#1C1B1A", ""),
+	Surface:    cc("#282726", ""),
+	Panel:      cc("#343331", ""),
+	Border:     cc("#575653", "8"),
+	Fg:         cc("#CECDC3", "15"),
+	Muted:      cc("#878580", "7"),
+	Subtle:     cc("#6F6E69", "8"),
+	Success:    cc("#879A39", "10"),
+	Warning:    cc("#D0A215", "11"),
+	Stale:      cc("#DA702C", "3"),
+	Danger:     cc("#D14D41", "9"),
+	Info:       cc("#4385BE", "12"),
+	Accent:     cc("#3AA99F", "14"),
+	Purple:     cc("#8B7EC8", "13"),
+	ZebraBg:    cc("#222120", ""),
+	SelectedFg: cc("#FFFCF0", "15"),
+	SelectedBg: cc("#403E3C", "4"),
 }
 
 var themeTokyoNight = Theme{
 	Name:       "Tokyo Night",
-	Bg:         "#1a1b26",
-	Surface:    "#24283b",
-	Panel:      "#292e42",
-	Border:     "#3b4261",
-	Fg:         "#c0caf5",
-	Muted:      "#a9b1d6",
-	Subtle:     "#565f89",
-	Success:    "#9ece6a",
-	Warning:    "#e0af68",
-	Stale:      "#ff9e64",
-	Danger:     "#f7768e",
-	Info:       "#7aa2f7",
-	Accent:     "#7dcfff",
-	Purple:     "#bb9af7",
-	ZebraBg:    "#1c1d28",
-	SelectedFg: "#c0caf5",
-	SelectedBg: "#292e42",
+	Bg:         cc("#1a1b26", ""),
+	Surface:    cc("#24283b", ""),
+	Panel:      cc("#292e42", ""),
+	Border:     cc("#3b4261", "8"),
+	Fg:         cc("#c0caf5", "15"),
+	Muted:      cc("#a9b1d6", "7"),
+	Subtle:     cc("#565f89", "8"),
+	Success:    cc("#9ece6a", "10"),
+	Warning:    cc("#e0af68", "11"),
+	Stale:      cc("#ff9e64", "3"),
+	Danger:     cc("#f7768e", "9"),
+	Info:       cc("#7aa2f7", "12"),
+	Accent:     cc("#7dcfff", "14"),
+	Purple:     cc("#bb9af7", "13"),
+	ZebraBg:    cc("#1c1d28", ""),
+	SelectedFg: cc("#c0caf5", "15"),
+	SelectedBg: cc("#292e42", "4"),
 }
 
 var themeGruvbox = Theme{
 	Name:       "Gruvbox",
-	Bg:         "#282828",
-	Surface:    "#3c3836",
-	Panel:      "#504945",
-	Border:     "#665c54",
-	Fg:         "#ebdbb2",
-	Muted:      "#bdae93",
-	Subtle:     "#7c6f64",
-	Success:    "#b8bb26",
-	Warning:    "#fabd2f",
-	Stale:      "#fe8019",
-	Danger:     "#fb4934",
-	Info:       "#83a598",
-	Accent:     "#8ec07c",
-	Purple:     "#d3869b",
-	ZebraBg:    "#2a2a2a",
-	SelectedFg: "#fbf1c7",
-	SelectedBg: "#504945",
+	Bg:         cc("#282828", ""),
+	Surface:    cc("#3c3836", ""),
+	Panel:      cc("#504945", ""),
+	Border:     cc("#665c54", "8"),
+	Fg:         cc("#ebdbb2", "15"),
+	Muted:      cc("#bdae93", "7"),
+	Subtle:     cc("#7c6f64", "8"),
+	Success:    cc("#b8bb26", "10"),
+	Warning:    cc("#fabd2f", "11"),
+	Stale:      cc("#fe8019", "3"),
+	Danger:     cc("#fb4934", "9"),
+	Info:       cc("#83a598", "12"),
+	Accent:     cc("#8ec07c", "14"),
+	Purple:     cc("#d3869b", "13"),
+	ZebraBg:    cc("#2a2a2a", ""),
+	SelectedFg: cc("#fbf1c7", "15"),
+	SelectedBg: cc("#504945", "4"),
 }
 
 var themeCatppuccinMocha = Theme{
 	Name:       "Catppuccin Mocha",
-	Bg:         "#1e1e2e",
-	Surface:    "#313244",
-	Panel:      "#45475a",
-	Border:     "#585b70",
-	Fg:         "#cdd6f4",
-	Muted:      "#a6adc8",
-	Subtle:     "#6c7086",
-	Success:    "#a6e3a1",
-	Warning:    "#f9e2af",
-	Stale:      "#fab387",
-	Danger:     "#f38ba8",
-	Info:       "#89b4fa",
-	Accent:     "#94e2d5",
-	Purple:     "#cba6f7",
-	ZebraBg:    "#232334",
-	SelectedFg: "#cdd6f4",
-	SelectedBg: "#45475a",
+	Bg:         cc("#1e1e2e", ""),
+	Surface:    cc("#313244", ""),
+	Panel:      cc("#45475a", ""),
+	Border:     cc("#585b70", "8"),
+	Fg:         cc("#cdd6f4", "15"),
+	Muted:      cc("#a6adc8", "7"),
+	Subtle:     cc("#6c7086", "8"),
+	Success:    cc("#a6e3a1", "10"),
+	Warning:    cc("#f9e2af", "11"),
+	Stale:      cc("#fab387", "3"),
+	Danger:     cc("#f38ba8", "9"),
+	Info:       cc("#89b4fa", "12"),
+	Accent:     cc("#94e2d5", "14"),
+	Purple:     cc("#cba6f7", "13"),
+	ZebraBg:    cc("#232334", ""),
+	SelectedFg: cc("#cdd6f4", "15"),
+	SelectedBg: cc("#45475a", "4"),
 }
 
 var themeNord = Theme{
 	Name:       "Nord",
-	Bg:         "#2e3440",
-	Surface:    "#3b4252",
-	Panel:      "#434c5e",
-	Border:     "#4c566a",
-	Fg:         "#d8dee9",
-	Muted:      "#d8dee9",
-	Subtle:     "#4c566a",
-	Success:    "#a3be8c",
-	Warning:    "#ebcb8b",
-	Stale:      "#d08770",
-	Danger:     "#bf616a",
-	Info:       "#81a1c1",
-	Accent:     "#88c0d0",
-	Purple:     "#b48ead",
-	ZebraBg:    "#323845",
-	SelectedFg: "#eceff4",
-	SelectedBg: "#434c5e",
+	Bg:         cc("#2e3440", ""),
+	Surface:    cc("#3b4252", ""),
+	Panel:      cc("#434c5e", ""),
+	Border:     cc("#4c566a", "8"),
+	Fg:         cc("#d8dee9", "15"),
+	Muted:      cc("#d8dee9", "7"),
+	Subtle:     cc("#4c566a", "8"),
+	Success:    cc("#a3be8c", "10"),
+	Warning:    cc("#ebcb8b", "11"),
+	Stale:      cc("#d08770", "3"),
+	Danger:     cc("#bf616a", "9"),
+	Info:       cc("#81a1c1", "12"),
+	Accent:     cc("#88c0d0", "14"),
+	Purple:     cc("#b48ead", "13"),
+	ZebraBg:    cc("#323845", ""),
+	SelectedFg: cc("#eceff4", "15"),
+	SelectedBg: cc("#434c5e", "4"),
 }
 
 func (t Theme) HuhTheme() *huh.Theme {

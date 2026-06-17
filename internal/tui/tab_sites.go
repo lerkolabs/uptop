@@ -204,7 +204,7 @@ func (m Model) viewSitesTab() string {
 			for i := start; i < end; i++ {
 				site := m.sites[i]
 				rowIdx := i - start
-				var rowBg lipgloss.Color
+				var rowBg lipgloss.TerminalColor
 				if i == m.cursor {
 					rowBg = m.theme.SelectedBg
 				} else if rowIdx%2 == 1 {

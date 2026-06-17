@@ -30,9 +30,9 @@ type styles struct {
 	activeTab    lipgloss.Style
 	inactiveTab  lipgloss.Style
 
-	sparkSuccess string
-	sparkWarning string
-	sparkDanger  string
+	sparkSuccess lipgloss.TerminalColor
+	sparkWarning lipgloss.TerminalColor
+	sparkDanger  lipgloss.TerminalColor
 
 	tableHeaderStyle   lipgloss.Style
 	tableCellStyle     lipgloss.Style
@@ -55,9 +55,9 @@ func newStyles(t Theme) *styles {
 		activeTab:    lipgloss.NewStyle().Background(t.Surface).Foreground(t.Accent).Bold(true).Padding(0, 1),
 		inactiveTab:  lipgloss.NewStyle().Padding(0, 1).Foreground(t.Muted),
 
-		sparkSuccess: string(t.Success),
-		sparkWarning: string(t.Warning),
-		sparkDanger:  string(t.Danger),
+		sparkSuccess: t.Success,
+		sparkWarning: t.Warning,
+		sparkDanger:  t.Danger,
 
 		tableHeaderStyle:   lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Padding(0, 1),
 		tableCellStyle:     lipgloss.NewStyle().Padding(0, 1),
