@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" fill="none">
+  <!-- Terminal-inspired text mark for uptop -->
+  <rect width="320" height="80" rx="8" fill="#1C1B1A"/>
+  <!-- Prompt caret -->
+  <text x="16" y="52" font-family="'JetBrains Mono','Fira Code','SF Mono',monospace" font-size="36" font-weight="700" fill="#3AA99F">▲</text>
+  <!-- "uptop" in monospace -->
+  <text x="52" y="52" font-family="'JetBrains Mono','Fira Code','SF Mono',monospace" font-size="36" font-weight="700" fill="#CECDC3">uptop</text>
+  <!-- Status dot -->
+  <circle cx="296" cy="40" r="6" fill="#879A39"/>
+</svg>

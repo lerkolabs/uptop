@@ -1,13 +1,15 @@
 <div align="center">
-  <h1>uptop</h1>
+  <img src="assets/logo.svg" alt="uptop" width="320">
   <p>Self-hosted uptime monitoring with a TUI over SSH.</p>
   <p>No browser. No client install. Just <code>ssh -p 23234 your-server</code>.</p>
 
   <p>
     <a href="https://gitea.lerkolabs.com/lerkolabs/uptop/actions"><img src="https://gitea.lerkolabs.com/lerkolabs/uptop/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-    <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License">
+    <a href="https://github.com/lerkolabs/uptop/releases/latest"><img src="https://img.shields.io/github/v/release/lerkolabs/uptop" alt="Latest Release"></a>
+    <a href="https://goreportcard.com/report/github.com/lerkolabs/uptop"><img src="https://goreportcard.com/badge/github.com/lerkolabs/uptop" alt="Go Report Card"></a>
     <img src="https://img.shields.io/badge/go-1.26-00ADD8?logo=go&logoColor=white" alt="Go 1.26">
     <img src="https://img.shields.io/docker/pulls/lerkolabs/uptop" alt="Docker Pulls">
+    <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License">
   </p>
 
   <img src="assets/demo.gif" alt="uptop demo" width="800">
