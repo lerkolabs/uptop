@@ -179,7 +179,7 @@ type Model struct {
 	lastTabLoad        time.Time // last dispatch of loadTabDataCmd (throttle)
 	tabSeq             int       // seq of the newest issued tab-data load
 
-	// detail-panel state-change history, loaded on enter so View does no DB IO
+	detailOpen          bool
 	detailChanges       []models.StateChange
 	detailChangesSiteID int
 

@@ -517,7 +517,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "tab":
 		m.switchTab(m.currentTab + 1)
-	case "left", "h":
+	case "left":
 		if m.currentTab == tabSettings {
 			m.switchSettingsSection(m.settingsSection - 1)
 		}
@@ -532,6 +532,9 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.tableOffset = m.cursor
 			}
 			m.syncSelectedID()
+			if m.detailOpen && m.currentTab == tabMonitors && m.cursor < len(m.sites) {
+				return m, m.loadDetailCmd(m.sites[m.cursor].ID)
+			}
 		}
 	case "down", "j":
 		max := m.currentListLen() - 1
@@ -541,6 +544,9 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.tableOffset++
 			}
 			m.syncSelectedID()
+			if m.detailOpen && m.currentTab == tabMonitors && m.cursor < len(m.sites) {
+				return m, m.loadDetailCmd(m.sites[m.cursor].ID)
+			}
 		}
 	case "n":
 		return m.handleNewItem()
@@ -574,10 +580,34 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "i":
 		if m.currentTab == tabMonitors && len(m.sites) > 0 {
-			m.state = stateDetail
-			return m, m.loadDetailCmd(m.sites[m.cursor].ID)
+			m.detailOpen = !m.detailOpen
+			if m.detailOpen {
+				return m, m.loadDetailCmd(m.sites[m.cursor].ID)
+			}
 		} else if m.currentTab == tabSettings && m.settingsSection == sectionAlerts && len(m.alerts) > 0 {
 			m.state = stateAlertDetail
+		}
+	case "esc":
+		if m.currentTab == tabMonitors && m.detailOpen {
+			m.detailOpen = false
+		}
+	case "h":
+		if m.detailOpen && m.currentTab == tabMonitors && m.cursor < len(m.sites) {
+			site := m.sites[m.cursor]
+			m.historySiteName = site.Name
+			m.historySiteID = site.ID
+			m.historyChanges = nil
+			m.historyViewport = viewport.New(
+				m.termWidth-chromePadH,
+				m.termHeight-10,
+			)
+			m.historyViewport.SetContent("\n  Loading state history...")
+			m.state = stateHistory
+			return m, m.loadHistoryCmd(site.ID)
+		}
+	case "s":
+		if m.detailOpen && m.currentTab == tabMonitors && m.cursor < len(m.sites) {
+			return m, m.openSLAView(m.sites[m.cursor])
 		}
 	case "x":
 		if m.currentTab == tabMaint && len(m.maintenanceWindows) > 0 {

@@ -162,10 +162,22 @@ func (m Model) viewDashboard() string {
 			left := lipgloss.NewStyle().Width(leftW).Render(monitors)
 			sidebar := m.viewLogsSidebar(rightW)
 			right := lipgloss.NewStyle().Width(rightW).Render(sidebar)
-			content = lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+			top := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+			if m.detailOpen {
+				detail := m.viewDetailInline(availW)
+				content = top + "\n" + detail
+			} else {
+				content = top
+			}
 		} else {
 			m.contentWidth = m.termWidth
-			content = m.viewSitesTab()
+			monitors := m.viewSitesTab()
+			if m.detailOpen {
+				detail := m.viewDetailInline(m.termWidth - chromePadH)
+				content = monitors + "\n" + detail
+			} else {
+				content = monitors
+			}
 		}
 	case tabMaint:
 		m.contentWidth = m.termWidth
