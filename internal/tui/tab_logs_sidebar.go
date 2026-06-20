@@ -52,7 +52,7 @@ func (m Model) renderCompactLogLine(line string, maxW int) string {
 	return " " + tag + " " + msg
 }
 
-func (m Model) viewLogsSidebar(width int) string {
+func (m Model) viewLogsSidebar(width, maxLines int) string {
 	logs := m.engine.GetLogs()
 	if len(logs) == 0 {
 		return m.st.subtleStyle.Render("  No logs yet")
@@ -69,6 +69,9 @@ func (m Model) viewLogsSidebar(width int) string {
 			continue
 		}
 		lines = append(lines, m.renderCompactLogLine(line, width))
+		if maxLines > 0 && len(lines) >= maxLines {
+			break
+		}
 	}
 
 	return "\n" + sidebarStyle.Render(strings.Join(lines, "\n"))

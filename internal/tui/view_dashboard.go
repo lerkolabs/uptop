@@ -160,7 +160,7 @@ func (m Model) viewDashboard() string {
 			m.contentWidth = leftW
 			monitors := m.viewSitesTab()
 			left := lipgloss.NewStyle().Width(leftW).Render(monitors)
-			sidebar := m.viewLogsSidebar(rightW)
+			sidebar := m.viewLogsSidebar(rightW, m.maxTableRows+chromeTable)
 			right := lipgloss.NewStyle().Width(rightW).Render(sidebar)
 			top := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 			if m.detailOpen {
