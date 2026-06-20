@@ -116,7 +116,7 @@ func (m *Model) submitUserForm() tea.Cmd {
 	st := m.store
 	id := m.editID
 	username, key, role := d.Username, d.PublicKey, d.Role
-	m.state = stateUsers
+	m.state = stateDashboard
 	if id > 0 {
 		return writeCmd("Update user", func() error {
 			return st.UpdateUser(context.Background(), id, username, key, role)

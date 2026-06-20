@@ -151,20 +151,22 @@ func (m Model) viewDashboard() string {
 
 	var content string
 	switch m.currentTab {
-	case 0:
-		content = m.viewSitesTab()
-	case 1:
-		content = m.viewAlertsTab()
-	case 2:
-		content = m.viewLogsTab()
-	case 3:
-		content = m.viewNodesTab()
-	case 4:
-		content = m.viewMaintTab()
-	case 5:
-		if m.isAdmin {
-			content = m.viewUsersTab()
+	case tabMonitors:
+		monitors := m.viewSitesTab()
+		if m.termWidth >= wideBreakpoint {
+			availW := m.termWidth - chromePadH
+			leftW := availW * 70 / 100
+			rightW := availW - leftW
+			left := lipgloss.NewStyle().Width(leftW).Render(monitors)
+			right := lipgloss.NewStyle().Width(rightW).Render(m.viewLogsTab())
+			content = lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+		} else {
+			content = monitors
 		}
+	case tabMaint:
+		content = m.viewMaintTab()
+	case tabSettings:
+		content = m.viewSettingsTab()
 	}
 
 	content = strings.TrimSpace(content)
@@ -199,15 +201,15 @@ type tabEntry struct {
 }
 
 func (m Model) renderTabBar(stats dashboardStats) string {
+	settingsCount := len(m.alerts) + len(m.nodes)
+	settingsWarn := stats.offlineNodes
+	if m.isAdmin {
+		settingsCount += len(m.users)
+	}
 	tabs := []tabEntry{
 		{"Monitors", stats.totalMonitors, stats.downCount + stats.lateCount},
-		{"Alerts", len(m.alerts), 0},
-		{"Logs", 0, 0},
-		{"Nodes", len(m.nodes), stats.offlineNodes},
 		{"Maint", len(m.maintenanceWindows), stats.activeMaint},
-	}
-	if m.isAdmin {
-		tabs = append(tabs, tabEntry{"Users", len(m.users), 0})
+		{"Settings", settingsCount, settingsWarn},
 	}
 
 	countStyle := lipgloss.NewStyle().Foreground(m.theme.Muted)
@@ -270,23 +272,26 @@ func (m Model) renderFooter(stats dashboardStats) string {
 
 	var keys string
 	switch m.currentTab {
-	case 0:
+	case tabMonitors:
 		keys = "[/]Filter [n]New [e]Edit [i]Info [d]Del [p]Pause [Space]Collapse [T]Theme [Tab]Switch [q]Quit"
-	case 1:
-		keys = "[n]New [e]Edit [i]Info [d]Del [t]Test [T]Theme [Tab]Switch [q]Quit"
-	case 2:
-		keys = "[↑/↓]Scroll  [PgUp/PgDn]Page  [f]Filter  [T]Theme  [Tab]Switch  [q]Quit"
-	case 4:
+	case tabMaint:
 		keys = "[n]New [x]End [d]Del [T]Theme [Tab]Switch [q]Quit"
-	case 5:
-		keys = "[n]Add [d]Revoke [T]Theme [Tab]Switch [q]Quit"
+	case tabSettings:
+		switch m.settingsSection {
+		case sectionAlerts:
+			keys = "[n]New [e]Edit [i]Info [d]Del [t]Test [←/→]Section [T]Theme [Tab]Switch [q]Quit"
+		case sectionUsers:
+			keys = "[n]Add [d]Revoke [←/→]Section [T]Theme [Tab]Switch [q]Quit"
+		default:
+			keys = "[←/→]Section [T]Theme [Tab]Switch [q]Quit"
+		}
 	default:
 		keys = "[T]Theme [Tab]Switch [q]Quit"
 	}
 
 	ver := m.st.subtleStyle.Render("v" + m.version)
 	line := statusLine + "  " + m.st.subtleStyle.Render(keys) + "  " + ver
-	if m.filterText != "" && m.currentTab == 0 {
+	if m.filterText != "" && m.currentTab == tabMonitors {
 		line = m.st.subtleStyle.Render(fmt.Sprintf("filter: %s", m.filterText)) + "  " + statusLine + "  " + m.st.subtleStyle.Render(keys) + "  " + ver
 	}
 

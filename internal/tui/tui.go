@@ -84,6 +84,18 @@ const (
 	detailSparkWidth = 40
 )
 
+const (
+	tabMonitors = 0
+	tabMaint    = 1
+	tabSettings = 2
+)
+
+const (
+	sectionAlerts = 0
+	sectionNodes  = 1
+	sectionUsers  = 2
+)
+
 type sessionState int
 
 const (
@@ -102,16 +114,17 @@ const (
 )
 
 type Model struct {
-	state        sessionState
-	currentTab   int
-	cursor       int
-	selectedID   int
-	tableOffset  int
-	maxTableRows int
-	termWidth    int
-	termHeight   int
-	editID       int
-	editToken    string
+	state           sessionState
+	currentTab      int
+	settingsSection int
+	cursor          int
+	selectedID      int
+	tableOffset     int
+	maxTableRows    int
+	termWidth       int
+	termHeight      int
+	editID          int
+	editToken       string
 
 	huhForm       *huh.Form
 	siteFormData  *siteFormData

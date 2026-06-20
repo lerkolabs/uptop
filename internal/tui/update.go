@@ -78,31 +78,28 @@ func (m *Model) handleConfirmDelete(msg tea.Msg) (tea.Model, tea.Cmd) {
 		id := m.deleteID
 		var cmd tea.Cmd
 		switch m.deleteTab {
-		case 0:
+		case tabMonitors:
 			cmd = writeCmd("Delete site", func() error { return st.DeleteSite(context.Background(), id) })
 			m.engine.RemoveSite(id)
 			m.adjustCursor(len(m.sites) - 1)
-		case 1:
-			cmd = writeCmd("Delete alert", func() error { return st.DeleteAlert(context.Background(), id) })
-			m.adjustCursor(len(m.alerts) - 1)
-		case 4:
+		case tabMaint:
 			cmd = writeCmd("Delete maintenance window", func() error { return st.DeleteMaintenanceWindow(context.Background(), id) })
 			m.adjustCursor(len(m.maintenanceWindows) - 1)
-		case 5:
-			cmd = writeCmd("Delete user", func() error { return st.DeleteUser(context.Background(), id) })
-			m.adjustCursor(len(m.users) - 1)
+		case tabSettings:
+			switch m.settingsSection {
+			case sectionAlerts:
+				cmd = writeCmd("Delete alert", func() error { return st.DeleteAlert(context.Background(), id) })
+				m.adjustCursor(len(m.alerts) - 1)
+			case sectionUsers:
+				cmd = writeCmd("Delete user", func() error { return st.DeleteUser(context.Background(), id) })
+				m.adjustCursor(len(m.users) - 1)
+			}
 		}
 		m.refreshLive()
 		m.state = stateDashboard
-		if m.deleteTab == 5 {
-			m.state = stateUsers
-		}
 		return m, cmd
 	case "n", "N", "esc":
 		m.state = stateDashboard
-		if m.deleteTab == 5 {
-			m.state = stateUsers
-		}
 	case "ctrl+c":
 		return m, tea.Quit
 	}
@@ -117,9 +114,6 @@ func (m *Model) handleFormMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if keyMsg.String() == "esc" {
 			m.huhForm = nil
 			m.state = stateDashboard
-			if m.currentTab == 5 {
-				m.state = stateUsers
-			}
 			return m, nil
 		}
 	}
@@ -265,22 +259,13 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if m.state != stateDashboard && m.state != stateLogs && m.state != stateUsers {
+	if m.state != stateDashboard {
 		return m, nil
 	}
 	if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
 		return m.handleClick(msg)
 	}
 	if msg.Button != tea.MouseButtonWheelUp && msg.Button != tea.MouseButtonWheelDown {
-		return m, nil
-	}
-
-	if m.state == stateLogs {
-		if msg.Button == tea.MouseButtonWheelUp {
-			m.logViewport.ScrollUp(3)
-		} else {
-			m.logViewport.ScrollDown(3)
-		}
 		return m, nil
 	}
 
@@ -325,7 +310,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleSLAKey(msg)
 	case stateAlertDetail:
 		return m.handleAlertDetailKey(msg)
-	case stateDashboard, stateLogs, stateUsers:
+	case stateDashboard:
 		return m.handleDashboardKey(msg)
 	}
 	return m, nil
@@ -521,33 +506,27 @@ func (m *Model) handleAlertDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
 	switch msg.String() {
 	case "q":
 		return m, tea.Quit
 	case "/":
-		if m.currentTab == 0 {
+		if m.currentTab == tabMonitors {
 			m.filterMode = true
 			m.recalcLayout()
 			return m, nil
 		}
-	case "f":
-		if m.state == stateLogs {
-			m.logFilterImportant = !m.logFilterImportant
-			m.refreshLogContent()
-			return m, nil
-		}
 	case "tab":
 		m.switchTab(m.currentTab + 1)
-	case "pgup", "pgdown":
-		if m.state == stateLogs {
-			m.logViewport, cmd = m.logViewport.Update(msg)
-			return m, cmd
+	case "left", "h":
+		if m.currentTab == tabSettings {
+			m.switchSettingsSection(m.settingsSection - 1)
+		}
+	case "right", "l":
+		if m.currentTab == tabSettings {
+			m.switchSettingsSection(m.settingsSection + 1)
 		}
 	case "up", "k":
-		if m.state == stateLogs {
-			m.logViewport.ScrollUp(1)
-		} else if m.cursor > 0 {
+		if m.cursor > 0 {
 			m.cursor--
 			if m.cursor < m.tableOffset {
 				m.tableOffset = m.cursor
@@ -555,29 +534,25 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.syncSelectedID()
 		}
 	case "down", "j":
-		if m.state == stateLogs {
-			m.logViewport.ScrollDown(1)
-		} else {
-			max := m.currentListLen() - 1
-			if m.cursor < max {
-				m.cursor++
-				if m.cursor >= m.tableOffset+m.maxTableRows {
-					m.tableOffset++
-				}
-				m.syncSelectedID()
+		max := m.currentListLen() - 1
+		if m.cursor < max {
+			m.cursor++
+			if m.cursor >= m.tableOffset+m.maxTableRows {
+				m.tableOffset++
 			}
+			m.syncSelectedID()
 		}
 	case "n":
 		return m.handleNewItem()
 	case "e", "enter":
 		return m.handleEditItem()
 	case "t":
-		if m.currentTab == 1 && len(m.alerts) > 0 {
+		if m.currentTab == tabSettings && m.settingsSection == sectionAlerts && len(m.alerts) > 0 {
 			a := m.alerts[m.cursor]
 			return m, m.testAlertCmd(a.ID, a.Name)
 		}
 	case " ":
-		if m.currentTab == 0 && len(m.sites) > 0 && m.sites[m.cursor].Type == "group" {
+		if m.currentTab == tabMonitors && len(m.sites) > 0 && m.sites[m.cursor].Type == "group" {
 			gid := m.sites[m.cursor].ID
 			m.collapsed[gid] = !m.collapsed[gid]
 			payload := collapsedJSON(m.collapsed)
@@ -588,7 +563,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			})
 		}
 	case "p":
-		if m.currentTab == 0 && len(m.sites) > 0 {
+		if m.currentTab == tabMonitors && len(m.sites) > 0 {
 			id := m.sites[m.cursor].ID
 			paused := m.engine.ToggleSitePause(id)
 			st := m.store
@@ -598,14 +573,14 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			})
 		}
 	case "i":
-		if m.currentTab == 0 && len(m.sites) > 0 {
+		if m.currentTab == tabMonitors && len(m.sites) > 0 {
 			m.state = stateDetail
 			return m, m.loadDetailCmd(m.sites[m.cursor].ID)
-		} else if m.currentTab == 1 && len(m.alerts) > 0 {
+		} else if m.currentTab == tabSettings && m.settingsSection == sectionAlerts && len(m.alerts) > 0 {
 			m.state = stateAlertDetail
 		}
 	case "x":
-		if m.currentTab == 4 && len(m.maintenanceWindows) > 0 {
+		if m.currentTab == tabMaint && len(m.maintenanceWindows) > 0 {
 			mw := m.maintenanceWindows[m.cursor]
 			now := time.Now()
 			isActive := !mw.StartTime.After(now) && (mw.EndTime.IsZero() || mw.EndTime.After(now))
@@ -637,19 +612,22 @@ func (m *Model) handleNewItem() (tea.Model, tea.Cmd) {
 	m.editID = 0
 	m.editToken = ""
 	switch m.currentTab {
-	case 0:
+	case tabMonitors:
 		m.state = stateFormSite
 		return m, m.initSiteHuhForm()
-	case 1:
-		m.state = stateFormAlert
-		return m, m.initAlertHuhForm()
-	case 4:
+	case tabMaint:
 		m.state = stateFormMaint
 		return m, m.initMaintHuhForm()
-	case 5:
-		if m.isAdmin {
-			m.state = stateFormUser
-			return m, m.initUserHuhForm()
+	case tabSettings:
+		switch m.settingsSection {
+		case sectionAlerts:
+			m.state = stateFormAlert
+			return m, m.initAlertHuhForm()
+		case sectionUsers:
+			if m.isAdmin {
+				m.state = stateFormUser
+				return m, m.initUserHuhForm()
+			}
 		}
 	}
 	return m, nil
@@ -657,24 +635,27 @@ func (m *Model) handleNewItem() (tea.Model, tea.Cmd) {
 
 func (m *Model) handleEditItem() (tea.Model, tea.Cmd) {
 	switch m.currentTab {
-	case 0:
+	case tabMonitors:
 		if len(m.sites) > 0 {
 			m.editID = m.sites[m.cursor].ID
 			m.editToken = m.sites[m.cursor].Token
 			m.state = stateFormSite
 			return m, m.initSiteHuhForm()
 		}
-	case 1:
-		if len(m.alerts) > 0 {
-			m.editID = m.alerts[m.cursor].ID
-			m.state = stateFormAlert
-			return m, m.initAlertHuhForm()
-		}
-	case 5:
-		if m.isAdmin && len(m.users) > 0 {
-			m.editID = m.users[m.cursor].ID
-			m.state = stateFormUser
-			return m, m.initUserHuhForm()
+	case tabSettings:
+		switch m.settingsSection {
+		case sectionAlerts:
+			if len(m.alerts) > 0 {
+				m.editID = m.alerts[m.cursor].ID
+				m.state = stateFormAlert
+				return m, m.initAlertHuhForm()
+			}
+		case sectionUsers:
+			if m.isAdmin && len(m.users) > 0 {
+				m.editID = m.users[m.cursor].ID
+				m.state = stateFormUser
+				return m, m.initUserHuhForm()
+			}
 		}
 	}
 	return m, nil
@@ -682,43 +663,43 @@ func (m *Model) handleEditItem() (tea.Model, tea.Cmd) {
 
 func (m *Model) handleDeleteItem() (tea.Model, tea.Cmd) {
 	switch m.currentTab {
-	case 0:
+	case tabMonitors:
 		if len(m.sites) > 0 {
 			m.deleteID = m.sites[m.cursor].ID
 			m.deleteName = m.sites[m.cursor].Name
-			m.deleteTab = 0
+			m.deleteTab = tabMonitors
 			m.state = stateConfirmDelete
 		}
-	case 1:
-		if len(m.alerts) > 0 {
-			m.deleteID = m.alerts[m.cursor].ID
-			m.deleteName = m.alerts[m.cursor].Name
-			m.deleteTab = 1
-			m.state = stateConfirmDelete
-		}
-	case 4:
+	case tabMaint:
 		if len(m.maintenanceWindows) > 0 {
 			m.deleteID = m.maintenanceWindows[m.cursor].ID
 			m.deleteName = m.maintenanceWindows[m.cursor].Title
-			m.deleteTab = 4
+			m.deleteTab = tabMaint
 			m.state = stateConfirmDelete
 		}
-	case 5:
-		if m.isAdmin && len(m.users) > 0 {
-			m.deleteID = m.users[m.cursor].ID
-			m.deleteName = m.users[m.cursor].Username
-			m.deleteTab = 5
-			m.state = stateConfirmDelete
+	case tabSettings:
+		switch m.settingsSection {
+		case sectionAlerts:
+			if len(m.alerts) > 0 {
+				m.deleteID = m.alerts[m.cursor].ID
+				m.deleteName = m.alerts[m.cursor].Name
+				m.deleteTab = tabSettings
+				m.state = stateConfirmDelete
+			}
+		case sectionUsers:
+			if m.isAdmin && len(m.users) > 0 {
+				m.deleteID = m.users[m.cursor].ID
+				m.deleteName = m.users[m.cursor].Username
+				m.deleteTab = tabSettings
+				m.state = stateConfirmDelete
+			}
 		}
 	}
 	return m, nil
 }
 
 func (m *Model) handleClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	tabCount := 5
-	if m.isAdmin {
-		tabCount = 6
-	}
+	tabCount := tabSettings + 1
 	for i := 0; i < tabCount; i++ {
 		if m.zones.Get(fmt.Sprintf("tab-%d", i)).InBounds(msg) {
 			m.switchTab(i)
@@ -743,24 +724,14 @@ func (m *Model) handleClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) switchTab(idx int) {
-	maxTabs := 4
-	if m.isAdmin {
-		maxTabs = 5
-	}
+	maxTabs := tabSettings
 	if idx > maxTabs {
 		idx = 0
 	}
 	m.currentTab = idx
 	m.cursor = 0
 	m.tableOffset = 0
-	switch idx {
-	case 2:
-		m.state = stateLogs
-	case 5:
-		m.state = stateUsers
-	default:
-		m.state = stateDashboard
-	}
+	m.state = stateDashboard
 }
 
 func (m *Model) adjustCursor(_ int) {
@@ -791,30 +762,36 @@ func (m *Model) submitForm() tea.Cmd {
 
 func (m Model) currentListLen() int {
 	switch m.currentTab {
-	case 1:
-		return len(m.alerts)
-	case 3:
-		return len(m.nodes)
-	case 4:
-		return len(m.maintenanceWindows)
-	case 5:
-		return len(m.users)
-	default:
+	case tabMonitors:
 		return len(m.sites)
+	case tabMaint:
+		return len(m.maintenanceWindows)
+	case tabSettings:
+		switch m.settingsSection {
+		case sectionAlerts:
+			return len(m.alerts)
+		case sectionNodes:
+			return len(m.nodes)
+		case sectionUsers:
+			return len(m.users)
+		}
 	}
+	return 0
 }
 
 func (m Model) currentZonePrefix() (string, int) {
 	switch m.currentTab {
-	case 0:
+	case tabMonitors:
 		return "site", len(m.sites)
-	case 1:
-		return "alert", len(m.alerts)
-	case 4:
+	case tabMaint:
 		return "maint", len(m.maintenanceWindows)
-	case 5:
-		return "user", len(m.users)
-	default:
-		return "site", 0
+	case tabSettings:
+		switch m.settingsSection {
+		case sectionAlerts:
+			return "alert", len(m.alerts)
+		case sectionUsers:
+			return "user", len(m.users)
+		}
 	}
+	return "site", 0
 }
