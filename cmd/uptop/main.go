@@ -52,7 +52,14 @@ func init() {
 		return
 	}
 	if mv := info.Main.Version; mv != "" && mv != "(devel)" {
-		version = strings.TrimPrefix(mv, "v")
+		mv = strings.TrimPrefix(mv, "v")
+		// Pseudo-versions (e.g. "0.1.1-0.20260620165311-5ca534b0b100+dirty")
+		// are noisy in the TUI footer. Extract just the base semver.
+		if i := strings.Index(mv, "-0."); i > 0 {
+			mv = mv[:i]
+		}
+		mv = strings.TrimSuffix(mv, "+dirty")
+		version = mv
 	}
 	for _, s := range info.Settings {
 		switch s.Key {

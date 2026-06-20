@@ -25,13 +25,13 @@ func (m Model) viewDetailPanel() string {
 	if site.ParentID > 0 {
 		for _, s := range m.sites {
 			if s.ID == site.ParentID {
-				breadcrumb = m.st.subtleStyle.Render("  Sites > "+s.Name+" > ") + m.st.titleStyle.Render(site.Name)
+				breadcrumb = m.st.subtleStyle.Render("  Monitors > "+s.Name+" > ") + m.st.titleStyle.Render(site.Name)
 				break
 			}
 		}
 	}
 	if breadcrumb == "" {
-		breadcrumb = m.st.subtleStyle.Render("  Sites > ") + m.st.titleStyle.Render(site.Name)
+		breadcrumb = m.st.subtleStyle.Render("  Monitors > ") + m.st.titleStyle.Render(site.Name)
 	}
 	b.WriteString(breadcrumb + "\n")
 	b.WriteString(m.divider() + "\n")

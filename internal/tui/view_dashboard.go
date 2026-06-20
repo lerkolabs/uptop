@@ -194,7 +194,7 @@ type tabEntry struct {
 
 func (m Model) renderTabBar(stats dashboardStats) string {
 	tabs := []tabEntry{
-		{"Sites", stats.totalMonitors, stats.downCount + stats.lateCount},
+		{"Monitors", stats.totalMonitors, stats.downCount + stats.lateCount},
 		{"Alerts", len(m.alerts), 0},
 		{"Logs", 0, 0},
 		{"Nodes", len(m.nodes), stats.offlineNodes},
