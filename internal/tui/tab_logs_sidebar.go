@@ -74,5 +74,5 @@ func (m Model) viewLogsSidebar(width, maxLines int) string {
 		}
 	}
 
-	return "\n" + sidebarStyle.Render(strings.Join(lines, "\n"))
+	return sidebarStyle.Render(strings.Join(lines, "\n"))
 }
