@@ -34,7 +34,8 @@ jobs:
             -H "Authorization: token ${GITEA_TOKEN}" \
             "https://gitea.lerkolabs.com/api/v1/repos/lerkolabs/uptop/labels?limit=50") || exit 1
 
-          LABEL_IDS=$(echo "$GITEA_LABELS" | jq --argjson gh "$GH_LABELS" '
+          GH_LABELS_COMPACT=$(echo "$GH_LABELS" | jq -c '.')
+          LABEL_IDS=$(echo "$GITEA_LABELS" | jq -c --argjson gh "$GH_LABELS_COMPACT" '
             [.[] | select(
               .name == "github" or
               (.name as $n | $gh | index($n) != null)
