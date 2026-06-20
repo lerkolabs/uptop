@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -20,7 +22,7 @@ func (m Model) viewNodesTab() string {
 	}
 	nameW := widths[0]
 
-	return m.renderTable(
+	tbl := m.renderTable(
 		headers,
 		len(m.nodes),
 		func(start, end int) [][]string {
@@ -48,6 +50,30 @@ func (m Model) viewNodesTab() string {
 		widths,
 		nil,
 	)
+
+	var online int
+	regions := make(map[string]bool)
+	var leader string
+	for _, n := range m.nodes {
+		if time.Since(n.LastSeen) < 60*time.Second {
+			online++
+		}
+		if n.Region != "" {
+			regions[n.Region] = true
+		}
+		if n.Name == "leader" {
+			leader = n.ID
+		}
+	}
+	parts := []string{fmt.Sprintf("%d/%d online", online, len(m.nodes))}
+	if leader != "" {
+		parts = append(parts, fmt.Sprintf("leader: %s", leader))
+	}
+	if len(regions) > 0 {
+		parts = append(parts, fmt.Sprintf("%d regions", len(regions)))
+	}
+
+	return tbl + "\n  " + m.st.subtleStyle.Render(strings.Join(parts, " · "))
 }
 
 func (m Model) fmtNodeStatus(lastSeen time.Time) string {

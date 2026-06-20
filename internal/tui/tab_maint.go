@@ -107,7 +107,7 @@ func (m Model) viewMaintTab() string {
 	monW := widths[3]
 	timeW := widths[5]
 
-	return m.renderTable(
+	tbl := m.renderTable(
 		headers,
 		len(m.maintenanceWindows),
 		func(start, end int) [][]string {
@@ -130,6 +130,21 @@ func (m Model) viewMaintTab() string {
 		widths,
 		nil,
 	)
+
+	now := time.Now()
+	var active, scheduled, ended int
+	for _, mw := range m.maintenanceWindows {
+		if mw.StartTime.After(now) {
+			scheduled++
+		} else if !mw.EndTime.IsZero() && mw.EndTime.Before(now) {
+			ended++
+		} else {
+			active++
+		}
+	}
+	summary := fmt.Sprintf("%d active · %d scheduled · %d ended", active, scheduled, ended)
+
+	return tbl + "\n  " + m.st.subtleStyle.Render(summary)
 }
 
 func (m *Model) initMaintHuhForm() tea.Cmd {

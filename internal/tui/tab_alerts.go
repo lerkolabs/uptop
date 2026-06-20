@@ -185,7 +185,7 @@ func (m Model) viewAlertsTab() string {
 	nameW := widths[2]
 	cfgW := widths[4]
 
-	return m.renderTable(
+	tbl := m.renderTable(
 		headers,
 		len(m.alerts),
 		func(start, end int) [][]string {
@@ -206,6 +206,25 @@ func (m Model) viewAlertsTab() string {
 		},
 		widths, nil,
 	)
+
+	var totalSent, totalFail int
+	for _, a := range m.alerts {
+		h := m.engine.GetAlertHealth(a.ID)
+		totalSent += h.SendCount
+		totalFail += h.FailCount
+	}
+	types := make(map[string]bool)
+	for _, a := range m.alerts {
+		types[a.Type] = true
+	}
+	failLabel := "failures"
+	if totalFail == 1 {
+		failLabel = "failure"
+	}
+	summary := fmt.Sprintf("%d channels · %d types · %d sent · %d %s",
+		len(m.alerts), len(types), totalSent, totalFail, failLabel)
+
+	return tbl + "\n  " + m.st.subtleStyle.Render(summary)
 }
 
 func (m Model) viewAlertDetailPanel() string {
