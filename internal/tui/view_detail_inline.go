@@ -18,8 +18,8 @@ func (m Model) viewDetailInline(width int) string {
 
 	var b strings.Builder
 
-	title := m.st.titleStyle.Render(site.Name)
-	b.WriteString("  " + title + "\n")
+	title := m.st.dangerStyle.Render("▶ " + site.Name)
+	b.WriteString(title + "\n")
 
 	divW := width - 4
 	if divW < 20 {
