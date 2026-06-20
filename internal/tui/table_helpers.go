@@ -52,8 +52,7 @@ func (m Model) renderTable(headers []string, items int, buildRows func(start, en
 	}
 
 	t := table.New().
-		Border(lipgloss.RoundedBorder()).
-		BorderStyle(m.st.tableBorderStyle).
+		Border(lipgloss.HiddenBorder()).
 		Width(tableWidth).
 		Headers(headers...).
 		Rows(rows...).
@@ -94,5 +93,5 @@ func (m Model) renderTable(headers []string, items int, buildRows func(start, en
 			return base
 		})
 
-	return "\n" + t.Render()
+	return t.Render()
 }

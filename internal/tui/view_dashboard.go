@@ -157,35 +157,38 @@ func (m Model) viewDashboard() string {
 			availW := m.termWidth - chromePadH
 			leftW := availW * 70 / 100
 			rightW := availW - leftW
-			m.contentWidth = leftW
+			m.contentWidth = leftW - 2
 			monitors := m.viewSitesTab()
-			left := lipgloss.NewStyle().Width(leftW).Render(monitors)
-			sidebarBorder := lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(m.theme.Border).
-				BorderLeft(false).
-				BorderBottom(false)
-			innerW := rightW - 2
-			if innerW < 10 {
-				innerW = 10
-			}
-			sidebar := m.viewLogsSidebar(innerW, m.maxTableRows)
-			right := sidebarBorder.Render(sidebar)
-			top := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+			monPanel := m.titledPanel("Monitors", monitors, leftW, !m.detailOpen)
+			sidebarContent := m.viewLogsSidebar(rightW-2, m.maxTableRows)
+			logPanel := m.titledPanel("Logs", sidebarContent, rightW, false)
+			top := lipgloss.JoinHorizontal(lipgloss.Top, monPanel, logPanel)
 			if m.detailOpen {
-				detail := m.viewDetailInline(availW)
-				content = top + "\n" + detail
+				site := ""
+				if m.cursor < len(m.sites) {
+					site = m.sites[m.cursor].Name
+				}
+				detail := m.viewDetailInline(availW - 2)
+				detailPanel := m.titledPanel(site, detail, availW, true)
+				content = top + "\n" + detailPanel
 			} else {
 				content = top
 			}
 		} else {
-			m.contentWidth = m.termWidth
+			m.contentWidth = m.termWidth - 2
 			monitors := m.viewSitesTab()
+			availW := m.termWidth - chromePadH
+			monPanel := m.titledPanel("Monitors", monitors, availW, !m.detailOpen)
 			if m.detailOpen {
-				detail := m.viewDetailInline(m.termWidth - chromePadH)
-				content = monitors + "\n" + detail
+				site := ""
+				if m.cursor < len(m.sites) {
+					site = m.sites[m.cursor].Name
+				}
+				detail := m.viewDetailInline(availW - 2)
+				detailPanel := m.titledPanel(site, detail, availW, true)
+				content = monPanel + "\n" + detailPanel
 			} else {
-				content = monitors
+				content = monPanel
 			}
 		}
 	case tabMaint:

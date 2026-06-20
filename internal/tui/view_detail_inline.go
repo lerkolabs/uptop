@@ -18,15 +18,6 @@ func (m Model) viewDetailInline(width int) string {
 
 	var b strings.Builder
 
-	title := m.st.titleStyle.Render(site.Name)
-	b.WriteString("  " + title + "\n")
-
-	divW := width - 4
-	if divW < 20 {
-		divW = 20
-	}
-	b.WriteString("  " + m.st.subtleStyle.Render(strings.Repeat("─", divW)) + "\n")
-
 	status := m.fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID))
 	latency := m.fmtLatency(site.Latency)
 	uptime := m.fmtUptime(hist.Statuses)
