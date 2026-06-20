@@ -142,10 +142,15 @@ func (m *Model) handleFormMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+const detailInlineHeight = 8
+
 func (m *Model) recalcLayout() {
 	chrome := chromeBase
 	if m.filterMode || m.filterText != "" {
 		chrome++
+	}
+	if m.detailOpen && m.currentTab == tabMonitors {
+		chrome += detailInlineHeight
 	}
 	m.maxTableRows = m.termHeight - chrome
 	if m.maxTableRows < 1 {
@@ -581,6 +586,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "i":
 		if m.currentTab == tabMonitors && len(m.sites) > 0 {
 			m.detailOpen = !m.detailOpen
+			m.recalcLayout()
 			if m.detailOpen {
 				return m, m.loadDetailCmd(m.sites[m.cursor].ID)
 			}
@@ -590,6 +596,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		if m.currentTab == tabMonitors && m.detailOpen {
 			m.detailOpen = false
+			m.recalcLayout()
 		}
 	case "h":
 		if m.detailOpen && m.currentTab == tabMonitors && m.cursor < len(m.sites) {
