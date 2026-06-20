@@ -13,7 +13,11 @@ const (
 )
 
 func (m Model) isWide() bool {
-	return m.termWidth >= wideBreakpoint
+	w := m.contentWidth
+	if w == 0 {
+		w = m.termWidth
+	}
+	return w >= wideBreakpoint
 }
 
 func (m Model) renderTable(headers []string, items int, buildRows func(start, end int) [][]string, colWidths []int, styleOverride StyleOverride) string {
@@ -35,7 +39,11 @@ func (m Model) renderTable(headers []string, items int, buildRows func(start, en
 	}
 	borderOverhead := 2 + len(colWidths) - 1
 	tableWidth := colTotal + borderOverhead
-	maxWidth := m.termWidth - chromePadH - 2
+	cw := m.contentWidth
+	if cw == 0 {
+		cw = m.termWidth
+	}
+	maxWidth := cw - chromePadH - 2
 	if tableWidth > maxWidth {
 		tableWidth = maxWidth
 	}

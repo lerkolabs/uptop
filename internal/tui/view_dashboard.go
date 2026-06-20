@@ -152,21 +152,26 @@ func (m Model) viewDashboard() string {
 	var content string
 	switch m.currentTab {
 	case tabMonitors:
-		monitors := m.viewSitesTab()
-		if m.termWidth >= wideBreakpoint {
+		showSidebar := m.termWidth >= wideBreakpoint
+		if showSidebar {
 			availW := m.termWidth - chromePadH
 			leftW := availW * 70 / 100
 			rightW := availW - leftW
+			m.contentWidth = leftW
+			monitors := m.viewSitesTab()
 			left := lipgloss.NewStyle().Width(leftW).Render(monitors)
 			sidebar := m.viewLogsSidebar(rightW)
 			right := lipgloss.NewStyle().Width(rightW).Render(sidebar)
 			content = lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 		} else {
-			content = monitors
+			m.contentWidth = m.termWidth
+			content = m.viewSitesTab()
 		}
 	case tabMaint:
+		m.contentWidth = m.termWidth
 		content = m.viewMaintTab()
 	case tabSettings:
+		m.contentWidth = m.termWidth
 		content = m.viewSettingsTab()
 	}
 

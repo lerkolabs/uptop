@@ -82,8 +82,12 @@ func (m Model) computeLayout() tableLayout {
 	var widths []int
 	var fixed int
 
+	cw := m.contentWidth
+	if cw == 0 {
+		cw = m.termWidth
+	}
 	for _, c := range siteColumns {
-		if c.minTerm > 0 && m.termWidth < c.minTerm {
+		if c.minTerm > 0 && cw < c.minTerm {
 			continue
 		}
 		active = append(active, c.key)
@@ -104,7 +108,7 @@ func (m Model) computeLayout() tableLayout {
 
 	numCols := len(headers)
 	borderOverhead := 2 + (numCols - 1)
-	avail := m.termWidth - chromePadH - 2 - borderOverhead - fixed
+	avail := cw - chromePadH - 2 - borderOverhead - fixed
 	if avail < 20 {
 		avail = 20
 	}

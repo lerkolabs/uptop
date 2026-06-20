@@ -123,6 +123,7 @@ type Model struct {
 	maxTableRows    int
 	termWidth       int
 	termHeight      int
+	contentWidth    int
 	editID          int
 	editToken       string
 
