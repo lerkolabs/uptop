@@ -27,3 +27,4 @@ tmp
 *.local.md
 data/
 .env
+vhs

@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/docker/pulls/lerkolabs/uptop" alt="Docker Pulls">
   </p>
 
-  <img src="assets/monitors.png" alt="uptop monitors view" width="800">
+  <img src="assets/demo.gif" alt="uptop demo" width="800">
 </div>
 
 ## What is this
@@ -38,17 +38,26 @@ Canonical repo: [gitea.lerkolabs.com/lerkolabs/uptop](https://gitea.lerkolabs.co
 
 <table>
   <tr>
+    <td><img src="assets/monitors.png" alt="monitors dashboard" width="400"></td>
     <td><img src="assets/detail.png" alt="detail panel" width="400"></td>
+  </tr>
+  <tr>
     <td><img src="assets/alerts.png" alt="alerts view" width="400"></td>
-  </tr>
-  <tr>
     <td><img src="assets/logs.png" alt="logs view" width="400"></td>
-    <td><img src="assets/nodes.png" alt="cluster nodes" width="400"></td>
   </tr>
   <tr>
-    <td colspan="2" align="center"><img src="assets/theme.png" alt="theme selection" width="600"></td>
+    <td><img src="assets/nodes.png" alt="cluster nodes" width="400"></td>
+    <td><img src="assets/theme.png" alt="theme selection" width="400"></td>
   </tr>
 </table>
+
+### Themes
+
+Five built-in themes: Flexoki Dark, Tokyo Night, Catppuccin Mocha, Nord, Gruvbox. Press `T` to cycle.
+
+<p align="center">
+  <img src="assets/themes.png" alt="all five themes" width="800">
+</p>
 
 ## Quick start
 
