@@ -71,5 +71,5 @@ func (m Model) viewLogsSidebar(width int) string {
 		lines = append(lines, m.renderCompactLogLine(line, width))
 	}
 
-	return sidebarStyle.Render(strings.Join(lines, "\n"))
+	return "\n" + sidebarStyle.Render(strings.Join(lines, "\n"))
 }
