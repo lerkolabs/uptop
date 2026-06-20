@@ -8,6 +8,8 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    sysctls:
+      - net.ipv4.ping_group_range=0 2147483647
     tmpfs:
       - /tmp
     ports:

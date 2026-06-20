@@ -77,15 +77,35 @@ func main() {
 		case "export":
 			runExport(os.Args[2:])
 			return
-		case "version", "--version", "-v":
+		case "version", "--version", "-v", "-version":
 			printVersion()
 			return
 		case "migrate-secrets":
 			runMigrateSecrets(os.Args[2:])
 			return
+		case "help", "--help", "-h":
+			printUsage()
+			return
+		case "serve":
+			runServe(os.Args[2:])
+			return
 		}
 	}
 	runServe(os.Args[1:])
+}
+
+func printUsage() {
+	fmt.Fprintf(os.Stderr, `Usage: uptop <command> [flags]
+
+Commands:
+  serve             Start the server (default if no command given)
+  apply             Apply monitors from a YAML file
+  export            Export monitors to YAML
+  migrate-secrets   Re-encrypt alert credentials with current key
+  version           Print version and exit
+
+Run 'uptop serve --help' for server flags.
+`)
 }
 
 func printVersion() {

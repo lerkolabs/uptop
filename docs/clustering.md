@@ -47,13 +47,11 @@ Probes are lightweight, stateless nodes that run checks from different locations
 | Node | Variable | Value |
 |------|----------|-------|
 | Both | `UPTOP_CLUSTER_SECRET` | Same shared secret |
-| Leader | `UPTOP_AGG_STRATEGY` | `any-down`, `majority-down`, or `all-down` |
 | Probe | `UPTOP_CLUSTER_MODE` | `probe` |
 | Probe | `UPTOP_PEER_URL` | Leader's HTTP URL |
 | Probe | `UPTOP_NODE_ID` | Unique identifier (e.g. `probe-us-east`) |
-| Probe | `UPTOP_NODE_REGION` | Region tag matching monitor assignments |
 
-Optional: `UPTOP_NODE_NAME` for a human-readable label in the TUI.
+Optional: `UPTOP_AGG_STRATEGY` (default `any-down`), `UPTOP_NODE_REGION` (omit to match all monitors), `UPTOP_NODE_NAME` (human-readable label in the TUI).
 
 See [`deploy/docker-compose.probe.yml`](../deploy/docker-compose.probe.yml) for a multi-region example.
 
@@ -80,6 +78,6 @@ Set via `UPTOP_AGG_STRATEGY` on the leader.
 
 ## Security
 
-- Set `UPTOP_CLUSTER_SECRET` on all nodes. Without it, cluster API endpoints are unauthenticated.
+- Set `UPTOP_CLUSTER_SECRET` on all nodes. Without it, cluster API endpoints reject all requests (fail closed); only `/api/health` stays open.
 - Secrets are sent in HTTP headers (`X-Uptop-Secret`). Use TLS or a reverse proxy for production.
 - uptop warns on startup if the cluster secret is missing or if cluster mode is active without TLS.

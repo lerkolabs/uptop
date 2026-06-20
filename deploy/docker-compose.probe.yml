@@ -1,6 +1,8 @@
 services:
   leader:
     image: lerkolabs/uptop:latest
+    sysctls:
+      - net.ipv4.ping_group_range=0 2147483647
     environment:
       - UPTOP_CLUSTER_MODE=leader
       - UPTOP_CLUSTER_SECRET=changeme  # EXAMPLE ONLY — rotate before use

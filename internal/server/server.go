@@ -159,10 +159,6 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if s.cfg.ClusterKey != "" && !checkSecret(r.Header.Get("X-Uptop-Secret"), s.cfg.ClusterKey) {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("OK"))
 }

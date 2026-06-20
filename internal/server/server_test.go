@@ -219,8 +219,8 @@ func TestHealth_WrongSecret(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 401 {
-		t.Errorf("expected 401, got %d", resp.StatusCode)
+	if resp.StatusCode != 200 {
+		t.Errorf("health is unauthenticated, expected 200, got %d", resp.StatusCode)
 	}
 }
 

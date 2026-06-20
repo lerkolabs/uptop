@@ -16,7 +16,7 @@ body:
       label: What happened?
       description: Include what you expected to happen instead.
       placeholder: |
-        When I run `uptop serve`, the TUI crashes after 10 seconds.
+        When I run `uptop`, the TUI crashes after 10 seconds.
         I expected it to keep running and display monitor status.
     validations:
       required: true
@@ -25,7 +25,7 @@ body:
     attributes:
       label: Steps to reproduce
       placeholder: |
-        1. Run `uptop serve`
+        1. Run `uptop`
         2. Wait ~10 seconds
         3. TUI crashes with panic
     validations:
@@ -37,7 +37,7 @@ body:
       description: Output of `uptop version`, OS, terminal. Paste any errors below.
       render: shell
       placeholder: |
-        uptop version 2026.06.1
+        uptop 0.1.0 (abc1234, 2026-06-17)
         OS: Debian 13
         Terminal: Ghostty
 

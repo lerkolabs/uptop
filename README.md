@@ -4,7 +4,7 @@
   <p>No browser. No client install. Just <code>ssh -p 23234 your-server</code>.</p>
 
   <p>
-    <a href="https://gitea.lerkolabs.com/lerkolabs/uptop/actions/workflows/ci.yml"><img src="https://gitea.lerkolabs.com/lerkolabs/uptop/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+    <a href="https://gitea.lerkolabs.com/lerkolabs/uptop/actions"><img src="https://gitea.lerkolabs.com/lerkolabs/uptop/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License">
     <img src="https://img.shields.io/badge/go-1.26-00ADD8?logo=go&logoColor=white" alt="Go 1.26">
     <img src="https://img.shields.io/docker/pulls/lerkolabs/uptop" alt="Docker Pulls">
@@ -27,7 +27,7 @@ Canonical repo: [gitea.lerkolabs.com/lerkolabs/uptop](https://gitea.lerkolabs.co
 - **10 alert providers** — Discord, Slack, Email, Ntfy, Webhook, Telegram, PagerDuty, Pushover, Gotify, Opsgenie
 - **Config as code** — define monitors in YAML, apply declaratively, version control your setup
 - **HA clustering** — leader/follower with automatic failover
-- **Prometheus metrics** — `/metrics` endpoint, wire it straight to Grafana
+- **Prometheus metrics** — `/metrics` endpoint (`UPTOP_METRICS_PUBLIC=true` to expose without auth)
 - **Public status page** — HTML + JSON, toggle with an env var
 - **SQLite or Postgres** — SQLite for single-node, Postgres for production
 - **Uptime Kuma import** — migrate from Kuma with one command
@@ -146,6 +146,8 @@ Full reference in [docs/config-as-code.md](docs/config-as-code.md).
 | `UPTOP_INSECURE_SKIP_VERIFY` | `false` | Skip TLS verification for checks |
 | `UPTOP_ALLOW_PRIVATE_TARGETS` | `false` | Allow monitoring RFC1918/loopback addresses |
 | `UPTOP_ADMIN_KEY` | | SSH public key seeded as first admin on startup |
+| `UPTOP_METRICS_PUBLIC` | `false` | Expose `/metrics` without auth |
+| `UPTOP_MAINT_RETENTION` | `168h` | How long ended maintenance windows are kept |
 | `UPTOP_TRUSTED_PROXIES` | | Comma-separated CIDRs/IPs whose `X-Forwarded-For` is trusted ([details](#running-behind-a-reverse-proxy)) |
 
 See [`.env.example`](.env.example) for all options including TLS, probes, and advanced settings.
@@ -179,7 +181,7 @@ uptop prunes its own history in the background — no external cleanup jobs need
 | Check history | newest 1,000 checks per monitor |
 | State changes (UP/DOWN transitions) | newest 5,000 per monitor |
 | Logs | newest 200 entries |
-| Maintenance windows | 7 days after they end (configurable) |
+| Maintenance windows | 7 days after they end (`UPTOP_MAINT_RETENTION`) |
 
 Sparklines, uptime percentages, and SLA reports are computed from these windows, so very long-horizon stats aren't retained. Export to Prometheus via `/metrics` if you need unlimited history.
 

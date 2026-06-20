@@ -5,6 +5,8 @@ services:
   leader:
     image: lerkolabs/uptop:latest
     container_name: uptop-leader
+    sysctls:
+      - net.ipv4.ping_group_range=0 2147483647
     ports:
       - "23234:23234" # SSH
       - "8080:8080"   # HTTP
@@ -40,6 +42,8 @@ services:
   follower:
     image: lerkolabs/uptop:latest
     container_name: uptop-follower
+    sysctls:
+      - net.ipv4.ping_group_range=0 2147483647
     ports:
       - "23233:23234" # SSH (Mapped to different host port)
       - "8081:8080"   # HTTP (Mapped to different host port)
