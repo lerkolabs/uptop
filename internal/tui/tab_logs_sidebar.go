@@ -60,7 +60,7 @@ func (m Model) viewLogsSidebar(width, maxLines int) string {
 
 	sidebarStyle := lipgloss.NewStyle().Width(width).MaxWidth(width)
 
-	var lines []string
+	var all []string
 	for _, line := range logs {
 		if strings.TrimSpace(line) == "" {
 			continue
@@ -68,11 +68,43 @@ func (m Model) viewLogsSidebar(width, maxLines int) string {
 		if m.logFilterImportant && !isImportantLog(classifyLog(line)) {
 			continue
 		}
-		lines = append(lines, m.renderCompactLogLine(line, width))
-		if maxLines > 0 && len(lines) >= maxLines {
-			break
-		}
+		all = append(all, m.renderCompactLogLine(line, width))
 	}
 
-	return sidebarStyle.Render(strings.Join(lines, "\n"))
+	start := m.logScrollOffset
+	if start > len(all) {
+		start = len(all)
+	}
+	end := start + maxLines
+	if end > len(all) {
+		end = len(all)
+	}
+	visible := all[start:end]
+
+	return sidebarStyle.Render(strings.Join(visible, "\n"))
+}
+
+func (m *Model) scrollLogs(delta int) {
+	logs := m.engine.GetLogs()
+	total := 0
+	for _, line := range logs {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if m.logFilterImportant && !isImportantLog(classifyLog(line)) {
+			continue
+		}
+		total++
+	}
+
+	m.logScrollOffset += delta
+	if m.logScrollOffset < 0 {
+		m.logScrollOffset = 0
+	}
+	if m.logScrollOffset > total-1 {
+		m.logScrollOffset = total - 1
+	}
+	if m.logScrollOffset < 0 {
+		m.logScrollOffset = 0
+	}
 }

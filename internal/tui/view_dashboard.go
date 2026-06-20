@@ -159,9 +159,9 @@ func (m Model) viewDashboard() string {
 			rightW := availW - leftW
 			m.contentWidth = leftW - 2
 			monitors := m.viewSitesTab()
-			monPanel := m.titledPanel("Monitors", monitors, leftW, !m.detailOpen)
+			monPanel := m.zones.Mark("panel-monitors", m.titledPanel("Monitors", monitors, leftW, m.focusedPanel == panelMonitors))
 			sidebarContent := m.viewLogsSidebar(rightW-2, m.maxTableRows)
-			logPanel := m.titledPanel("Logs", sidebarContent, rightW, false)
+			logPanel := m.zones.Mark("panel-logs", m.titledPanel("Logs", sidebarContent, rightW, m.focusedPanel == panelLogs))
 			top := lipgloss.JoinHorizontal(lipgloss.Top, monPanel, logPanel)
 			if m.detailOpen {
 				site := ""
@@ -169,7 +169,7 @@ func (m Model) viewDashboard() string {
 					site = m.sites[m.cursor].Name
 				}
 				detail := m.viewDetailInline(availW - 2)
-				detailPanel := m.titledPanel(site, detail, availW, true)
+				detailPanel := m.zones.Mark("panel-detail", m.titledPanel(site, detail, availW, m.focusedPanel == panelDetail))
 				content = top + "\n" + detailPanel
 			} else {
 				content = top
@@ -178,14 +178,14 @@ func (m Model) viewDashboard() string {
 			m.contentWidth = m.termWidth - 2
 			monitors := m.viewSitesTab()
 			availW := m.termWidth - chromePadH
-			monPanel := m.titledPanel("Monitors", monitors, availW, !m.detailOpen)
+			monPanel := m.zones.Mark("panel-monitors", m.titledPanel("Monitors", monitors, availW, m.focusedPanel == panelMonitors))
 			if m.detailOpen {
 				site := ""
 				if m.cursor < len(m.sites) {
 					site = m.sites[m.cursor].Name
 				}
 				detail := m.viewDetailInline(availW - 2)
-				detailPanel := m.titledPanel(site, detail, availW, true)
+				detailPanel := m.zones.Mark("panel-detail", m.titledPanel(site, detail, availW, m.focusedPanel == panelDetail))
 				content = monPanel + "\n" + detailPanel
 			} else {
 				content = monPanel
@@ -303,10 +303,12 @@ func (m Model) renderFooter(stats dashboardStats) string {
 	var keys string
 	switch m.currentTab {
 	case tabMonitors:
-		if m.detailOpen {
-			keys = "[i]Close [Enter]Expand [h]History [s]SLA [e]Edit [↑/↓]Select [T]Theme [q]Quit"
+		if m.focusedPanel == panelLogs {
+			keys = "[↑/↓]Scroll [l/Esc]Back [T]Theme [q]Quit"
+		} else if m.detailOpen {
+			keys = "[i]Close [Enter]Expand [h]History [s]SLA [e]Edit [l]Logs [↑/↓]Select [T]Theme [q]Quit"
 		} else {
-			keys = "[/]Filter [i]Info [Enter]Detail [n]New [e]Edit [d]Del [p]Pause [T]Theme [Tab]Switch [q]Quit"
+			keys = "[/]Filter [i]Info [Enter]Detail [n]New [e]Edit [d]Del [l]Logs [T]Theme [Tab]Switch [q]Quit"
 		}
 	case tabMaint:
 		keys = "[n]New [x]End [d]Del [T]Theme [Tab]Switch [q]Quit"

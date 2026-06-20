@@ -96,6 +96,12 @@ const (
 	sectionUsers  = 2
 )
 
+const (
+	panelMonitors = 0
+	panelLogs     = 1
+	panelDetail   = 2
+)
+
 type sessionState int
 
 const (
@@ -124,6 +130,8 @@ type Model struct {
 	termWidth       int
 	termHeight      int
 	contentWidth    int
+	focusedPanel    int
+	logScrollOffset int
 	editID          int
 	editToken       string
 

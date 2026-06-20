@@ -274,6 +274,15 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	if m.currentTab == tabMonitors && m.focusedPanel == panelLogs {
+		if msg.Button == tea.MouseButtonWheelUp {
+			m.scrollLogs(-3)
+		} else {
+			m.scrollLogs(3)
+		}
+		return m, nil
+	}
+
 	listLen := m.currentListLen()
 	if msg.Button == tea.MouseButtonWheelUp {
 		if m.cursor > 0 {
@@ -291,6 +300,9 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	m.syncSelectedID()
+	if m.detailOpen && m.currentTab == tabMonitors && m.cursor < len(m.sites) {
+		return m, m.loadDetailCmd(m.sites[m.cursor].ID)
+	}
 	return m, nil
 }
 
@@ -526,11 +538,26 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.currentTab == tabSettings {
 			m.switchSettingsSection(m.settingsSection - 1)
 		}
-	case "right", "l":
+	case "right":
 		if m.currentTab == tabSettings {
 			m.switchSettingsSection(m.settingsSection + 1)
 		}
+	case "l":
+		switch m.currentTab {
+		case tabSettings:
+			m.switchSettingsSection(m.settingsSection + 1)
+		case tabMonitors:
+			if m.focusedPanel == panelLogs {
+				m.focusedPanel = panelMonitors
+			} else {
+				m.focusedPanel = panelLogs
+			}
+		}
 	case "up", "k":
+		if m.currentTab == tabMonitors && m.focusedPanel == panelLogs {
+			m.scrollLogs(-1)
+			return m, nil
+		}
 		if m.cursor > 0 {
 			m.cursor--
 			if m.cursor < m.tableOffset {
@@ -542,6 +569,10 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case "down", "j":
+		if m.currentTab == tabMonitors && m.focusedPanel == panelLogs {
+			m.scrollLogs(1)
+			return m, nil
+		}
 		max := m.currentListLen() - 1
 		if m.cursor < max {
 			m.cursor++
@@ -600,9 +631,13 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.state = stateAlertDetail
 		}
 	case "esc":
-		if m.currentTab == tabMonitors && m.detailOpen {
-			m.detailOpen = false
-			m.recalcLayout()
+		if m.currentTab == tabMonitors {
+			if m.focusedPanel != panelMonitors {
+				m.focusedPanel = panelMonitors
+			} else if m.detailOpen {
+				m.detailOpen = false
+				m.recalcLayout()
+			}
 		}
 	case "h":
 		if m.detailOpen && m.currentTab == tabMonitors && m.cursor < len(m.sites) {
@@ -750,6 +785,18 @@ func (m *Model) handleClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	if m.currentTab == tabMonitors {
+		if m.zones.Get("panel-monitors").InBounds(msg) {
+			m.focusedPanel = panelMonitors
+		} else if m.zones.Get("panel-logs").InBounds(msg) {
+			m.focusedPanel = panelLogs
+			return m, nil
+		} else if m.detailOpen && m.zones.Get("panel-detail").InBounds(msg) {
+			m.focusedPanel = panelDetail
+			return m, nil
+		}
+	}
+
 	prefix, listLen := m.currentZonePrefix()
 	end := m.tableOffset + m.maxTableRows
 	if end > listLen {
@@ -759,6 +806,9 @@ func (m *Model) handleClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		if m.zones.Get(fmt.Sprintf("%s-%d", prefix, i)).InBounds(msg) {
 			m.cursor = i
 			m.syncSelectedID()
+			if m.detailOpen && m.currentTab == tabMonitors {
+				return m, m.loadDetailCmd(m.sites[m.cursor].ID)
+			}
 			return m, nil
 		}
 	}
