@@ -35,11 +35,16 @@ jobs:
 
           TAGS="lerkolabs/uptop:${TAG}"
           TAGS="${TAGS},lerkolabs/uptop:sha-${SHORT_SHA}"
+          TAGS="${TAGS},ghcr.io/lerkolabs/uptop:${TAG}"
+          TAGS="${TAGS},ghcr.io/lerkolabs/uptop:sha-${SHORT_SHA}"
           # :latest only for real releases — rc rehearsal tags must not move it
           if [ "${{ github.ref_type }}" = "tag" ]; then
             case "$TAG" in
               *-*) ;;
-              *) TAGS="${TAGS},lerkolabs/uptop:latest" ;;
+              *)
+                TAGS="${TAGS},lerkolabs/uptop:latest"
+                TAGS="${TAGS},ghcr.io/lerkolabs/uptop:latest"
+                ;;
             esac
           fi
           echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
@@ -55,6 +60,13 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
 
       # Scan must gate the push: build amd64 locally, scan it, and only then run
       # the multi-arch push (amd64 layers come from the builder cache, so the

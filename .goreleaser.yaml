@@ -59,6 +59,24 @@ nfpms:
         dst: /usr/share/doc/uptop/LICENSE
         type: doc
 
+brews:
+  - name: uptop
+    repository:
+      owner: lerkolabs
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    url_template: "https://github.com/lerkolabs/uptop/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    commit_author:
+      name: lerkolabs-bot
+      email: bot@lerkolabs.com
+    homepage: https://github.com/lerkolabs/uptop
+    description: Self-hosted uptime monitoring with a TUI over SSH
+    license: MIT
+    install: |
+      bin.install "uptop"
+    test: |
+      system bin/"uptop", "version"
+
 # Changelog generation must stay enabled: the --release-notes flag is consumed
 # by the changelog pipe, so disabling it silently drops the git-cliff notes
 # (empty release body on v0.1.0-rc.1). With --release-notes set, GoReleaser

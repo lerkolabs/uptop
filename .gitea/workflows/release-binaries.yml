@@ -53,6 +53,7 @@ jobs:
           GORELEASER_FORCE_TOKEN: gitea
           GITEA_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           GITEA_API_URL: http://gitea:3000/api/v1
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
 
       # GitHub release relaying is handled by .github/workflows/mirror-release.yml,
       # which runs on GitHub Actions when the push mirror delivers the tag and
