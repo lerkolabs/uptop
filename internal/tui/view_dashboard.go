@@ -158,7 +158,8 @@ func (m Model) viewDashboard() string {
 			leftW := availW * 70 / 100
 			rightW := availW - leftW
 			left := lipgloss.NewStyle().Width(leftW).Render(monitors)
-			right := lipgloss.NewStyle().Width(rightW).Render(m.viewLogsTab())
+			sidebar := m.viewLogsSidebar(rightW)
+			right := lipgloss.NewStyle().Width(rightW).Render(sidebar)
 			content = lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 		} else {
 			content = monitors

@@ -107,23 +107,3 @@ func (m *Model) refreshLogContent() {
 	m.logShown = shown
 	m.logViewport.SetContent(strings.Join(rendered, "\n"))
 }
-
-func (m Model) viewLogsTab() string {
-	if m.logTotal == 0 {
-		return m.emptyState("No log entries yet.", "Logs appear as monitors run checks")
-	}
-
-	filterLabel := "All"
-	if m.logFilterImportant {
-		filterLabel = "Important"
-	}
-
-	header := m.st.subtleStyle.Render(fmt.Sprintf(
-		"  %d entries  Filter: %s", m.logShown, filterLabel))
-
-	if m.logFilterImportant && m.logShown < m.logTotal {
-		header += m.st.subtleStyle.Render(fmt.Sprintf("  (%d hidden)", m.logTotal-m.logShown))
-	}
-
-	return "\n" + header + "\n\n" + m.logViewport.View()
-}
