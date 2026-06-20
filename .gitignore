@@ -25,4 +25,5 @@ authorized_keys
 tmp
 *.local.json
 *.local.md
+data/
 .env

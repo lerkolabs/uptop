@@ -206,7 +206,7 @@ func runApply(args []string) {
 	filePath := fs.String("f", "", "Path to YAML config file (required)")
 	dryRun := fs.Bool("dry-run", false, "Show planned changes without applying")
 	prune := fs.Bool("prune", false, "Delete monitors/alerts not in YAML")
-	dbType := fs.String("db-type", envOrDefault("UPTOP_DB_TYPE", "sqlite"), "Database type")
+	dbType := fs.String("db-type", envOrDefault("UPTOP_DB_TYPE", "sqlite"), "Database type (sqlite or postgres)")
 	dsn := fs.String("dsn", envOrDefault("UPTOP_DB_DSN", "uptop.db"), "Database DSN")
 	_ = fs.Parse(args) // ExitOnError: parse errors exit before returning
 
@@ -239,7 +239,7 @@ func runApply(args []string) {
 func runExport(args []string) {
 	fs := flag.NewFlagSet("export", flag.ExitOnError)
 	outPath := fs.String("o", "-", "Output file path (- for stdout)")
-	dbType := fs.String("db-type", envOrDefault("UPTOP_DB_TYPE", "sqlite"), "Database type")
+	dbType := fs.String("db-type", envOrDefault("UPTOP_DB_TYPE", "sqlite"), "Database type (sqlite or postgres)")
 	dsn := fs.String("dsn", envOrDefault("UPTOP_DB_DSN", "uptop.db"), "Database DSN")
 	_ = fs.Parse(args) // ExitOnError: parse errors exit before returning
 
@@ -259,7 +259,7 @@ func runExport(args []string) {
 
 func runMigrateSecrets(args []string) {
 	fs := flag.NewFlagSet("migrate-secrets", flag.ExitOnError)
-	dbType := fs.String("db-type", envOrDefault("UPTOP_DB_TYPE", "sqlite"), "Database type")
+	dbType := fs.String("db-type", envOrDefault("UPTOP_DB_TYPE", "sqlite"), "Database type (sqlite or postgres)")
 	dsn := fs.String("dsn", envOrDefault("UPTOP_DB_DSN", "uptop.db"), "Database DSN")
 	_ = fs.Parse(args)
 
@@ -351,7 +351,7 @@ func runServe(args []string) {
 
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	port := fs.Int("port", cfg.Port, "SSH Port")
-	flagDBType := fs.String("db-type", cfg.DBType, "Database type")
+	flagDBType := fs.String("db-type", cfg.DBType, "Database type (sqlite or postgres)")
 	flagDSN := fs.String("dsn", cfg.DBDSN, "Database DSN")
 	demo := fs.Bool("demo", false, "Seed demo data")
 	importKuma := fs.String("import-kuma", "", "Import Uptime Kuma backup JSON file")

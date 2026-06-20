@@ -14,6 +14,8 @@ services:
 
   probe-us-east:
     image: lerkolabs/uptop:latest
+    healthcheck:
+      disable: true
     environment:
       - UPTOP_CLUSTER_MODE=probe
       - UPTOP_NODE_ID=us-east-1
@@ -26,6 +28,8 @@ services:
 
   probe-eu-west:
     image: lerkolabs/uptop:latest
+    healthcheck:
+      disable: true
     environment:
       - UPTOP_CLUSTER_MODE=probe
       - UPTOP_NODE_ID=eu-west-1

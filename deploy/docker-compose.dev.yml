@@ -13,7 +13,7 @@ services:
       - UPTOP_DB_TYPE=postgres
       - UPTOP_DB_DSN=postgres://devuser:devpass@postgres:5432/uptop_dev?sslmode=disable
       
-      # --- Web Server Configuration (Phase 4) ---
+      # --- Web Server Configuration ---
       - UPTOP_HTTP_PORT=8080
       - UPTOP_STATUS_ENABLED=true
       - UPTOP_STATUS_TITLE=Dev Infrastructure Status
