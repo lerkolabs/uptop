@@ -219,6 +219,8 @@ func InitialModel(isAdmin bool, s store.Store, eng *monitor.Engine, version stri
 		}
 	}
 
+	detailPref, _ := s.GetPreference(context.Background(), "detail_open")
+
 	return Model{
 		state:           stateDashboard,
 		logViewport:     vpLogs,
@@ -232,6 +234,7 @@ func InitialModel(isAdmin bool, s store.Store, eng *monitor.Engine, version stri
 		theme:           theme,
 		themeIndex:      themeIdx,
 		st:              newStyles(theme),
+		detailOpen:      detailPref == "true",
 		demoMode:        os.Getenv("UPTOP_DEMO") == "1",
 		version:         version,
 		sparkTooltipIdx: -1,

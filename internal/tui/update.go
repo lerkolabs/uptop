@@ -624,9 +624,23 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.currentTab == tabMonitors && len(m.sites) > 0 {
 			m.detailOpen = !m.detailOpen
 			m.recalcLayout()
+			st := m.store
+			open := m.detailOpen
+			var cmd tea.Cmd
 			if m.detailOpen {
-				return m, m.loadDetailCmd(m.sites[m.cursor].ID)
+				cmd = m.loadDetailCmd(m.sites[m.cursor].ID)
 			}
+			saveCmd := writeCmd("Save detail preference", func() error {
+				v := "false"
+				if open {
+					v = "true"
+				}
+				return st.SetPreference(context.Background(), "detail_open", v)
+			})
+			if cmd != nil {
+				return m, tea.Batch(cmd, saveCmd)
+			}
+			return m, saveCmd
 		} else if m.currentTab == tabSettings && m.settingsSection == sectionAlerts && len(m.alerts) > 0 {
 			m.state = stateAlertDetail
 		}
@@ -637,6 +651,10 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else if m.detailOpen {
 				m.detailOpen = false
 				m.recalcLayout()
+				st := m.store
+				return m, writeCmd("Save detail preference", func() error {
+					return st.SetPreference(context.Background(), "detail_open", "false")
+				})
 			}
 		}
 	case "h":
