@@ -177,13 +177,19 @@ func (m Model) viewDashboard() string {
 		availHeight = 5
 	}
 
-	contentHeight := availHeight - lipgloss.Height(header) - lipgloss.Height(footer)
+	divW := m.termWidth - chromePadH
+	if divW < 40 {
+		divW = 40
+	}
+	tabDivider := m.st.subtleStyle.Render(strings.Repeat("─", divW))
+
+	contentHeight := availHeight - lipgloss.Height(header) - 1 - lipgloss.Height(footer)
 	if contentHeight < 1 {
 		contentHeight = 1
 	}
 	paddedContent := lipgloss.NewStyle().Height(contentHeight).MaxHeight(contentHeight).Render(content)
 
-	return outerPad.Render(lipgloss.JoinVertical(lipgloss.Top, header, paddedContent, footer))
+	return outerPad.Render(lipgloss.JoinVertical(lipgloss.Top, header, tabDivider, paddedContent, footer))
 }
 
 type tabEntry struct {
@@ -279,9 +285,14 @@ func (m Model) renderFooter(stats dashboardStats) string {
 	}
 
 	ver := m.st.subtleStyle.Render("v" + m.version)
-	footer := statusLine + "  " + m.st.subtleStyle.Render(keys) + "  " + ver
+	line := statusLine + "  " + m.st.subtleStyle.Render(keys) + "  " + ver
 	if m.filterText != "" && m.currentTab == 0 {
-		footer = m.st.subtleStyle.Render(fmt.Sprintf("filter: %s", m.filterText)) + "  " + statusLine + "  " + m.st.subtleStyle.Render(keys) + "  " + ver
+		line = m.st.subtleStyle.Render(fmt.Sprintf("filter: %s", m.filterText)) + "  " + statusLine + "  " + m.st.subtleStyle.Render(keys) + "  " + ver
 	}
-	return footer
+
+	divW := m.termWidth - chromePadH
+	if divW < 40 {
+		divW = 40
+	}
+	return m.st.subtleStyle.Render(strings.Repeat("─", divW)) + "\n" + line
 }
