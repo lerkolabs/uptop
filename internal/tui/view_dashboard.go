@@ -160,8 +160,17 @@ func (m Model) viewDashboard() string {
 			m.contentWidth = leftW
 			monitors := m.viewSitesTab()
 			left := lipgloss.NewStyle().Width(leftW).Render(monitors)
-			sidebar := m.viewLogsSidebar(rightW, m.maxTableRows+chromeTable)
-			right := lipgloss.NewStyle().Width(rightW).Render(sidebar)
+			sidebarBorder := lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(m.theme.Border).
+				BorderLeft(false).
+				BorderBottom(false)
+			innerW := rightW - 2
+			if innerW < 10 {
+				innerW = 10
+			}
+			sidebar := m.viewLogsSidebar(innerW, m.maxTableRows)
+			right := sidebarBorder.Render(sidebar)
 			top := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 			if m.detailOpen {
 				detail := m.viewDetailInline(availW)
@@ -291,7 +300,11 @@ func (m Model) renderFooter(stats dashboardStats) string {
 	var keys string
 	switch m.currentTab {
 	case tabMonitors:
-		keys = "[/]Filter [n]New [e]Edit [i]Info [d]Del [p]Pause [Space]Collapse [T]Theme [Tab]Switch [q]Quit"
+		if m.detailOpen {
+			keys = "[i]Close [Enter]Expand [h]History [s]SLA [e]Edit [↑/↓]Select [T]Theme [q]Quit"
+		} else {
+			keys = "[/]Filter [i]Info [Enter]Detail [n]New [e]Edit [d]Del [p]Pause [T]Theme [Tab]Switch [q]Quit"
+		}
 	case tabMaint:
 		keys = "[n]New [x]End [d]Del [T]Theme [Tab]Switch [q]Quit"
 	case tabSettings:

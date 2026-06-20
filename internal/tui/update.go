@@ -555,7 +555,13 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "n":
 		return m.handleNewItem()
-	case "e", "enter":
+	case "enter":
+		if m.currentTab == tabMonitors && len(m.sites) > 0 {
+			m.state = stateDetail
+			return m, m.loadDetailCmd(m.sites[m.cursor].ID)
+		}
+		return m.handleEditItem()
+	case "e":
 		return m.handleEditItem()
 	case "t":
 		if m.currentTab == tabSettings && m.settingsSection == sectionAlerts && len(m.alerts) > 0 {
