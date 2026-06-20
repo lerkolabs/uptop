@@ -1,8 +1,9 @@
 package tui
 
 import (
-	"fmt"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 func (m Model) renderCompactLogLine(line string, maxW int) string {
@@ -31,16 +32,24 @@ func (m Model) renderCompactLogLine(line string, maxW int) string {
 		}
 	}
 
-	msgW := maxW - 10
-	if msgW < 10 {
-		msgW = 10
+	msg = strings.TrimPrefix(msg, "Monitor ")
+	msg = strings.TrimPrefix(msg, "Push ")
+
+	// prefix: " HH:MM ● " = 9 visible chars, or " ● " = 3 without timestamp
+	prefixW := 3
+	if ts != "" {
+		prefixW = len(ts) + 4
+	}
+	msgW := maxW - prefixW
+	if msgW < 5 {
+		msgW = 5
 	}
 	msg = limitStr(msg, msgW)
 
 	if ts != "" {
-		return fmt.Sprintf(" %s %s %s", m.st.subtleStyle.Render(ts), tag, msg)
+		return " " + m.st.subtleStyle.Render(ts) + " " + tag + " " + msg
 	}
-	return fmt.Sprintf(" %s %s", tag, msg)
+	return " " + tag + " " + msg
 }
 
 func (m Model) viewLogsSidebar(width int) string {
@@ -48,6 +57,8 @@ func (m Model) viewLogsSidebar(width int) string {
 	if len(logs) == 0 {
 		return m.st.subtleStyle.Render("  No logs yet")
 	}
+
+	sidebarStyle := lipgloss.NewStyle().Width(width).MaxWidth(width)
 
 	var lines []string
 	for _, line := range logs {
@@ -60,5 +71,5 @@ func (m Model) viewLogsSidebar(width int) string {
 		lines = append(lines, m.renderCompactLogLine(line, width))
 	}
 
-	return strings.Join(lines, "\n")
+	return sidebarStyle.Render(strings.Join(lines, "\n"))
 }
