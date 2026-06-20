@@ -1,8 +1,1 @@
 blank_issues_enabled: false
-contact_links:
-  - name: Report a Bug
-    url: https://gitea.lerkolabs.com/lerkolabs/uptop/issues/new?template=bug_report.yaml
-    about: Report bugs on our Gitea instance
-  - name: Request a Feature
-    url: https://gitea.lerkolabs.com/lerkolabs/uptop/issues/new?template=feature_request.yaml
-    about: Suggest features on our Gitea instance

@@ -1,0 +1,46 @@
+name: Bug Report
+description: Something isn't working as expected
+labels:
+  - bug
+body:
+  - type: checkboxes
+    id: search
+    attributes:
+      label: Before filing
+      options:
+        - label: I searched existing issues and didn't find a match
+          required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Include what you expected to happen instead.
+      placeholder: |
+        When I run `uptop`, the TUI crashes after 10 seconds.
+        I expected it to keep running and display monitor status.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `uptop`
+        2. Wait ~10 seconds
+        3. TUI crashes with panic
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment & logs
+      description: Output of `uptop version`, OS, terminal. Paste any errors below.
+      render: shell
+      placeholder: |
+        uptop 0.1.0 (abc1234, 2026-06-17)
+        OS: Debian 13
+        Terminal: Ghostty
+
+        [paste any error output here]
+    validations:
+      required: false

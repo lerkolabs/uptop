@@ -1,0 +1,77 @@
+name: Forward Issues to Gitea
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  forward:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build issue body
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+        run: |
+          jq -n \
+            --arg url "$ISSUE_URL" \
+            --arg author "$ISSUE_AUTHOR" \
+            --arg body "$ISSUE_BODY" \
+            '">" + " Forwarded from GitHub: " + $url + "\n> Reported by: [@" + $author + "](https://github.com/" + $author + ")\n\n---\n\n" + $body' \
+            -r > /tmp/gitea-issue-body.md || exit 1
+
+      - name: Resolve label IDs
+        id: labels
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GH_LABELS: ${{ toJSON(github.event.issue.labels.*.name) }}
+        run: |
+          GITEA_LABELS=$(curl -f \
+            -H "Authorization: token ${GITEA_TOKEN}" \
+            "https://gitea.lerkolabs.com/api/v1/repos/lerkolabs/uptop/labels?limit=50") || exit 1
+
+          LABEL_IDS=$(echo "$GITEA_LABELS" | jq --argjson gh "$GH_LABELS" '
+            [.[] | select(
+              .name == "github" or
+              (.name as $n | $gh | index($n) != null)
+            ) | .id]
+          ')
+
+          echo "ids=${LABEL_IDS}" >> "$GITHUB_OUTPUT"
+
+      - name: Create Gitea issue
+        id: create
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          LABEL_IDS: ${{ steps.labels.outputs.ids }}
+        run: |
+          RESPONSE=$(curl -f -X POST \
+            -H "Authorization: token ${GITEA_TOKEN}" \
+            -H "Content-Type: application/json" \
+            "https://gitea.lerkolabs.com/api/v1/repos/lerkolabs/uptop/issues" \
+            -d "$(jq -n \
+              --arg title "$ISSUE_TITLE" \
+              --rawfile body /tmp/gitea-issue-body.md \
+              --argjson labels "$LABEL_IDS" \
+              '{title: $title, body: $body, labels: $labels}'
+            )") || exit 1
+
+          GITEA_URL=$(echo "$RESPONSE" | jq -re '.html_url') || exit 1
+          GITEA_NUM=$(echo "$RESPONSE" | jq -re '.number') || exit 1
+
+          echo "url=${GITEA_URL}" >> "$GITHUB_OUTPUT"
+          echo "number=${GITEA_NUM}" >> "$GITHUB_OUTPUT"
+
+      - name: Comment on GitHub issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITEA_URL: ${{ steps.create.outputs.url }}
+        run: |
+          gh issue comment "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" \
+            --body "Thanks for reporting! This issue has been forwarded to our [primary tracker](${GITEA_URL}). Discussion and updates will happen there."
