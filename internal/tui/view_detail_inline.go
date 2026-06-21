@@ -71,7 +71,7 @@ func (m Model) viewDetailInline(width int) string {
 		if chartW < 20 {
 			chartW = 20
 		}
-		chart := m.latencyChart(hist.Latencies, hist.Statuses, chartW, 2)
+		chart := m.latencyChart(hist.Latencies, hist.Statuses, chartW, 3)
 		if chart != "" {
 			b.WriteString(chart + "\n")
 		}

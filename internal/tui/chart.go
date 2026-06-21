@@ -4,19 +4,17 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/NimbleMarkets/ntcharts/sparkline"
-	"github.com/charmbracelet/lipgloss"
 )
 
 func (m Model) latencyChart(latencies []time.Duration, statuses []bool, width, height int) string {
-	if len(latencies) == 0 || width < 20 || height < 2 {
+	if len(latencies) == 0 || width < 20 || height < 1 {
 		return ""
 	}
 
 	var minMs, maxMs, sumMs int64
 	minMs = latencies[0].Milliseconds()
 	maxMs = minMs
+	upCount := 0
 	for i, l := range latencies {
 		ms := l.Milliseconds()
 		if i < len(statuses) && !statuses[i] {
@@ -29,12 +27,7 @@ func (m Model) latencyChart(latencies []time.Duration, statuses []bool, width, h
 			maxMs = ms
 		}
 		sumMs += ms
-	}
-	upCount := 0
-	for _, s := range statuses {
-		if s {
-			upCount++
-		}
+		upCount++
 	}
 	var avgMs int64
 	if upCount > 0 {
@@ -57,34 +50,75 @@ func (m Model) latencyChart(latencies []time.Duration, statuses []bool, width, h
 		chartW = 10
 	}
 
-	style := lipgloss.NewStyle().Foreground(m.theme.Accent)
-	sl := sparkline.New(chartW, height, sparkline.WithStyle(style))
-
-	vals := make([]float64, len(latencies))
-	for i, l := range latencies {
-		ms := float64(l.Milliseconds())
-		if i < len(statuses) && !statuses[i] {
-			ms = 0
+	samples := latencies
+	sampledStatuses := statuses
+	if len(samples) > chartW {
+		samples = samples[len(samples)-chartW:]
+		if len(sampledStatuses) > chartW {
+			sampledStatuses = sampledStatuses[len(sampledStatuses)-chartW:]
 		}
-		vals[i] = ms
 	}
-	sl.PushAll(vals)
-	sl.Draw()
 
-	chartLines := strings.Split(sl.View(), "\n")
+	spread := maxMs - minMs
+	if spread == 0 {
+		spread = 1
+	}
+	totalLevels := height * 8
 
-	var result []string
+	levels := make([]int, len(samples))
+	for i, l := range samples {
+		ms := l.Milliseconds()
+		if i < len(sampledStatuses) && !sampledStatuses[i] {
+			levels[i] = 0
+			continue
+		}
+		lvl := int(float64(ms-minMs) / float64(spread) * float64(totalLevels-1))
+		if lvl < 1 && ms > 0 {
+			lvl = 1
+		}
+		if lvl >= totalLevels {
+			lvl = totalLevels - 1
+		}
+		levels[i] = lvl
+	}
+
 	labelStyle := m.st.subtleStyle
-	for i, line := range chartLines {
+
+	var rows []string
+	for row := height - 1; row >= 0; row-- {
 		var label string
-		if i == 0 {
+		switch row {
+		case height - 1:
 			label = fmt.Sprintf("%*s", labelW, maxLabel)
-		} else if i == len(chartLines)-1 {
+		case 0:
 			label = fmt.Sprintf("%*s", labelW, minLabel)
-		} else {
+		default:
 			label = strings.Repeat(" ", labelW)
 		}
-		result = append(result, labelStyle.Render(label)+line)
+
+		var sb strings.Builder
+		sb.WriteString(labelStyle.Render(label))
+
+		rowBase := row * 8
+		for i := range samples {
+			fill := levels[i] - rowBase
+			if fill <= 0 {
+				sb.WriteString(" ")
+				continue
+			}
+			if fill > 8 {
+				fill = 8
+			}
+			ch := string(sparkChars[fill-1])
+
+			isDown := i < len(sampledStatuses) && !sampledStatuses[i]
+			if isDown {
+				sb.WriteString(m.st.dangerStyle.Render(ch))
+			} else {
+				sb.WriteString(m.latencyStyle(samples[i].Milliseconds(), nil).Render(ch))
+			}
+		}
+		rows = append(rows, sb.String())
 	}
 
 	stats := fmt.Sprintf("%*s Min %s  Avg %s  Max %s",
@@ -92,7 +126,7 @@ func (m Model) latencyChart(latencies []time.Duration, statuses []bool, width, h
 		m.fmtLatency(time.Duration(minMs)*time.Millisecond),
 		m.fmtLatency(time.Duration(avgMs)*time.Millisecond),
 		m.fmtLatency(time.Duration(maxMs)*time.Millisecond))
-	result = append(result, stats)
+	rows = append(rows, stats)
 
-	return strings.Join(result, "\n")
+	return strings.Join(rows, "\n")
 }
