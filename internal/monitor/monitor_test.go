@@ -25,7 +25,7 @@ type mockStore struct {
 	sites         []models.SiteConfig
 	alerts        map[int]models.AlertConfig
 	maintenance   map[int]bool
-	logs          []string
+	logs          []models.LogEntry
 	history       map[int][]models.CheckRecord
 	savedChecks   []savedCheck
 	savedLogs     []string
@@ -103,7 +103,7 @@ func (m *mockStore) SaveLog(_ context.Context, msg string) error {
 	return nil
 }
 
-func (m *mockStore) LoadLogs(_ context.Context, _ int) ([]string, error) {
+func (m *mockStore) LoadLogs(_ context.Context, _ int) ([]models.LogEntry, error) {
 	return m.logs, nil
 }
 
@@ -330,7 +330,7 @@ func TestHandleStatusChange_AlertSuppressedMaintenance(t *testing.T) {
 	logs := e.GetLogs()
 	found := false
 	for _, l := range logs {
-		if containsStr(l, "suppressed") {
+		if containsStr(l.Message, "suppressed") {
 			found = true
 			break
 		}
@@ -973,14 +973,17 @@ func TestAddLog_PrependAndCap(t *testing.T) {
 	if len(logs) != 100 {
 		t.Errorf("expected 100 logs, got %d", len(logs))
 	}
-	if !containsStr(logs[0], "log-104") {
-		t.Errorf("expected newest log first, got %s", logs[0])
+	if !containsStr(logs[0].Message, "log-104") {
+		t.Errorf("expected newest log first, got %s", logs[0].Message)
 	}
 }
 
 func TestInitLogs_LoadsFromDB(t *testing.T) {
 	ms := newMockStore()
-	ms.logs = []string{"old-log-1", "old-log-2"}
+	ms.logs = []models.LogEntry{
+		{Message: "old-log-1"},
+		{Message: "old-log-2"},
+	}
 	e := newTestEngine(ms)
 	e.InitLogs()
 

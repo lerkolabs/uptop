@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
@@ -554,21 +555,27 @@ func (s *SQLStore) PruneLogs(ctx context.Context) error {
 	return err
 }
 
-func (s *SQLStore) LoadLogs(ctx context.Context, limit int) ([]string, error) {
-	rows, err := s.db.QueryContext(ctx, s.q("SELECT message FROM logs ORDER BY created_at DESC LIMIT ?"), limit)
+func (s *SQLStore) LoadLogs(ctx context.Context, limit int) ([]models.LogEntry, error) {
+	rows, err := s.db.QueryContext(ctx, s.q("SELECT message, created_at FROM logs ORDER BY created_at DESC, id DESC LIMIT ?"), limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var logs []string
+	var entries []models.LogEntry
 	for rows.Next() {
-		var msg string
-		if err := rows.Scan(&msg); err != nil {
-			return logs, err
+		var e models.LogEntry
+		if err := rows.Scan(&e.Message, &e.CreatedAt); err != nil {
+			return entries, err
 		}
-		logs = append(logs, msg)
+		// Strip legacy [HH:MM] or [HH:MM:SS] prefix from pre-refactor entries.
+		if len(e.Message) > 3 && e.Message[0] == '[' {
+			if idx := strings.Index(e.Message, "]"); idx > 0 && idx < 12 {
+				e.Message = strings.TrimSpace(e.Message[idx+1:])
+			}
+		}
+		entries = append(entries, e)
 	}
-	return logs, rows.Err()
+	return entries, rows.Err()
 }
 
 func (s *SQLStore) LoadAllHistory(ctx context.Context, limit int) (map[int][]models.CheckRecord, error) {

@@ -61,7 +61,7 @@ type Store interface {
 
 	// Logs
 	SaveLog(ctx context.Context, message string) error
-	LoadLogs(ctx context.Context, limit int) ([]string, error)
+	LoadLogs(ctx context.Context, limit int) ([]models.LogEntry, error)
 	PruneLogs(ctx context.Context) error
 
 	// Maintenance Windows

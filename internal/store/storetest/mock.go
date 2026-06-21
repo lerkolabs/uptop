@@ -212,8 +212,8 @@ func (m *BaseMock) SaveLog(ctx context.Context, message string) error {
 	return nil
 }
 
-func (m *BaseMock) LoadLogs(_ context.Context, _ int) ([]string, error) { return nil, nil }
-func (m *BaseMock) PruneLogs(_ context.Context) error                   { return nil }
+func (m *BaseMock) LoadLogs(_ context.Context, _ int) ([]models.LogEntry, error) { return nil, nil }
+func (m *BaseMock) PruneLogs(_ context.Context) error                            { return nil }
 
 func (m *BaseMock) GetActiveMaintenanceWindows(ctx context.Context) ([]models.MaintenanceWindow, error) {
 	if m.GetActiveMaintenanceWindowsFunc != nil {

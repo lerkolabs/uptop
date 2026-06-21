@@ -3,6 +3,8 @@ package tui
 import (
 	"fmt"
 	"strings"
+
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 )
 
 type logSeverity int
@@ -15,8 +17,8 @@ const (
 	severitySystem
 )
 
-func classifyLog(line string) logSeverity {
-	lower := strings.ToLower(line)
+func classifyLog(msg string) logSeverity {
+	lower := strings.ToLower(msg)
 	switch {
 	case strings.Contains(lower, "confirmed down"),
 		strings.Contains(lower, "is down"),
@@ -63,44 +65,29 @@ func (m Model) renderLogTag(sev logSeverity) string {
 	}
 }
 
-func (m Model) renderLogLine(line string) string {
-	sev := classifyLog(line)
+func (m Model) renderLogLine(entry models.LogEntry) string {
+	sev := classifyLog(entry.Message)
 	tag := m.renderLogTag(sev)
-
-	ts := ""
-	msg := line
-	if len(line) > 10 && line[0] == '[' {
-		if idx := strings.Index(line, "]"); idx > 0 && idx < 12 {
-			ts = m.st.subtleStyle.Render(line[1:idx])
-			msg = strings.TrimSpace(line[idx+1:])
-		}
-	}
-
-	if ts != "" {
-		return fmt.Sprintf("  %s  %s  %s", ts, tag, msg)
-	}
-	return fmt.Sprintf("  %s  %s", tag, msg)
+	ts := m.st.subtleStyle.Render(entry.CreatedAt.Local().Format("01/02 15:04"))
+	return fmt.Sprintf("  %s  %s  %s", ts, tag, entry.Message)
 }
 
-// refreshLogContent rebuilds the log viewport from the full engine log list,
-// filtering before windowing so the entry count and "(n hidden)" reflect all
-// logs, not just the visible viewport slice.
 func (m *Model) refreshLogContent() {
 	var rendered []string
 	total := 0
 	shown := 0
 
-	for _, line := range m.engine.GetLogs() {
-		if strings.TrimSpace(line) == "" {
+	for _, entry := range m.engine.GetLogs() {
+		if strings.TrimSpace(entry.Message) == "" {
 			continue
 		}
 		total++
-		sev := classifyLog(line)
+		sev := classifyLog(entry.Message)
 		if m.logFilterImportant && !isImportantLog(sev) {
 			continue
 		}
 		shown++
-		rendered = append(rendered, m.renderLogLine(line))
+		rendered = append(rendered, m.renderLogLine(entry))
 	}
 
 	m.logTotal = total

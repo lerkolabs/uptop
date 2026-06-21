@@ -3,11 +3,12 @@ package tui
 import (
 	"strings"
 
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 	"github.com/charmbracelet/lipgloss"
 )
 
-func (m Model) renderCompactLogLine(line string, maxW int) string {
-	sev := classifyLog(line)
+func (m Model) renderCompactLogLine(entry models.LogEntry, maxW int) string {
+	sev := classifyLog(entry.Message)
 
 	var tag string
 	switch sev {
@@ -23,33 +24,20 @@ func (m Model) renderCompactLogLine(line string, maxW int) string {
 		tag = m.st.subtleStyle.Render("·")
 	}
 
-	ts := ""
-	msg := line
-	if len(line) > 10 && line[0] == '[' {
-		if idx := strings.Index(line, "]"); idx > 0 && idx < 12 {
-			ts = line[1:idx]
-			msg = strings.TrimSpace(line[idx+1:])
-		}
-	}
+	ts := entry.CreatedAt.Local().Format("01/02 15:04")
 
+	msg := entry.Message
 	msg = strings.TrimPrefix(msg, "Monitor ")
 	msg = strings.TrimPrefix(msg, "Push ")
 
-	// prefix: " HH:MM ● " = 9 visible chars, or " ● " = 3 without timestamp
-	prefixW := 3
-	if ts != "" {
-		prefixW = len(ts) + 4
-	}
+	prefixW := len(ts) + 4
 	msgW := maxW - prefixW
 	if msgW < 5 {
 		msgW = 5
 	}
 	msg = limitStr(msg, msgW)
 
-	if ts != "" {
-		return " " + m.st.subtleStyle.Render(ts) + " " + tag + " " + msg
-	}
-	return " " + tag + " " + msg
+	return " " + m.st.subtleStyle.Render(ts) + " " + tag + " " + msg
 }
 
 func (m Model) viewLogsSidebar(width, maxLines int) string {
@@ -61,14 +49,14 @@ func (m Model) viewLogsSidebar(width, maxLines int) string {
 	sidebarStyle := lipgloss.NewStyle().Width(width).MaxWidth(width)
 
 	var all []string
-	for _, line := range logs {
-		if strings.TrimSpace(line) == "" {
+	for _, entry := range logs {
+		if strings.TrimSpace(entry.Message) == "" {
 			continue
 		}
-		if m.logFilterImportant && !isImportantLog(classifyLog(line)) {
+		if m.logFilterImportant && !isImportantLog(classifyLog(entry.Message)) {
 			continue
 		}
-		all = append(all, m.renderCompactLogLine(line, width))
+		all = append(all, m.renderCompactLogLine(entry, width))
 	}
 
 	start := m.logScrollOffset
@@ -87,11 +75,11 @@ func (m Model) viewLogsSidebar(width, maxLines int) string {
 func (m *Model) scrollLogs(delta int) {
 	logs := m.engine.GetLogs()
 	total := 0
-	for _, line := range logs {
-		if strings.TrimSpace(line) == "" {
+	for _, entry := range logs {
+		if strings.TrimSpace(entry.Message) == "" {
 			continue
 		}
-		if m.logFilterImportant && !isImportantLog(classifyLog(line)) {
+		if m.logFilterImportant && !isImportantLog(classifyLog(entry.Message)) {
 			continue
 		}
 		total++

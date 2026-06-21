@@ -40,7 +40,7 @@ type Engine struct {
 	liveState map[int]models.Site
 
 	logMu    sync.RWMutex
-	logStore []string
+	logStore []models.LogEntry
 
 	activeMu sync.RWMutex
 	isActive bool
@@ -152,11 +152,13 @@ func fmtDurationShort(d time.Duration) string {
 // appendLog adds a timestamped entry to the in-memory ring buffer and returns
 // it. It never touches the database, so it is safe to call from the db-write
 // drop/error path without recursing back through the write queue.
-func (e *Engine) appendLog(msg string) string {
-	ts := time.Now().Format("15:04:05")
-	entry := fmt.Sprintf("[%s] %s", ts, sanitizeLog(msg))
+func (e *Engine) appendLog(msg string) models.LogEntry {
+	entry := models.LogEntry{
+		Message:   sanitizeLog(msg),
+		CreatedAt: time.Now(),
+	}
 	e.logMu.Lock()
-	e.logStore = append([]string{entry}, e.logStore...)
+	e.logStore = append([]models.LogEntry{entry}, e.logStore...)
 	if len(e.logStore) > maxLogEntries {
 		e.logStore = e.logStore[:maxLogEntries]
 	}
@@ -166,7 +168,7 @@ func (e *Engine) appendLog(msg string) string {
 
 func (e *Engine) AddLog(msg string) {
 	entry := e.appendLog(msg)
-	e.enqueueWrite(writeLog{message: entry})
+	e.enqueueWrite(writeLog{message: entry.Message})
 }
 
 // enqueueWrite hands a persistence task to the writer goroutine without
@@ -246,16 +248,16 @@ func (e *Engine) Stop() {
 }
 
 func (e *Engine) InitLogs() {
-	logs, err := e.db.LoadLogs(context.Background(), maxLogEntries)
+	entries, err := e.db.LoadLogs(context.Background(), maxLogEntries)
 	if err != nil {
 		return
 	}
-	if len(logs) == 0 {
+	if len(entries) == 0 {
 		return
 	}
 	e.logMu.Lock()
 	defer e.logMu.Unlock()
-	e.logStore = logs
+	e.logStore = entries
 }
 
 // InitAlertHealth restores persisted alert send health so the dashboard shows real
@@ -278,10 +280,10 @@ func (e *Engine) InitAlertHealth() {
 	}
 }
 
-func (e *Engine) GetLogs() []string {
+func (e *Engine) GetLogs() []models.LogEntry {
 	e.logMu.RLock()
 	defer e.logMu.RUnlock()
-	logs := make([]string, len(e.logStore))
+	logs := make([]models.LogEntry, len(e.logStore))
 	copy(logs, e.logStore)
 	return logs
 }

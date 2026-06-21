@@ -300,7 +300,7 @@ func TestWriteDoneMsg_LogsErrorAndReloads(t *testing.T) {
 	mm := updated.(Model)
 	found := false
 	for _, line := range mm.engine.GetLogs() {
-		if strings.Contains(line, "Delete site failed: boom") {
+		if strings.Contains(line.Message, "Delete site failed: boom") {
 			found = true
 		}
 	}

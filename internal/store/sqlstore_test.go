@@ -407,7 +407,7 @@ func TestPruneLogs(t *testing.T) {
 	// LoadLogs ordering ties when rows share a created_at second).
 	present := make(map[string]bool, len(logs))
 	for _, l := range logs {
-		present[l] = true
+		present[l.Message] = true
 	}
 	if !present[fmt.Sprintf("log %d", maxLogRows+50-1)] {
 		t.Error("newest log was pruned")
