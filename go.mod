@@ -3,6 +3,7 @@ module gitea.lerkolabs.com/lerkolabs/uptop
 go 1.26.4
 
 require (
+	github.com/NimbleMarkets/ntcharts v0.5.1
 	github.com/charmbracelet/bubbles v0.21.1-0.20250623103423-23b8fd6302d7
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/harmonica v0.2.0

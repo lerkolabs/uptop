@@ -67,14 +67,16 @@ func (m Model) viewDetailInline(width int) string {
 	}
 
 	if len(hist.Latencies) > 0 {
-		sparkW := width - 30
-		if sparkW < 10 {
-			sparkW = 10
+		chartW := width - 4
+		if chartW < 20 {
+			chartW = 20
 		}
-		if sparkW > detailSparkWidth {
-			sparkW = detailSparkWidth
+		chartH := 4
+		chart := m.latencyChart(hist.Latencies, hist.Statuses, chartW, chartH)
+		if chart != "" {
+			b.WriteString(chart + "\n")
 		}
-		spark := m.latencySparkline(hist.Latencies, hist.Statuses, sparkW, m.theme.Bg)
+
 		minMs := hist.Latencies[0].Milliseconds()
 		maxMs := hist.Latencies[0].Milliseconds()
 		var sumMs int64
@@ -89,11 +91,11 @@ func (m Model) viewDetailInline(width int) string {
 			sumMs += ms
 		}
 		avgMs := sumMs / int64(len(hist.Latencies))
-		stats := fmt.Sprintf("Min %s  Avg %s  Max %s",
+		stats := fmt.Sprintf("  Min %s  Avg %s  Max %s",
 			m.fmtLatency(time.Duration(minMs)*time.Millisecond),
 			m.fmtLatency(time.Duration(avgMs)*time.Millisecond),
 			m.fmtLatency(time.Duration(maxMs)*time.Millisecond))
-		b.WriteString("  " + spark + "  " + stats + "\n")
+		b.WriteString(stats + "\n")
 	}
 
 	keys := m.st.subtleStyle.Render("[h] History  [s] SLA  [e] Edit  [esc] Close")
