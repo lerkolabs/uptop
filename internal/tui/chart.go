@@ -13,8 +13,13 @@ func (m Model) latencyChart(latencies []time.Duration, statuses []bool, width, h
 		return ""
 	}
 
+	chartW := len(latencies)
+	if chartW > width {
+		chartW = width
+	}
+
 	lineStyle := lipgloss.NewStyle().Foreground(m.theme.Accent)
-	slc := streamlinechart.New(width, height,
+	slc := streamlinechart.New(chartW, height,
 		streamlinechart.WithStyles(runes.ThinLineStyle, lineStyle),
 	)
 
