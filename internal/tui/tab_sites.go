@@ -106,6 +106,24 @@ func (m Model) computeLayout() tableLayout {
 		}
 	}
 
+	sortColMap := map[int]colKey{
+		sortStatus:  colStatus,
+		sortName:    colName,
+		sortLatency: colLatency,
+	}
+	if sortedKey, ok := sortColMap[m.sortColumn]; ok {
+		arrow := "▼"
+		if m.sortAsc {
+			arrow = "▲"
+		}
+		for i, k := range active {
+			if k == sortedKey {
+				headers[i] = headers[i] + arrow
+				break
+			}
+		}
+	}
+
 	numCols := len(headers)
 	borderOverhead := 2 + (numCols - 1)
 	avail := cw - chromePadH - 2 - borderOverhead - fixed

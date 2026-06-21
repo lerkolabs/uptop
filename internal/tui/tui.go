@@ -102,6 +102,13 @@ const (
 	panelDetail   = 2
 )
 
+const (
+	sortStatus  = 0
+	sortName    = 1
+	sortLatency = 2
+	sortMax     = 3
+)
+
 type sessionState int
 
 const (
@@ -125,6 +132,8 @@ type Model struct {
 	settingsSection int
 	cursor          int
 	selectedID      int
+	sortColumn      int
+	sortAsc         bool
 	tableOffset     int
 	maxTableRows    int
 	termWidth       int

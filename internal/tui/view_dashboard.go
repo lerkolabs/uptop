@@ -308,7 +308,7 @@ func (m Model) renderFooter(stats dashboardStats) string {
 		} else if m.detailOpen {
 			keys = "[i]Close [Enter]Expand [h]History [s]SLA [e]Edit [l]Logs [↑/↓]Select [T]Theme [q]Quit"
 		} else {
-			keys = "[/]Filter [i]Info [Enter]Detail [n]New [e]Edit [d]Del [l]Logs [T]Theme [Tab]Switch [q]Quit"
+			keys = "[/]Filter [i]Info [Enter]Detail [</>]Sort [r]Reverse [n]New [e]Edit [d]Del [l]Logs [T]Theme [Tab]Switch [q]Quit"
 		}
 	case tabMaint:
 		keys = "[n]New [x]End [d]Del [T]Theme [Tab]Switch [q]Quit"

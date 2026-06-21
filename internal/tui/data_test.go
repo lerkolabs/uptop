@@ -12,7 +12,7 @@ func TestSortSitesForDisplay_GroupsFirst(t *testing.T) {
 		{SiteConfig: models.SiteConfig{ID: 1, Name: "group-a", Type: "group"}, SiteState: models.SiteState{Status: "UP"}},
 		{SiteConfig: models.SiteConfig{ID: 2, Name: "child", Type: "http", ParentID: 1}, SiteState: models.SiteState{Status: "UP"}},
 	}
-	result := sortSitesForDisplay(sites, nil)
+	result := sortSitesForDisplay(sites, nil, sortStatus, false)
 	if len(result) != 3 {
 		t.Fatalf("expected 3 sites, got %d", len(result))
 	}
@@ -34,7 +34,7 @@ func TestSortSitesForDisplay_CollapsedHidesChildren(t *testing.T) {
 		{SiteConfig: models.SiteConfig{ID: 3, Name: "child-2", Type: "http", ParentID: 1}, SiteState: models.SiteState{Status: "UP"}},
 	}
 	collapsed := map[int]bool{1: true}
-	result := sortSitesForDisplay(sites, collapsed)
+	result := sortSitesForDisplay(sites, collapsed, sortStatus, false)
 	if len(result) != 1 {
 		t.Fatalf("collapsed group should hide children, got %d items", len(result))
 	}
@@ -49,7 +49,7 @@ func TestSortSitesForDisplay_StatusOrdering(t *testing.T) {
 		{SiteConfig: models.SiteConfig{ID: 2, Name: "down-site", Type: "http"}, SiteState: models.SiteState{Status: "DOWN"}},
 		{SiteConfig: models.SiteConfig{ID: 3, Name: "late-site", Type: "http"}, SiteState: models.SiteState{Status: "LATE"}},
 	}
-	result := sortSitesForDisplay(sites, nil)
+	result := sortSitesForDisplay(sites, nil, sortStatus, false)
 	if result[0].Status != "DOWN" {
 		t.Errorf("DOWN should sort first, got %s", result[0].Status)
 	}

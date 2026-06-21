@@ -49,7 +49,7 @@ func writeCmd(op string, fn func() error) tea.Cmd {
 	}
 }
 
-func sortSitesForDisplay(allSites []models.Site, collapsed map[int]bool) []models.Site {
+func sortSitesForDisplay(allSites []models.Site, collapsed map[int]bool, sortCol int, sortAsc bool) []models.Site {
 	var groups, ungrouped []models.Site
 	children := make(map[int][]models.Site)
 	for _, s := range allSites {
@@ -68,8 +68,26 @@ func sortSitesForDisplay(allSites []models.Site, collapsed map[int]bool) []model
 		sort.SliceStable(c, func(i, j int) bool { return siteOrder(c[i]) < siteOrder(c[j]) })
 		children[pid] = c
 	}
-	sort.Slice(ungrouped, func(i, j int) bool { return ungrouped[i].ID < ungrouped[j].ID })
-	sort.SliceStable(ungrouped, func(i, j int) bool { return siteOrder(ungrouped[i]) < siteOrder(ungrouped[j]) })
+
+	sortSlice := func(s []models.Site) {
+		sort.Slice(s, func(i, j int) bool { return s[i].ID < s[j].ID })
+		sort.SliceStable(s, func(i, j int) bool {
+			var less bool
+			switch sortCol {
+			case sortName:
+				less = strings.ToLower(s[i].Name) < strings.ToLower(s[j].Name)
+			case sortLatency:
+				less = s[i].Latency < s[j].Latency
+			default:
+				less = siteOrder(s[i]) < siteOrder(s[j])
+			}
+			if !sortAsc {
+				return less
+			}
+			return !less
+		})
+	}
+	sortSlice(ungrouped)
 
 	var ordered []models.Site
 	for _, g := range groups {
@@ -99,7 +117,7 @@ func filterSites(sites []models.Site, needle string) []models.Site {
 // separately via loadTabDataCmd.
 func (m *Model) refreshLive() {
 	allSites := m.engine.GetAllSites()
-	ordered := sortSitesForDisplay(allSites, m.collapsed)
+	ordered := sortSitesForDisplay(allSites, m.collapsed, m.sortColumn, m.sortAsc)
 	if m.filterText != "" {
 		ordered = filterSites(ordered, m.filterText)
 	}

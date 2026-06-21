@@ -532,6 +532,23 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.recalcLayout()
 			return m, nil
 		}
+	case ">", ".":
+		if m.currentTab == tabMonitors {
+			m.sortColumn = (m.sortColumn + 1) % sortMax
+			m.sortAsc = false
+			m.refreshLive()
+		}
+	case "<", ",":
+		if m.currentTab == tabMonitors {
+			m.sortColumn = (m.sortColumn - 1 + sortMax) % sortMax
+			m.sortAsc = false
+			m.refreshLive()
+		}
+	case "r":
+		if m.currentTab == tabMonitors {
+			m.sortAsc = !m.sortAsc
+			m.refreshLive()
+		}
 	case "tab":
 		m.switchTab(m.currentTab + 1)
 	case "left":
