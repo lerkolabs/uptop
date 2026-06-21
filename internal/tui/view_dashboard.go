@@ -233,6 +233,12 @@ type tabEntry struct {
 func (m Model) renderTabBar(stats dashboardStats) string {
 	settingsCount := len(m.alerts) + len(m.nodes)
 	settingsWarn := stats.offlineNodes
+	for _, a := range m.alerts {
+		h := m.engine.GetAlertHealth(a.ID)
+		if !h.LastSendOK && !h.LastSendAt.IsZero() {
+			settingsWarn++
+		}
+	}
 	if m.isAdmin {
 		settingsCount += len(m.users)
 	}
