@@ -71,31 +71,10 @@ func (m Model) viewDetailInline(width int) string {
 		if chartW < 20 {
 			chartW = 20
 		}
-		chartH := 4
-		chart := m.latencyChart(hist.Latencies, hist.Statuses, chartW, chartH)
+		chart := m.latencyChart(hist.Latencies, hist.Statuses, chartW, 2)
 		if chart != "" {
 			b.WriteString(chart + "\n")
 		}
-
-		minMs := hist.Latencies[0].Milliseconds()
-		maxMs := hist.Latencies[0].Milliseconds()
-		var sumMs int64
-		for _, l := range hist.Latencies {
-			ms := l.Milliseconds()
-			if ms < minMs {
-				minMs = ms
-			}
-			if ms > maxMs {
-				maxMs = ms
-			}
-			sumMs += ms
-		}
-		avgMs := sumMs / int64(len(hist.Latencies))
-		stats := fmt.Sprintf("  Min %s  Avg %s  Max %s",
-			m.fmtLatency(time.Duration(minMs)*time.Millisecond),
-			m.fmtLatency(time.Duration(avgMs)*time.Millisecond),
-			m.fmtLatency(time.Duration(maxMs)*time.Millisecond))
-		b.WriteString(stats + "\n")
 	}
 
 	keys := m.st.subtleStyle.Render("[h] History  [s] SLA  [e] Edit  [esc] Close")

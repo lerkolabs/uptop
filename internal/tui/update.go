@@ -142,7 +142,7 @@ func (m *Model) handleFormMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-const detailInlineHeight = 12
+const detailInlineHeight = 10
 
 func (m *Model) recalcLayout() {
 	chrome := chromeBase
