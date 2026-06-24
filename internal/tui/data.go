@@ -62,12 +62,6 @@ func sortSitesForDisplay(allSites []models.Site, collapsed map[int]bool, sortCol
 		}
 	}
 	sort.Slice(groups, func(i, j int) bool { return groups[i].ID < groups[j].ID })
-	for pid := range children {
-		c := children[pid]
-		sort.Slice(c, func(i, j int) bool { return c[i].ID < c[j].ID })
-		sort.SliceStable(c, func(i, j int) bool { return siteOrder(c[i]) < siteOrder(c[j]) })
-		children[pid] = c
-	}
 
 	sortSlice := func(s []models.Site) {
 		sort.Slice(s, func(i, j int) bool { return s[i].ID < s[j].ID })
@@ -86,6 +80,12 @@ func sortSitesForDisplay(allSites []models.Site, collapsed map[int]bool, sortCol
 			}
 			return !less
 		})
+	}
+
+	for pid := range children {
+		c := children[pid]
+		sortSlice(c)
+		children[pid] = c
 	}
 	sortSlice(ungrouped)
 
