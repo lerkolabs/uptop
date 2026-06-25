@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
-	"gitea.lerkolabs.com/lerkolabs/uptop/internal/monitor"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -56,28 +55,8 @@ func (m Model) viewDetailPanel() string {
 		return m.st.titleStyle.Render("  "+title) + " " + m.st.subtleStyle.Render(strings.Repeat("─", divW-len(title)-3))
 	}
 
-	// Left column: status + endpoint
+	// Left column: endpoint details
 	var left []string
-	left = append(left, row("Status", m.fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID))))
-
-	if (site.Status == models.StatusDown || site.Status == models.StatusSSLExp || site.Status == models.StatusLate || site.Status == models.StatusStale) && site.LastError != "" {
-		errW := colW - 19
-		if errW < 20 {
-			errW = 20
-		}
-		errMsg := limitStr(site.LastError, errW)
-		left = append(left, row("Error", m.st.dangerStyle.Render(errMsg)))
-	}
-
-	if site.Type == "http" && site.StatusCode > 0 {
-		left = append(left, row("HTTP Code", strconv.Itoa(site.StatusCode)))
-	}
-	if !site.StatusChangedAt.IsZero() {
-		dur := time.Since(site.StatusChangedAt)
-		left = append(left, row("State Since", fmtDuration(dur)+" ago"))
-	}
-
-	left = append(left, "")
 	left = append(left, m.st.titleStyle.Render("  ENDPOINT"))
 	left = append(left, row("Type", site.Type))
 	if site.URL != "" {
@@ -89,12 +68,27 @@ func (m Model) viewDetailPanel() string {
 	if site.Port > 0 {
 		left = append(left, row("Port", strconv.Itoa(site.Port)))
 	}
+	left = append(left, row("Interval", fmt.Sprintf("%ds", site.Interval)))
+	if site.MaxRetries > 0 {
+		left = append(left, row("Retries", m.fmtRetries(site)))
+	}
+	if site.Regions != "" {
+		left = append(left, row("Regions", site.Regions))
+	}
+	if site.Description != "" {
+		left = append(left, row("Description", limitStr(site.Description, colW-19)))
+	}
 
-	// Right column: timing + config
+	// Right column: status + timing + HTTP
 	var right []string
+	right = append(right, m.st.titleStyle.Render("  STATUS"))
+	right = append(right, row("Status", m.fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID))))
 	right = append(right, row("Latency", m.fmtLatency(site.Latency)))
 	right = append(right, row("Uptime", m.fmtUptime(hist.Statuses)))
-	right = append(right, row("Interval", fmt.Sprintf("%ds", site.Interval)))
+	if !site.StatusChangedAt.IsZero() {
+		dur := time.Since(site.StatusChangedAt)
+		right = append(right, row("State Since", fmtDuration(dur)+" ago"))
+	}
 	if !site.LastCheck.IsZero() {
 		right = append(right, row("Last Check", m.fmtTimeAgo(site.LastCheck)))
 	}
@@ -102,9 +96,18 @@ func (m Model) viewDetailPanel() string {
 		right = append(right, row("Last Success", m.fmtTimeAgo(site.LastSuccessAt)))
 	}
 
+	if (site.Status == models.StatusDown || site.Status == models.StatusSSLExp || site.Status == models.StatusLate || site.Status == models.StatusStale) && site.LastError != "" {
+		errW := colW - 19
+		if errW < 20 {
+			errW = 20
+		}
+		right = append(right, row("Error", m.st.dangerStyle.Render(limitStr(site.LastError, errW))))
+	}
+
 	if site.Type == "http" {
-		right = append(right, "")
-		right = append(right, m.st.titleStyle.Render("  HTTP"))
+		if site.StatusCode > 0 {
+			right = append(right, row("HTTP Code", strconv.Itoa(site.StatusCode)))
+		}
 		codes := site.AcceptedCodes
 		if codes == "" {
 			codes = "200-299"
@@ -114,10 +117,6 @@ func (m Model) viewDetailPanel() string {
 		if site.Method != "" && site.Method != "GET" {
 			right = append(right, row("Method", site.Method))
 		}
-	}
-
-	if site.MaxRetries > 0 {
-		right = append(right, row("Retries", m.fmtRetries(site)))
 	}
 
 	// Pad shorter column
@@ -131,7 +130,7 @@ func (m Model) viewDetailPanel() string {
 	leftCol := lipgloss.NewStyle().Width(colW).Render(strings.Join(left, "\n"))
 	rightCol := lipgloss.NewStyle().Width(colW).Render(strings.Join(right, "\n"))
 	b.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, leftCol, rightCol) + "\n")
-	b.WriteString(sectionDiv + "\n")
+	b.WriteString("\n" + sectionDiv + "\n")
 
 	// Connection chain (full width, only on errors)
 	if (site.Status == models.StatusDown || site.Status == models.StatusSSLExp) && site.LastError != "" {
@@ -202,35 +201,30 @@ func (m Model) viewDetailPanel() string {
 		}
 	}
 
-	// State changes
-	var stateChanges []models.StateChange
-	if m.detailChangesSiteID == site.ID {
-		stateChanges = m.detailChanges
+	// Bottom two-column: graphs left, state changes right
+	graphW := (totalW - 4) * 70 / 100
+	changeW := totalW - 4 - graphW
+	if graphW < 30 {
+		graphW = 30
 	}
-	if len(stateChanges) > 0 {
-		b.WriteString("\n" + sectionHead("STATE CHANGES") + "\n")
-		for i, sc := range stateChanges {
-			from := m.fmtStatusWord(string(sc.FromStatus))
-			to := m.fmtStatusWord(string(sc.ToStatus))
-			ago := fmtDuration(time.Since(sc.ChangedAt))
-			line := fmt.Sprintf("  %s → %s  %s ago", from, to, ago)
-			if sc.ToStatus == "UP" {
-				dur := computeOutageDuration(stateChanges, i)
-				if dur > 0 {
-					line += "  " + m.st.warnStyle.Render("outage "+fmtDuration(dur))
-				}
-			}
-			if sc.ErrorReason != "" {
-				line += "  " + m.st.dangerStyle.Render(sc.ErrorReason)
-			}
-			b.WriteString(line + "\n")
-		}
+	if changeW < 20 {
+		changeW = 20
+	}
+	bottomColW := graphW
+
+	// Left: latency + histogram
+	var graphLines []string
+	sectionLabel := func(title string) string {
+		return m.st.titleStyle.Render("  " + title)
 	}
 
-	// Sparkline + stats
-	b.WriteString("\n" + sectionHead("LATENCY") + "\n")
+	graphLines = append(graphLines, sectionLabel("LATENCY"))
 	if site.Type == "push" {
-		b.WriteString("  " + m.zones.Mark("spark-heartbeat", m.heartbeatSparkline(hist.Statuses, detailSparkWidth, nil)))
+		sparkW := bottomColW - 4
+		if sparkW > detailSparkWidth {
+			sparkW = detailSparkWidth
+		}
+		graphLines = append(graphLines, "  "+m.heartbeatSparkline(hist.Statuses, sparkW, nil))
 		if len(hist.Statuses) > 0 {
 			up := 0
 			for _, s := range hist.Statuses {
@@ -238,12 +232,15 @@ func (m Model) viewDetailPanel() string {
 					up++
 				}
 			}
-			fmt.Fprintf(&b, "\n  %s %d/%d checks up",
-				m.st.subtleStyle.Render("Heartbeats"),
-				up, len(hist.Statuses))
+			graphLines = append(graphLines, fmt.Sprintf("  %s %d/%d checks up",
+				m.st.subtleStyle.Render("Heartbeats"), up, len(hist.Statuses)))
 		}
 	} else {
-		b.WriteString("  " + m.zones.Mark("spark-latency", m.latencySparkline(hist.Latencies, hist.Statuses, detailSparkWidth, nil)))
+		sparkW := bottomColW - 4
+		if sparkW > detailSparkWidth {
+			sparkW = detailSparkWidth
+		}
+		graphLines = append(graphLines, "  "+m.latencySparkline(hist.Latencies, hist.Statuses, sparkW, nil))
 		var minL, maxL, total time.Duration
 		count := 0
 		for i, l := range hist.Latencies {
@@ -262,27 +259,58 @@ func (m Model) viewDetailPanel() string {
 		}
 		if count > 0 {
 			avg := total / time.Duration(count)
-			fmt.Fprintf(&b, "\n  %s %dms  %s %dms  %s %dms",
+			graphLines = append(graphLines, fmt.Sprintf("  %s %dms  %s %dms  %s %dms",
 				m.st.subtleStyle.Render("Min"), minL.Milliseconds(),
 				m.st.subtleStyle.Render("Avg"), avg.Milliseconds(),
-				m.st.subtleStyle.Render("Max"), maxL.Milliseconds())
+				m.st.subtleStyle.Render("Max"), maxL.Milliseconds()))
 		}
 	}
 
-	if m.sparkTooltipIdx >= 0 {
-		b.WriteString("\n" + m.renderSparkTooltip(site, hist, detailSparkWidth))
-	}
-
-	// Histogram
-	b.WriteString("\n")
 	if site.Type != "push" && len(hist.Latencies) > 5 {
-		histW := totalW - 4
-		if histW < 30 {
-			histW = 30
-		}
-		b.WriteString("\n" + sectionHead("RESPONSE TIME DISTRIBUTION") + "\n")
-		b.WriteString(m.latencyHistogram(hist.Latencies, hist.Statuses, histW))
+		graphLines = append(graphLines, "")
+		graphLines = append(graphLines, sectionLabel("DISTRIBUTION"))
+		graphLines = append(graphLines, m.latencyHistogram(hist.Latencies, hist.Statuses, bottomColW))
 	}
+
+	// Right: state changes
+	var changeLines []string
+	var stateChanges []models.StateChange
+	if m.detailChangesSiteID == site.ID {
+		stateChanges = m.detailChanges
+	}
+	changeLines = append(changeLines, sectionLabel("STATE CHANGES"))
+	if len(stateChanges) > 0 {
+		for i, sc := range stateChanges {
+			from := m.fmtStatusWord(string(sc.FromStatus))
+			to := m.fmtStatusWord(string(sc.ToStatus))
+			ago := fmtDuration(time.Since(sc.ChangedAt))
+			line := fmt.Sprintf("  %s → %s  %s ago", from, to, ago)
+			if sc.ToStatus == "UP" {
+				dur := computeOutageDuration(stateChanges, i)
+				if dur > 0 {
+					line += "  " + m.st.warnStyle.Render("outage "+fmtDuration(dur))
+				}
+			}
+			if sc.ErrorReason != "" {
+				line += "  " + m.st.dangerStyle.Render(limitStr(sc.ErrorReason, changeW-30))
+			}
+			changeLines = append(changeLines, line)
+		}
+	} else {
+		changeLines = append(changeLines, m.st.subtleStyle.Render("  No state changes"))
+	}
+
+	// Pad and join
+	for len(graphLines) < len(changeLines) {
+		graphLines = append(graphLines, "")
+	}
+	for len(changeLines) < len(graphLines) {
+		changeLines = append(changeLines, "")
+	}
+
+	graphCol := lipgloss.NewStyle().Width(graphW).Render(strings.Join(graphLines, "\n"))
+	changeCol := lipgloss.NewStyle().Width(changeW).Render(strings.Join(changeLines, "\n"))
+	b.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, graphCol, changeCol) + "\n")
 
 	b.WriteString("\n")
 	b.WriteString(m.divider() + "\n")
@@ -303,44 +331,4 @@ func (m Model) viewDetailPanel() string {
 	}
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(content)
-}
-
-func (m Model) renderSparkTooltip(site models.Site, hist monitor.SiteHistory, sparkWidth int) string {
-	idx := m.sparkTooltipIdx
-
-	var dataLen int
-	if site.Type == "push" {
-		dataLen = len(hist.Statuses)
-	} else {
-		dataLen = len(hist.Latencies)
-	}
-	if idx < 0 || idx >= dataLen {
-		return ""
-	}
-
-	var parts []string
-
-	checksAgo := dataLen - 1 - idx
-	approxSecs := checksAgo * site.Interval
-	if approxSecs == 0 {
-		parts = append(parts, "latest")
-	} else {
-		parts = append(parts, "~"+fmtDuration(time.Duration(approxSecs)*time.Second)+" ago")
-	}
-
-	if site.Type != "push" && idx < len(hist.Latencies) {
-		parts = append(parts, m.fmtLatency(hist.Latencies[idx]))
-	}
-
-	if idx < len(hist.Statuses) {
-		if hist.Statuses[idx] {
-			parts = append(parts, m.st.specialStyle.Render("UP"))
-		} else {
-			parts = append(parts, m.st.dangerStyle.Render("DOWN"))
-		}
-	}
-
-	sep := m.st.subtleStyle.Render(" | ")
-	pos := m.st.subtleStyle.Render(fmt.Sprintf("[%d/%d]", idx+1, dataLen))
-	return "  " + strings.Join(parts, sep) + "  " + pos
 }
