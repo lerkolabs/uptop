@@ -200,6 +200,7 @@ type Model struct {
 	detailChanges       []models.StateChange
 	detailChangesSiteID int
 	detailDailyDays     []monitor.DayReport
+	detailViewport      viewport.Model
 
 	filterMode bool
 	filterText string

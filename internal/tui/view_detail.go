@@ -20,6 +20,7 @@ func (m Model) viewDetailPanel() string {
 	hist, _ := m.engine.GetHistory(site.ID)
 
 	var b strings.Builder
+	totalW := m.termWidth - chromePadH
 
 	var breadcrumb string
 	if site.ParentID > 0 {
@@ -36,29 +37,93 @@ func (m Model) viewDetailPanel() string {
 	b.WriteString(breadcrumb + "\n")
 	b.WriteString(m.divider() + "\n")
 
-	row := func(label, value string) {
-		fmt.Fprintf(&b, "  %-16s %s\n", m.st.subtleStyle.Render(label), value)
+	// Two-column layout for key info
+	colW := (totalW - 4) / 2
+	if colW < 30 {
+		colW = 30
 	}
 
-	section := func(label string) {
-		b.WriteString("\n" + m.st.subtleStyle.Render("  "+label) + "\n")
+	row := func(label, value string) string {
+		return fmt.Sprintf("  %-16s %s", m.st.subtleStyle.Render(label), value)
 	}
 
-	row("Status", m.fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)))
+	// Left column: status + endpoint
+	var left []string
+	left = append(left, row("Status", m.fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID))))
 
 	if (site.Status == models.StatusDown || site.Status == models.StatusSSLExp || site.Status == models.StatusLate || site.Status == models.StatusStale) && site.LastError != "" {
-		errWidth := m.termWidth - chromePadH - 19
-		if errWidth < 30 {
-			errWidth = 30
+		errW := colW - 19
+		if errW < 20 {
+			errW = 20
 		}
-		wrapped := lipgloss.NewStyle().Width(errWidth).Render(site.LastError)
-		row("Error", m.st.dangerStyle.Render(wrapped))
+		errMsg := limitStr(site.LastError, errW)
+		left = append(left, row("Error", m.st.dangerStyle.Render(errMsg)))
 	}
 
 	if site.Type == "http" && site.StatusCode > 0 {
-		row("HTTP Code", strconv.Itoa(site.StatusCode))
+		left = append(left, row("HTTP Code", strconv.Itoa(site.StatusCode)))
+	}
+	if !site.StatusChangedAt.IsZero() {
+		dur := time.Since(site.StatusChangedAt)
+		left = append(left, row("State Since", fmtDuration(dur)+" ago"))
 	}
 
+	left = append(left, "")
+	left = append(left, m.st.subtleStyle.Render("  ENDPOINT"))
+	left = append(left, row("Type", site.Type))
+	if site.URL != "" {
+		left = append(left, row("URL", limitStr(site.URL, colW-19)))
+	}
+	if site.Hostname != "" {
+		left = append(left, row("Host", site.Hostname))
+	}
+	if site.Port > 0 {
+		left = append(left, row("Port", strconv.Itoa(site.Port)))
+	}
+
+	// Right column: timing + config
+	var right []string
+	right = append(right, row("Latency", m.fmtLatency(site.Latency)))
+	right = append(right, row("Uptime", m.fmtUptime(hist.Statuses)))
+	right = append(right, row("Interval", fmt.Sprintf("%ds", site.Interval)))
+	if !site.LastCheck.IsZero() {
+		right = append(right, row("Last Check", m.fmtTimeAgo(site.LastCheck)))
+	}
+	if !site.LastSuccessAt.IsZero() {
+		right = append(right, row("Last Success", m.fmtTimeAgo(site.LastSuccessAt)))
+	}
+
+	if site.Type == "http" {
+		right = append(right, "")
+		right = append(right, m.st.subtleStyle.Render("  HTTP"))
+		codes := site.AcceptedCodes
+		if codes == "" {
+			codes = "200-299"
+		}
+		right = append(right, row("Codes", codes))
+		right = append(right, row("SSL", m.fmtSSL(site)))
+		if site.Method != "" && site.Method != "GET" {
+			right = append(right, row("Method", site.Method))
+		}
+	}
+
+	if site.MaxRetries > 0 {
+		right = append(right, row("Retries", m.fmtRetries(site)))
+	}
+
+	// Pad shorter column
+	for len(left) < len(right) {
+		left = append(left, "")
+	}
+	for len(right) < len(left) {
+		right = append(right, "")
+	}
+
+	leftCol := lipgloss.NewStyle().Width(colW).Render(strings.Join(left, "\n"))
+	rightCol := lipgloss.NewStyle().Width(colW).Render(strings.Join(right, "\n"))
+	b.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, leftCol, rightCol) + "\n")
+
+	// Connection chain (full width, only on errors)
 	if (site.Status == models.StatusDown || site.Status == models.StatusSSLExp) && site.LastError != "" {
 		chain := connectionChain(site.LastError, site.Type, site.StatusCode, strings.HasPrefix(site.URL, "https"))
 		if len(chain) > 0 {
@@ -87,81 +152,22 @@ func (m Model) viewDetailPanel() string {
 		}
 	}
 
-	if !site.StatusChangedAt.IsZero() {
-		dur := time.Since(site.StatusChangedAt)
-		row("State Since", site.StatusChangedAt.Format("2006-01-02 15:04:05")+" ("+fmtDuration(dur)+")")
-	}
-
-	if !site.LastSuccessAt.IsZero() {
-		ago := time.Since(site.LastSuccessAt)
-		row("Last Success", site.LastSuccessAt.Format("15:04:05")+" ("+fmtDuration(ago)+" ago)")
-	}
-
+	// Maintenance
 	if m.isMonitorInMaintenance(site.ID) {
 		for _, mw := range m.maintenanceWindows {
 			if mw.Type == "maintenance" && (mw.MonitorID == 0 || mw.MonitorID == site.ID || mw.MonitorID == site.ParentID) {
-				row("Maintenance", m.st.maintStyle.Render(mw.Title))
+				fmt.Fprintf(&b, "  %-16s %s\n", m.st.subtleStyle.Render("Maintenance"), m.st.maintStyle.Render(mw.Title))
 				break
 			}
 		}
 	}
 
-	section("ENDPOINT")
-	row("Type", site.Type)
+	// Push token
 	if site.Type == "push" && site.Token != "" {
-		row("Token", site.Token)
-		row("Push", "curl -X POST -H 'Authorization: Bearer "+site.Token+"' <host>/api/push")
-	}
-	if site.URL != "" {
-		row("URL", site.URL)
-	}
-	if site.Hostname != "" {
-		row("Host", site.Hostname)
-	}
-	if site.Port > 0 {
-		row("Port", strconv.Itoa(site.Port))
+		fmt.Fprintf(&b, "  %-16s %s\n", m.st.subtleStyle.Render("Token"), site.Token)
 	}
 
-	section("TIMING")
-	row("Interval", fmt.Sprintf("%ds", site.Interval))
-	if site.Timeout > 0 {
-		row("Timeout", fmt.Sprintf("%ds", site.Timeout))
-	}
-	row("Latency", m.fmtLatency(site.Latency))
-	row("Uptime", m.fmtUptime(hist.Statuses))
-	if !site.LastCheck.IsZero() {
-		row("Last Check", m.fmtTimeAgo(site.LastCheck))
-	}
-
-	if site.Type == "http" {
-		section("HTTP")
-		if site.Method != "" && site.Method != "GET" {
-			row("Method", site.Method)
-		}
-		codes := site.AcceptedCodes
-		if codes == "" {
-			codes = "200-299"
-		}
-		row("Codes", codes)
-		row("SSL", m.fmtSSL(site))
-		if site.IgnoreTLS {
-			row("TLS Verify", m.st.dangerStyle.Render("disabled"))
-		}
-	}
-
-	if site.MaxRetries > 0 || site.Regions != "" || site.Description != "" {
-		section("CONFIG")
-		if site.MaxRetries > 0 {
-			row("Retries", m.fmtRetries(site))
-		}
-		if site.Regions != "" {
-			row("Regions", site.Regions)
-		}
-		if site.Description != "" {
-			row("Description", site.Description)
-		}
-	}
-
+	// Probe results
 	probeResults := m.engine.GetProbeResults(site.ID)
 	if len(probeResults) > 0 {
 		nodeIDs := make([]string, 0, len(probeResults))
@@ -186,7 +192,7 @@ func (m Model) viewDetailPanel() string {
 		}
 	}
 
-	// Loaded on panel-enter (loadDetailCmd) and cached, so View does no DB IO.
+	// State changes
 	var stateChanges []models.StateChange
 	if m.detailChangesSiteID == site.ID {
 		stateChanges = m.detailChanges
@@ -194,26 +200,25 @@ func (m Model) viewDetailPanel() string {
 	if len(stateChanges) > 0 {
 		b.WriteString("\n" + m.st.subtleStyle.Render("  STATE CHANGES") + "\n")
 		for i, sc := range stateChanges {
+			from := m.fmtStatusWord(string(sc.FromStatus))
+			to := m.fmtStatusWord(string(sc.ToStatus))
 			ago := fmtDuration(time.Since(sc.ChangedAt))
-			arrow := m.st.subtleStyle.Render(sc.FromStatus) + " → "
-			if sc.ToStatus == string(models.StatusUp) {
-				arrow += m.st.specialStyle.Render(sc.ToStatus)
-			} else {
-				arrow += m.st.dangerStyle.Render(sc.ToStatus)
+			line := fmt.Sprintf("  %s → %s  %s ago", from, to, ago)
+			if sc.ToStatus == "UP" {
+				dur := computeOutageDuration(stateChanges, i)
+				if dur > 0 {
+					line += "  " + m.st.warnStyle.Render("outage "+fmtDuration(dur))
+				}
 			}
-			line := fmt.Sprintf("  %s  %s", arrow, m.st.subtleStyle.Render(ago+" ago"))
-			if dur := computeOutageDuration(stateChanges, i); dur > 0 {
-				line += "  " + m.st.warnStyle.Render("outage "+fmtDuration(dur))
-			}
-			if sc.ErrorReason != "" && sc.ToStatus != string(models.StatusUp) {
+			if sc.ErrorReason != "" {
 				line += "  " + m.st.dangerStyle.Render(sc.ErrorReason)
 			}
 			b.WriteString(line + "\n")
 		}
-		b.WriteString("  " + m.st.subtleStyle.Render("[h] History") + "\n")
 	}
 
-	b.WriteString(m.divider() + "\n")
+	// Sparkline + stats
+	b.WriteString("\n")
 	if site.Type == "push" {
 		b.WriteString("  " + m.zones.Mark("spark-heartbeat", m.heartbeatSparkline(hist.Statuses, detailSparkWidth, nil)))
 		if len(hist.Statuses) > 0 {
@@ -258,8 +263,9 @@ func (m Model) viewDetailPanel() string {
 		b.WriteString("\n" + m.renderSparkTooltip(site, hist, detailSparkWidth))
 	}
 
+	// Histogram
 	if site.Type != "push" && len(hist.Latencies) > 5 {
-		histW := m.termWidth - chromePadH - 4
+		histW := totalW - 4
 		if histW < 30 {
 			histW = 30
 		}
@@ -271,7 +277,21 @@ func (m Model) viewDetailPanel() string {
 	b.WriteString(m.divider() + "\n")
 	b.WriteString(m.st.subtleStyle.Render("  [q/Esc] Back  [e] Edit  [h] History  [s] SLA  [click] Inspect"))
 
-	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
+	// Wrap in a viewport for scrolling
+	content := b.String()
+	contentH := m.termHeight - 4
+	if contentH < 10 {
+		contentH = 10
+	}
+	lines := strings.Split(content, "\n")
+	if len(lines) > contentH {
+		m.detailViewport.SetContent(content)
+		m.detailViewport.Width = totalW
+		m.detailViewport.Height = contentH
+		return lipgloss.NewStyle().Padding(1, 2).Render(m.detailViewport.View())
+	}
+
+	return lipgloss.NewStyle().Padding(1, 2).Render(content)
 }
 
 func (m Model) renderSparkTooltip(site models.Site, hist monitor.SiteHistory, sparkWidth int) string {

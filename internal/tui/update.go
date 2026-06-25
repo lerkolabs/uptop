@@ -368,6 +368,18 @@ func (m *Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "up", "k":
+		m.detailViewport.ScrollUp(1)
+		return m, nil
+	case "down", "j":
+		m.detailViewport.ScrollDown(1)
+		return m, nil
+	case "pgup":
+		m.detailViewport.ScrollUp(m.detailViewport.Height / 2)
+		return m, nil
+	case "pgdown":
+		m.detailViewport.ScrollDown(m.detailViewport.Height / 2)
+		return m, nil
 	case "esc":
 		if m.sparkTooltipIdx >= 0 {
 			m.sparkTooltipIdx = -1
