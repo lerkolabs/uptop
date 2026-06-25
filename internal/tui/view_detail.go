@@ -258,6 +258,15 @@ func (m Model) viewDetailPanel() string {
 		b.WriteString("\n" + m.renderSparkTooltip(site, hist, detailSparkWidth))
 	}
 
+	if site.Type != "push" && len(hist.Latencies) > 5 {
+		histW := m.termWidth - chromePadH - 4
+		if histW < 30 {
+			histW = 30
+		}
+		b.WriteString("\n\n" + m.st.subtleStyle.Render("  RESPONSE TIME DISTRIBUTION") + "\n")
+		b.WriteString(m.latencyHistogram(hist.Latencies, hist.Statuses, histW))
+	}
+
 	b.WriteString("\n")
 	b.WriteString(m.divider() + "\n")
 	b.WriteString(m.st.subtleStyle.Render("  [q/Esc] Back  [e] Edit  [h] History  [s] SLA  [click] Inspect"))
