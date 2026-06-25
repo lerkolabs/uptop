@@ -47,6 +47,15 @@ func (m Model) viewDetailPanel() string {
 		return fmt.Sprintf("  %-16s %s", m.st.subtleStyle.Render(label), value)
 	}
 
+	divW := totalW - 4
+	if divW < 20 {
+		divW = 20
+	}
+	sectionDiv := m.st.subtleStyle.Render(strings.Repeat("─", divW))
+	sectionHead := func(title string) string {
+		return m.st.titleStyle.Render("  "+title) + " " + m.st.subtleStyle.Render(strings.Repeat("─", divW-len(title)-3))
+	}
+
 	// Left column: status + endpoint
 	var left []string
 	left = append(left, row("Status", m.fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID))))
@@ -69,7 +78,7 @@ func (m Model) viewDetailPanel() string {
 	}
 
 	left = append(left, "")
-	left = append(left, m.st.subtleStyle.Render("  ENDPOINT"))
+	left = append(left, m.st.titleStyle.Render("  ENDPOINT"))
 	left = append(left, row("Type", site.Type))
 	if site.URL != "" {
 		left = append(left, row("URL", limitStr(site.URL, colW-19)))
@@ -95,7 +104,7 @@ func (m Model) viewDetailPanel() string {
 
 	if site.Type == "http" {
 		right = append(right, "")
-		right = append(right, m.st.subtleStyle.Render("  HTTP"))
+		right = append(right, m.st.titleStyle.Render("  HTTP"))
 		codes := site.AcceptedCodes
 		if codes == "" {
 			codes = "200-299"
@@ -122,6 +131,7 @@ func (m Model) viewDetailPanel() string {
 	leftCol := lipgloss.NewStyle().Width(colW).Render(strings.Join(left, "\n"))
 	rightCol := lipgloss.NewStyle().Width(colW).Render(strings.Join(right, "\n"))
 	b.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, leftCol, rightCol) + "\n")
+	b.WriteString(sectionDiv + "\n")
 
 	// Connection chain (full width, only on errors)
 	if (site.Status == models.StatusDown || site.Status == models.StatusSSLExp) && site.LastError != "" {
@@ -175,7 +185,7 @@ func (m Model) viewDetailPanel() string {
 			nodeIDs = append(nodeIDs, id)
 		}
 		sort.Strings(nodeIDs)
-		b.WriteString("\n" + m.st.subtleStyle.Render("  PROBE RESULTS") + "\n")
+		b.WriteString("\n" + sectionHead("PROBE RESULTS") + "\n")
 		for _, nodeID := range nodeIDs {
 			result := probeResults[nodeID]
 			status := m.st.specialStyle.Render("UP")
@@ -198,7 +208,7 @@ func (m Model) viewDetailPanel() string {
 		stateChanges = m.detailChanges
 	}
 	if len(stateChanges) > 0 {
-		b.WriteString("\n" + m.st.subtleStyle.Render("  STATE CHANGES") + "\n")
+		b.WriteString("\n" + sectionHead("STATE CHANGES") + "\n")
 		for i, sc := range stateChanges {
 			from := m.fmtStatusWord(string(sc.FromStatus))
 			to := m.fmtStatusWord(string(sc.ToStatus))
@@ -218,7 +228,7 @@ func (m Model) viewDetailPanel() string {
 	}
 
 	// Sparkline + stats
-	b.WriteString("\n")
+	b.WriteString("\n" + sectionHead("LATENCY") + "\n")
 	if site.Type == "push" {
 		b.WriteString("  " + m.zones.Mark("spark-heartbeat", m.heartbeatSparkline(hist.Statuses, detailSparkWidth, nil)))
 		if len(hist.Statuses) > 0 {
@@ -269,7 +279,7 @@ func (m Model) viewDetailPanel() string {
 		if histW < 30 {
 			histW = 30
 		}
-		b.WriteString("\n\n" + m.st.subtleStyle.Render("  RESPONSE TIME DISTRIBUTION") + "\n")
+		b.WriteString("\n" + sectionHead("RESPONSE TIME DISTRIBUTION") + "\n")
 		b.WriteString(m.latencyHistogram(hist.Latencies, hist.Statuses, histW))
 	}
 
