@@ -274,6 +274,7 @@ func (m Model) viewDetailPanel() string {
 	}
 
 	// Histogram
+	b.WriteString("\n")
 	if site.Type != "push" && len(hist.Latencies) > 5 {
 		histW := totalW - 4
 		if histW < 30 {
