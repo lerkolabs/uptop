@@ -28,6 +28,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.detailChanges = msg.changes
 		m.detailChangesSiteID = msg.siteID
+		m.detailDailyDays = msg.dailyDays
 		return m, nil
 	case historyDataMsg:
 		if msg.siteID != m.historySiteID {
@@ -142,7 +143,7 @@ func (m *Model) handleFormMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-const detailInlineHeight = 11
+const detailInlineHeight = 12
 
 func (m *Model) recalcLayout() {
 	chrome := chromeBase

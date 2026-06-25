@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/monitor"
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/store"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -191,8 +192,19 @@ func (m *Model) loadTabDataCmd() tea.Cmd {
 // goroutine. View renders the cached result rather than querying the DB.
 func (m *Model) loadDetailCmd(siteID int) tea.Cmd {
 	eng := m.engine
+	var currentStatus models.Status
+	for _, s := range m.sites {
+		if s.ID == siteID {
+			currentStatus = s.Status
+			break
+		}
+	}
 	return func() tea.Msg {
-		return detailDataMsg{siteID: siteID, changes: eng.GetStateChanges(siteID, 5)}
+		changes := eng.GetStateChanges(siteID, 5)
+		now := time.Now()
+		allChanges := eng.GetStateChangesSince(siteID, now.Add(-30*24*time.Hour))
+		daily := monitor.ComputeDailyBreakdown(allChanges, currentStatus, 30, now)
+		return detailDataMsg{siteID: siteID, changes: changes, dailyDays: daily}
 	}
 }
 

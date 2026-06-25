@@ -77,6 +77,14 @@ func (m Model) viewDetailInline(width int) string {
 		}
 	}
 
+	if len(m.detailDailyDays) > 0 && m.detailChangesSiteID == site.ID {
+		timelineW := width - 4
+		if timelineW < 20 {
+			timelineW = 20
+		}
+		b.WriteString("  " + m.st.subtleStyle.Render("30d") + " " + m.uptimeTimeline(m.detailDailyDays, timelineW) + "\n")
+	}
+
 	keys := m.st.subtleStyle.Render("[h] History  [s] SLA  [e] Edit  [esc] Close")
 	b.WriteString("  " + keys + "\n")
 

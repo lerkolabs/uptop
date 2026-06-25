@@ -199,6 +199,7 @@ type Model struct {
 	detailOpen          bool
 	detailChanges       []models.StateChange
 	detailChangesSiteID int
+	detailDailyDays     []monitor.DayReport
 
 	filterMode bool
 	filterText string

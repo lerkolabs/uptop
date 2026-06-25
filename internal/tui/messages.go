@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
+	"gitea.lerkolabs.com/lerkolabs/uptop/internal/monitor"
 )
 
 // tabRefreshTTL bounds how often the DB-backed tab data (alerts, users, nodes,
@@ -34,8 +35,9 @@ type tabDataMsg struct {
 // on entry and refreshed on the tab-data cadence so View never touches the
 // database.
 type detailDataMsg struct {
-	siteID  int
-	changes []models.StateChange
+	siteID    int
+	changes   []models.StateChange
+	dailyDays []monitor.DayReport
 }
 
 // historyDataMsg carries the full state-change history for the history view.
