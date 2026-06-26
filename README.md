@@ -40,16 +40,16 @@ Canonical repo: [gitea.lerkolabs.com/lerkolabs/uptop](https://gitea.lerkolabs.co
 
 <table>
   <tr>
-    <td><img src="assets/monitors.png" alt="monitors dashboard" width="400"></td>
-    <td><img src="assets/detail.png" alt="detail panel" width="400"></td>
+    <td><img src="assets/monitors.png" alt="monitors + log sidebar" width="400"></td>
+    <td><img src="assets/detail.png" alt="inline detail panel" width="400"></td>
   </tr>
   <tr>
-    <td><img src="assets/alerts.png" alt="alerts view" width="400"></td>
-    <td><img src="assets/logs.png" alt="logs view" width="400"></td>
+    <td><img src="assets/fulldetail.png" alt="full-screen detail" width="400"></td>
+    <td><img src="assets/settings.png" alt="settings / alerts" width="400"></td>
   </tr>
   <tr>
+    <td><img src="assets/maint.png" alt="maintenance windows" width="400"></td>
     <td><img src="assets/nodes.png" alt="cluster nodes" width="400"></td>
-    <td><img src="assets/theme.png" alt="theme selection" width="400"></td>
   </tr>
 </table>
 
