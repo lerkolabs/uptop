@@ -77,8 +77,12 @@ func (m *mockStore) GetActiveMaintenanceWindows(_ context.Context) ([]models.Mai
 
 // --- Helpers ---
 
-func freePort() int {
-	ln, _ := net.Listen("tcp", "127.0.0.1:0")
+func freePort(t *testing.T) int {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("freePort: %v", err)
+	}
 	port := ln.Addr().(*net.TCPAddr).Port
 	ln.Close()
 	return port
@@ -95,7 +99,7 @@ func newTestServer(t *testing.T, clusterKey string, enableStatus bool) *testServ
 	t.Helper()
 	ms := newMockStore()
 	eng := monitor.NewEngine(ms)
-	port := freePort()
+	port := freePort(t)
 
 	srv := Start(ServerConfig{
 		Port:         port,
@@ -285,7 +289,10 @@ func TestImport_MethodNotAllowed(t *testing.T) {
 
 func TestImport_Unauthorized(t *testing.T) {
 	ts := newTestServer(t, "secret", false)
-	body, _ := json.Marshal(models.Backup{})
+	body, err := json.Marshal(models.Backup{})
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
 	resp, err := authReq("POST", ts.baseURL+"/api/backup/import", "wrong", body)
 	if err != nil {
 		t.Fatal(err)
@@ -301,7 +308,10 @@ func TestImport_Success(t *testing.T) {
 	backup := models.Backup{
 		Sites: []models.SiteConfig{{Name: "imported", URL: "http://example.com"}},
 	}
-	body, _ := json.Marshal(backup)
+	body, err := json.Marshal(backup)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
 	resp, err := authReq("POST", ts.baseURL+"/api/backup/import", "secret", body)
 	if err != nil {
 		t.Fatal(err)
@@ -333,9 +343,12 @@ func TestImport_InvalidJSON(t *testing.T) {
 
 func TestProbeRegister_Success(t *testing.T) {
 	ts := newTestServer(t, "secret", false)
-	body, _ := json.Marshal(map[string]string{
+	body, err := json.Marshal(map[string]string{
 		"id": "node-1", "name": "US East", "region": "us-east",
 	})
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
 	resp, err := authReq("POST", ts.baseURL+"/api/probe/register", "secret", body)
 	if err != nil {
 		t.Fatal(err)
@@ -356,7 +369,10 @@ func TestProbeRegister_Success(t *testing.T) {
 
 func TestProbeRegister_MissingID(t *testing.T) {
 	ts := newTestServer(t, "secret", false)
-	body, _ := json.Marshal(map[string]string{"name": "test"})
+	body, err := json.Marshal(map[string]string{"name": "test"})
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
 	resp, err := authReq("POST", ts.baseURL+"/api/probe/register", "secret", body)
 	if err != nil {
 		t.Fatal(err)
@@ -369,7 +385,10 @@ func TestProbeRegister_MissingID(t *testing.T) {
 
 func TestProbeRegister_Unauthorized(t *testing.T) {
 	ts := newTestServer(t, "secret", false)
-	body, _ := json.Marshal(map[string]string{"id": "node-1"})
+	body, err := json.Marshal(map[string]string{"id": "node-1"})
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
 	resp, err := authReq("POST", ts.baseURL+"/api/probe/register", "wrong", body)
 	if err != nil {
 		t.Fatal(err)
@@ -384,12 +403,15 @@ func TestProbeRegister_Unauthorized(t *testing.T) {
 
 func TestProbeResults_Success(t *testing.T) {
 	ts := newTestServer(t, "secret", false)
-	body, _ := json.Marshal(map[string]any{
+	body, err := json.Marshal(map[string]any{
 		"node_id": "node-1",
 		"results": []map[string]any{
 			{"site_id": 1, "latency_ns": 5000000, "is_up": true},
 		},
 	})
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
 	resp, err := authReq("POST", ts.baseURL+"/api/probe/results", "secret", body)
 	if err != nil {
 		t.Fatal(err)
@@ -402,9 +424,12 @@ func TestProbeResults_Success(t *testing.T) {
 
 func TestProbeResults_MissingNodeID(t *testing.T) {
 	ts := newTestServer(t, "secret", false)
-	body, _ := json.Marshal(map[string]any{
+	body, err := json.Marshal(map[string]any{
 		"results": []map[string]any{},
 	})
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
 	resp, err := authReq("POST", ts.baseURL+"/api/probe/results", "secret", body)
 	if err != nil {
 		t.Fatal(err)
@@ -573,7 +598,10 @@ func TestClientIP_TrustedProxyHandling(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, _ := http.NewRequest(http.MethodGet, "/", nil)
+			r, err := http.NewRequest(http.MethodGet, "/", nil)
+			if err != nil {
+				t.Fatalf("http.NewRequest: %v", err)
+			}
 			r.RemoteAddr = tt.remoteAddr
 			if tt.xff != "" {
 				r.Header.Set("X-Forwarded-For", tt.xff)
@@ -591,7 +619,10 @@ func TestRateLimit_SpoofedXFFCannotBypass(t *testing.T) {
 	rl := NewRateLimiter(60, nil) // no trusted proxies
 	allowed := 0
 	for i := 0; i < 200; i++ {
-		r, _ := http.NewRequest(http.MethodGet, "/", nil)
+		r, err := http.NewRequest(http.MethodGet, "/", nil)
+		if err != nil {
+			t.Fatalf("http.NewRequest: %v", err)
+		}
 		r.RemoteAddr = "203.0.113.9:5000"
 		r.Header.Set("X-Forwarded-For", fmt.Sprintf("9.9.9.%d", i%256))
 		if rl.Allow(clientIP(r, rl.trusted)) {

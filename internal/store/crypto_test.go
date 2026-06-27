@@ -75,8 +75,14 @@ func TestEncryptorUniqueCiphertexts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	a, _ := enc.Encrypt("same")
-	b, _ := enc.Encrypt("same")
+	a, err := enc.Encrypt("same")
+	if err != nil {
+		t.Fatalf("first encrypt: %v", err)
+	}
+	b, err := enc.Encrypt("same")
+	if err != nil {
+		t.Fatalf("second encrypt: %v", err)
+	}
 	if a == b {
 		t.Error("two encryptions of same plaintext should produce different ciphertexts")
 	}

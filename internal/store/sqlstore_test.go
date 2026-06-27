@@ -343,7 +343,10 @@ func TestDeleteSiteCascade(t *testing.T) {
 	if err := s.AddSite(context.Background(), site); err != nil {
 		t.Fatalf("AddSite: %v", err)
 	}
-	sites, _ := s.GetSites(context.Background())
+	sites, err := s.GetSites(context.Background())
+	if err != nil {
+		t.Fatalf("GetSites: %v", err)
+	}
 	siteID := sites[0].ID
 
 	if err := s.SaveCheck(context.Background(), siteID, 1000, true); err != nil {
@@ -366,17 +369,26 @@ func TestDeleteSiteCascade(t *testing.T) {
 		t.Fatalf("DeleteSite: %v", err)
 	}
 
-	history, _ := s.LoadAllHistory(context.Background(), 100)
+	history, err := s.LoadAllHistory(context.Background(), 100)
+	if err != nil {
+		t.Fatalf("LoadAllHistory: %v", err)
+	}
 	if len(history[siteID]) != 0 {
 		t.Errorf("expected 0 check_history rows, got %d", len(history[siteID]))
 	}
 
-	changes, _ := s.GetStateChanges(context.Background(), siteID, 100)
+	changes, err := s.GetStateChanges(context.Background(), siteID, 100)
+	if err != nil {
+		t.Fatalf("GetStateChanges: %v", err)
+	}
 	if len(changes) != 0 {
 		t.Errorf("expected 0 state_changes rows, got %d", len(changes))
 	}
 
-	windows, _ := s.GetActiveMaintenanceWindows(context.Background())
+	windows, err := s.GetActiveMaintenanceWindows(context.Background())
+	if err != nil {
+		t.Fatalf("GetActiveMaintenanceWindows: %v", err)
+	}
 	for _, w := range windows {
 		if w.MonitorID == siteID {
 			t.Errorf("orphaned maintenance window found: id=%d", w.ID)
