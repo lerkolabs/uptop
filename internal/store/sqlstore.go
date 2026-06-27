@@ -652,6 +652,48 @@ func (s *SQLStore) GetAllMaintenanceWindows(ctx context.Context, limit int) ([]m
 	return windows, rows.Err()
 }
 
+func (s *SQLStore) GetOverlappingMaintenanceWindows(ctx context.Context, monitorID int, startTime, endTime time.Time) ([]models.MaintenanceWindow, error) {
+	var timeClause string
+	var args []interface{}
+
+	if endTime.IsZero() {
+		timeClause = "(end_time IS NULL OR end_time > ?)"
+		args = append(args, startTime)
+	} else {
+		timeClause = "(end_time IS NULL OR end_time > ?) AND start_time < ?"
+		args = append(args, startTime, endTime)
+	}
+
+	var scopeClause string
+	if monitorID == 0 {
+		scopeClause = "1=1"
+	} else {
+		scopeClause = "(monitor_id = ? OR monitor_id = 0 OR monitor_id IN (SELECT parent_id FROM sites WHERE id = ? AND parent_id > 0))"
+		args = append(args, monitorID, monitorID)
+	}
+
+	query := fmt.Sprintf(
+		"SELECT id, monitor_id, title, description, type, start_time, end_time, created_by, created_at FROM maintenance_windows WHERE %s AND %s ORDER BY start_time",
+		timeClause, scopeClause,
+	)
+
+	rows, err := s.db.QueryContext(ctx, s.q(query), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var windows []models.MaintenanceWindow
+	for rows.Next() {
+		mw, err := s.scanMaintenanceWindow(rows)
+		if err != nil {
+			return nil, err
+		}
+		windows = append(windows, mw)
+	}
+	return windows, rows.Err()
+}
+
 func (s *SQLStore) AddMaintenanceWindow(ctx context.Context, mw models.MaintenanceWindow) error {
 	if mw.StartTime.IsZero() {
 		mw.StartTime = time.Now()

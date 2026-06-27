@@ -229,6 +229,10 @@ func (m *BaseMock) GetAllMaintenanceWindows(ctx context.Context, limit int) ([]m
 	return nil, nil
 }
 
+func (m *BaseMock) GetOverlappingMaintenanceWindows(_ context.Context, _ int, _, _ time.Time) ([]models.MaintenanceWindow, error) {
+	return nil, nil
+}
+
 func (m *BaseMock) AddMaintenanceWindow(_ context.Context, _ models.MaintenanceWindow) error {
 	return nil
 }

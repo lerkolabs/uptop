@@ -67,6 +67,7 @@ type Store interface {
 	// Maintenance Windows
 	GetActiveMaintenanceWindows(ctx context.Context) ([]models.MaintenanceWindow, error)
 	GetAllMaintenanceWindows(ctx context.Context, limit int) ([]models.MaintenanceWindow, error)
+	GetOverlappingMaintenanceWindows(ctx context.Context, monitorID int, startTime, endTime time.Time) ([]models.MaintenanceWindow, error)
 	AddMaintenanceWindow(ctx context.Context, mw models.MaintenanceWindow) error
 	EndMaintenanceWindow(ctx context.Context, id int) error
 	DeleteMaintenanceWindow(ctx context.Context, id int) error

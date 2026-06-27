@@ -509,6 +509,103 @@ func TestPruneExpiredMaintenanceWindows(t *testing.T) {
 	}
 }
 
+func TestGetOverlappingMaintenanceWindows(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	site := models.SiteConfig{Name: "web", URL: "https://example.com", Interval: 30}
+	if err := s.AddSite(ctx, site); err != nil {
+		t.Fatalf("AddSite: %v", err)
+	}
+
+	now := time.Now()
+
+	active := models.MaintenanceWindow{
+		MonitorID: 1,
+		Title:     "Deploy v2",
+		Type:      "maintenance",
+		StartTime: now.Add(-30 * time.Minute),
+		EndTime:   now.Add(30 * time.Minute),
+	}
+	if err := s.AddMaintenanceWindow(ctx, active); err != nil {
+		t.Fatalf("AddMaintenanceWindow: %v", err)
+	}
+
+	ended := models.MaintenanceWindow{
+		MonitorID: 1,
+		Title:     "Old deploy",
+		Type:      "maintenance",
+		StartTime: now.Add(-3 * time.Hour),
+		EndTime:   now.Add(-2 * time.Hour),
+	}
+	if err := s.AddMaintenanceWindow(ctx, ended); err != nil {
+		t.Fatalf("AddMaintenanceWindow: %v", err)
+	}
+
+	t.Run("same monitor overlaps", func(t *testing.T) {
+		overlaps, err := s.GetOverlappingMaintenanceWindows(ctx, 1, now, now.Add(1*time.Hour))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(overlaps) != 1 {
+			t.Fatalf("expected 1 overlap, got %d", len(overlaps))
+		}
+		if overlaps[0].Title != "Deploy v2" {
+			t.Errorf("expected 'Deploy v2', got %q", overlaps[0].Title)
+		}
+	})
+
+	t.Run("different monitor no overlap", func(t *testing.T) {
+		overlaps, err := s.GetOverlappingMaintenanceWindows(ctx, 99, now, now.Add(1*time.Hour))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(overlaps) != 0 {
+			t.Errorf("expected 0 overlaps, got %d", len(overlaps))
+		}
+	})
+
+	t.Run("global window overlaps all", func(t *testing.T) {
+		global := models.MaintenanceWindow{
+			MonitorID: 0,
+			Title:     "Global freeze",
+			Type:      "maintenance",
+			StartTime: now.Add(-10 * time.Minute),
+			EndTime:   now.Add(2 * time.Hour),
+		}
+		if err := s.AddMaintenanceWindow(ctx, global); err != nil {
+			t.Fatalf("AddMaintenanceWindow: %v", err)
+		}
+		overlaps, err := s.GetOverlappingMaintenanceWindows(ctx, 1, now, now.Add(1*time.Hour))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(overlaps) != 2 {
+			t.Errorf("expected 2 overlaps (specific + global), got %d", len(overlaps))
+		}
+	})
+
+	t.Run("indefinite window overlaps", func(t *testing.T) {
+		overlaps, err := s.GetOverlappingMaintenanceWindows(ctx, 1, now, time.Time{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(overlaps) < 1 {
+			t.Error("expected at least 1 overlap for indefinite window")
+		}
+	})
+
+	t.Run("ended window excluded", func(t *testing.T) {
+		overlaps, err := s.GetOverlappingMaintenanceWindows(ctx, 1, now.Add(-4*time.Hour), now.Add(-3*time.Hour))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(overlaps) != 0 {
+			t.Errorf("expected 0 overlaps for past range, got %d", len(overlaps))
+		}
+	})
+}
+
 // ImportData must encrypt alert settings (like AddAlert/UpdateAlert) so a
 // restore with UPTOP_ENCRYPTION_KEY set never lands secrets in plaintext.
 func TestImportData_EncryptsAlertSettings(t *testing.T) {
