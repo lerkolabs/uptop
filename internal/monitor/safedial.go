@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+const dialTimeout = 10 * time.Second
+
 var privateRanges []*net.IPNet
 
 func init() {
@@ -60,7 +62,7 @@ func SafeDialContext(allowPrivate bool) func(ctx context.Context, network, addr 
 			}
 		}
 
-		dialer := &net.Dialer{Timeout: 10 * time.Second}
+		dialer := &net.Dialer{Timeout: dialTimeout}
 		for _, ip := range ips {
 			target := net.JoinHostPort(ip.IP.String(), port)
 			conn, err := dialer.DialContext(ctx, network, target)

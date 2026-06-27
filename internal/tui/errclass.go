@@ -58,7 +58,7 @@ func classifyError(errorReason string, siteType string, statusCode int) ErrorCat
 	if strings.HasPrefix(lower, "http ") || strings.Contains(lower, "keyword not found") {
 		return ErrCatHTTP
 	}
-	if statusCode >= 400 {
+	if statusCode >= httpErrorThreshold {
 		return ErrCatHTTP
 	}
 
@@ -145,7 +145,7 @@ func extractDetail(errorReason string, cat ErrorCategory, statusCode int) string
 			}
 		}
 		if detail == "" {
-			detail = limitStr(errorReason, 30)
+			detail = limitStr(errorReason, errorDetailMaxLen)
 		}
 	case ErrCatTCP:
 		for _, keyword := range []string{"connection refused", "connection reset", "no route to host", "network unreachable"} {
@@ -155,7 +155,7 @@ func extractDetail(errorReason string, cat ErrorCategory, statusCode int) string
 			}
 		}
 		if detail == "" {
-			detail = limitStr(errorReason, 30)
+			detail = limitStr(errorReason, errorDetailMaxLen)
 		}
 	case ErrCatTLS:
 		for _, keyword := range []string{"certificate expired", "certificate has expired", "handshake failure", "unknown authority"} {
@@ -166,16 +166,16 @@ func extractDetail(errorReason string, cat ErrorCategory, statusCode int) string
 		}
 		if detail == "" && strings.Contains(lower, "x509:") {
 			idx := strings.Index(lower, "x509:")
-			detail = limitStr(errorReason[idx:], 30)
+			detail = limitStr(errorReason[idx:], errorDetailMaxLen)
 		}
 		if detail == "" {
-			detail = limitStr(errorReason, 30)
+			detail = limitStr(errorReason, errorDetailMaxLen)
 		}
 	case ErrCatHTTP:
 		if statusCode > 0 {
 			detail = fmt.Sprintf("HTTP %d", statusCode)
 		} else {
-			detail = limitStr(errorReason, 30)
+			detail = limitStr(errorReason, errorDetailMaxLen)
 		}
 	case ErrCatTimeout:
 		if strings.Contains(lower, "i/o timeout") {
@@ -187,12 +187,12 @@ func extractDetail(errorReason string, cat ErrorCategory, statusCode int) string
 		if strings.Contains(lower, "no icmp response") {
 			detail = "no response"
 		} else {
-			detail = limitStr(errorReason, 30)
+			detail = limitStr(errorReason, errorDetailMaxLen)
 		}
 	case ErrCatPrivate:
 		detail = "private IP blocked"
 	default:
-		detail = limitStr(errorReason, 30)
+		detail = limitStr(errorReason, errorDetailMaxLen)
 	}
 
 	return detail

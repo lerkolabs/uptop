@@ -38,14 +38,20 @@ func Start(ctx context.Context, cfg Config, eng *monitor.Engine) {
 	// "probe" mode is handled directly in main.go before cluster.Start is called
 }
 
+const (
+	followerTimeout        = 2 * time.Second
+	leaderFailureThreshold = 3
+	followerRetryInterval  = 5 * time.Second
+)
+
 func runFollowerLoop(ctx context.Context, cfg Config, eng *monitor.Engine) {
-	client := http.Client{Timeout: 2 * time.Second}
+	client := http.Client{Timeout: followerTimeout}
 	failures := 0
-	threshold := 3
+	threshold := leaderFailureThreshold
 
 	for {
 		select {
-		case <-time.After(5 * time.Second):
+		case <-time.After(followerRetryInterval):
 		case <-ctx.Done():
 			return
 		}
@@ -59,7 +65,7 @@ func runFollowerLoop(ctx context.Context, cfg Config, eng *monitor.Engine) {
 		isLeaderHealthy := false
 
 		if err == nil {
-			isLeaderHealthy = resp.StatusCode == 200
+			isLeaderHealthy = resp.StatusCode == http.StatusOK
 			_ = resp.Body.Close()
 		}
 

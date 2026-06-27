@@ -202,8 +202,8 @@ func (m *Model) loadDetailCmd(siteID int) tea.Cmd {
 	return func() tea.Msg {
 		changes := eng.GetStateChanges(siteID, 5)
 		now := time.Now()
-		allChanges := eng.GetStateChangesSince(siteID, now.Add(-30*24*time.Hour))
-		daily := monitor.ComputeDailyBreakdown(allChanges, currentStatus, 30, now)
+		allChanges := eng.GetStateChangesSince(siteID, now.Add(-stateHistoryLookback))
+		daily := monitor.ComputeDailyBreakdown(allChanges, currentStatus, stateHistoryDays, now)
 		return detailDataMsg{siteID: siteID, changes: changes, dailyDays: daily}
 	}
 }
@@ -213,7 +213,7 @@ func (m *Model) loadDetailCmd(siteID int) tea.Cmd {
 func (m *Model) loadHistoryCmd(siteID int) tea.Cmd {
 	eng := m.engine
 	return func() tea.Msg {
-		return historyDataMsg{siteID: siteID, changes: eng.GetStateChanges(siteID, 100)}
+		return historyDataMsg{siteID: siteID, changes: eng.GetStateChanges(siteID, stateHistoryLimit)}
 	}
 }
 

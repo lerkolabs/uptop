@@ -130,7 +130,7 @@ func (m Model) computeStats() dashboardStats {
 		}
 	}
 	for _, n := range m.nodes {
-		if !n.LastSeen.IsZero() && time.Since(n.LastSeen) > 5*time.Minute {
+		if !n.LastSeen.IsZero() && time.Since(n.LastSeen) > nodeStaleThreshold {
 			s.offlineNodes++
 		}
 	}
@@ -294,7 +294,7 @@ func (m Model) renderFooter(stats dashboardStats) string {
 	if len(m.nodes) > 0 {
 		online := 0
 		for _, n := range m.nodes {
-			if !n.LastSeen.IsZero() && time.Since(n.LastSeen) < 60*time.Second {
+			if !n.LastSeen.IsZero() && time.Since(n.LastSeen) < nodeOnlineThreshold {
 				online++
 			}
 		}

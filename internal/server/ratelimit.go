@@ -14,6 +14,11 @@ import (
 // guard.
 const maxVisitors = 10000
 
+const (
+	visitorCleanupInterval = 5 * time.Minute
+	visitorIdleCutoff      = 10 * time.Minute
+)
+
 type visitor struct {
 	tokens   float64
 	lastSeen time.Time
@@ -90,13 +95,13 @@ func (rl *RateLimiter) evictOldest() {
 }
 
 func (rl *RateLimiter) cleanup() {
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(visitorCleanupInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
 			rl.mu.Lock()
-			cutoff := time.Now().Add(-10 * time.Minute)
+			cutoff := time.Now().Add(-visitorIdleCutoff)
 			for ip, v := range rl.visitors {
 				if v.lastSeen.Before(cutoff) {
 					delete(rl.visitors, ip)

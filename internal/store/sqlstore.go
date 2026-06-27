@@ -18,6 +18,10 @@ const (
 	maxLogRows             = 200
 	maxStateChangesPerSite = 5000
 	maxMaintenanceExport   = 1000
+	maxOpenConns           = 25
+	maxIdleConns           = 5
+	connMaxLifetime        = 5 * time.Minute
+	tokenByteLen           = 16
 )
 
 type SQLStore struct {
@@ -32,9 +36,9 @@ func NewSQLStore(driverName, dsn string, dialect Dialect) (*SQLStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetMaxOpenConns(maxOpenConns)
+	db.SetMaxIdleConns(maxIdleConns)
+	db.SetConnMaxLifetime(connMaxLifetime)
 	_, isDollar := dialect.(*PostgresDialect)
 	return &SQLStore{db: db, dialect: dialect, dollar: isDollar}, nil
 }
@@ -62,7 +66,7 @@ func (s *SQLStore) q(query string) string {
 }
 
 func generateToken() (string, error) {
-	b := make([]byte, 16)
+	b := make([]byte, tokenByteLen)
 	if _, err := rand.Read(b); err != nil {
 		return "", fmt.Errorf("crypto/rand failed: %w", err)
 	}

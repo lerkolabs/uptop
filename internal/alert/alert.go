@@ -18,7 +18,9 @@ import (
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 )
 
-var alertClient = &http.Client{Timeout: 10 * time.Second}
+const alertHTTPTimeout = 10 * time.Second
+
+var alertClient = &http.Client{Timeout: alertHTTPTimeout}
 
 // sanitizeError strips the request URL from transport errors before they are
 // stored or displayed. *url.Error embeds the full URL, which for several

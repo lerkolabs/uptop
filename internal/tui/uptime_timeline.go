@@ -26,9 +26,9 @@ func (m Model) uptimeTimeline(days []monitor.DayReport, width int) string {
 	for _, d := range display {
 		ch := "█"
 		switch {
-		case d.UptimePct >= 99.0:
+		case d.UptimePct >= uptimeGoodPct:
 			sb.WriteString(m.st.specialStyle.Render(ch))
-		case d.UptimePct >= 95.0:
+		case d.UptimePct >= uptimeWarnPct:
 			sb.WriteString(m.st.warnStyle.Render(ch))
 		case d.UptimePct > 0:
 			sb.WriteString(m.st.dangerStyle.Render(ch))
@@ -39,9 +39,9 @@ func (m Model) uptimeTimeline(days []monitor.DayReport, width int) string {
 
 	pct := days[len(days)-1].UptimePct
 	pctStyle := m.st.specialStyle
-	if pct < 99.0 {
+	if pct < uptimeGoodPct {
 		pctStyle = m.st.dangerStyle
-	} else if pct < 99.9 {
+	} else if pct < uptimeExcellentPct {
 		pctStyle = m.st.warnStyle
 	}
 	sb.WriteString("  " + pctStyle.Render(fmt.Sprintf("%.2f%%", pct)))

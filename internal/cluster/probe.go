@@ -26,12 +26,18 @@ type ProbeConfig struct {
 	AllowPrivateTargets bool
 }
 
+const (
+	probeMinInterval     = 10
+	probeDefaultInterval = 30
+	probeAPITimeout      = 10 * time.Second
+)
+
 func RunProbe(ctx context.Context, cfg ProbeConfig) error {
-	if cfg.Interval < 10 {
-		cfg.Interval = 30
+	if cfg.Interval < probeMinInterval {
+		cfg.Interval = probeDefaultInterval
 	}
 
-	apiClient := &http.Client{Timeout: 10 * time.Second}
+	apiClient := &http.Client{Timeout: probeAPITimeout}
 	dial := monitor.SafeDialContext(cfg.AllowPrivateTargets)
 	strictClient := &http.Client{
 		Transport: &http.Transport{

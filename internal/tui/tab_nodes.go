@@ -55,7 +55,7 @@ func (m Model) viewNodesTab() string {
 	regions := make(map[string]bool)
 	var leader string
 	for _, n := range m.nodes {
-		if time.Since(n.LastSeen) < 60*time.Second {
+		if time.Since(n.LastSeen) < nodeOnlineThreshold {
 			online++
 		}
 		if n.Region != "" {
@@ -81,10 +81,10 @@ func (m Model) fmtNodeStatus(lastSeen time.Time) string {
 		return m.st.subtleStyle.Render("UNKNOWN")
 	}
 	ago := time.Since(lastSeen)
-	if ago < 60*time.Second {
+	if ago < nodeOnlineThreshold {
 		return m.st.specialStyle.Render("ONLINE")
 	}
-	if ago < 5*time.Minute {
+	if ago < nodeStaleThreshold {
 		return m.st.warnStyle.Render("STALE")
 	}
 	return m.st.dangerStyle.Render("OFFLINE")

@@ -45,15 +45,27 @@ type Server struct {
 	statusRL *RateLimiter
 }
 
+const (
+	pushRateLimit   = 60
+	probeRateLimit  = 30
+	backupRateLimit = 10
+	statusRateLimit = 120
+
+	httpReadHeaderTimeout = 10 * time.Second
+	httpReadTimeout       = 30 * time.Second
+	httpWriteTimeout      = 60 * time.Second
+	httpIdleTimeout       = 120 * time.Second
+)
+
 func NewServer(cfg ServerConfig, s store.Store, eng *monitor.Engine) *Server {
 	return &Server{
 		cfg:      cfg,
 		store:    s,
 		eng:      eng,
-		pushRL:   NewRateLimiter(60, cfg.TrustedProxies),
-		probeRL:  NewRateLimiter(30, cfg.TrustedProxies),
-		backupRL: NewRateLimiter(10, cfg.TrustedProxies),
-		statusRL: NewRateLimiter(120, cfg.TrustedProxies),
+		pushRL:   NewRateLimiter(pushRateLimit, cfg.TrustedProxies),
+		probeRL:  NewRateLimiter(probeRateLimit, cfg.TrustedProxies),
+		backupRL: NewRateLimiter(backupRateLimit, cfg.TrustedProxies),
+		statusRL: NewRateLimiter(statusRateLimit, cfg.TrustedProxies),
 	}
 }
 
@@ -77,10 +89,10 @@ func (s *Server) Start() *http.Server {
 	httpSrv := &http.Server{
 		Addr:              addr,
 		Handler:           handler,
-		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      60 * time.Second,
-		IdleTimeout:       120 * time.Second,
+		ReadHeaderTimeout: httpReadHeaderTimeout,
+		ReadTimeout:       httpReadTimeout,
+		WriteTimeout:      httpWriteTimeout,
+		IdleTimeout:       httpIdleTimeout,
 	}
 	go func() {
 		if s.cfg.TLSCert != "" && s.cfg.TLSKey != "" {

@@ -24,6 +24,7 @@ const (
 	maintPruneInterval    = 15 * time.Minute
 	defaultMaintRetention = 7 * 24 * time.Hour
 	dbWriteBuffer         = 4096
+	alertSendTimeout      = 30 * time.Second
 	dbPruneInterval       = 10 * time.Minute
 )
 
@@ -900,7 +901,7 @@ func (e *Engine) triggerAlert(alertID int, title, message string) {
 	provider := alert.GetProvider(cfg)
 	if provider != nil {
 		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), alertSendTimeout)
 			defer cancel()
 			if err := provider.Send(ctx, title, message); err != nil {
 				e.AddLog(fmt.Sprintf("Alert send failed (%s): %v", cfg.Name, err))
@@ -953,7 +954,7 @@ func (e *Engine) TestAlert(alertID int) error {
 	if provider == nil {
 		return fmt.Errorf("no provider for type %q", cfg.Type)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), alertSendTimeout)
 	defer cancel()
 	err = provider.Send(ctx, "🧪 Test Alert", fmt.Sprintf("Test notification from uptop for channel '%s'.", cfg.Name))
 	if err != nil {

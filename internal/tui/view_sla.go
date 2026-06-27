@@ -40,10 +40,10 @@ func (m Model) viewSLAPanel() string {
 	}
 	bar := m.uptimeBar(r.UptimePct, barWidth)
 	uptimeColor := m.st.specialStyle
-	if r.UptimePct < 99.9 {
+	if r.UptimePct < uptimeExcellentPct {
 		uptimeColor = m.st.warnStyle
 	}
-	if r.UptimePct < 99.0 {
+	if r.UptimePct < uptimeGoodPct {
 		uptimeColor = m.st.dangerStyle
 	}
 	fmt.Fprintf(&b, "  %-16s %s  %s\n", m.st.subtleStyle.Render("Uptime"), uptimeColor.Render(fmt.Sprintf("%s%%", fmtPct(r.UptimePct))), bar)
@@ -94,10 +94,10 @@ func (m Model) buildSLADailyContent() string {
 		pctStr := fmtPct(day.UptimePct) + "%"
 
 		color := m.st.specialStyle
-		if day.UptimePct < 99.9 {
+		if day.UptimePct < uptimeExcellentPct {
 			color = m.st.warnStyle
 		}
-		if day.UptimePct < 99.0 {
+		if day.UptimePct < uptimeGoodPct {
 			color = m.st.dangerStyle
 		}
 
@@ -128,7 +128,7 @@ func fmtPct(pct float64) string {
 	if pct == 100 {
 		return "100.00"
 	}
-	if pct >= 99.99 {
+	if pct >= uptimePrecisionPct {
 		return fmt.Sprintf("%.3f", pct)
 	}
 	return fmt.Sprintf("%.2f", pct)
