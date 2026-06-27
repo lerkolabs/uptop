@@ -64,6 +64,7 @@ type Engine struct {
 	dbWrites  chan dbWrite
 	writerWG  sync.WaitGroup
 	checkerWG sync.WaitGroup
+	ctx       context.Context
 	cancel    context.CancelFunc
 	stopOnce  sync.Once
 }
@@ -90,6 +91,7 @@ func newEngine(s store.Store, allowPrivateTargets bool) *Engine {
 		allowPrivateTargets: allowPrivateTargets,
 		maintRetention:      defaultMaintRetention,
 		dbWrites:            make(chan dbWrite, dbWriteBuffer),
+		ctx:                 context.Background(),
 		db:                  s,
 		strictClient: &http.Client{
 			Transport: &http.Transport{
@@ -200,6 +202,8 @@ func (e *Engine) dbWriter(ctx context.Context) {
 }
 
 // drainWrites flushes everything still buffered, best-effort, at shutdown.
+// Uses context.Background because the engine ctx is already cancelled when
+// this runs — writes still need to reach the DB.
 func (e *Engine) drainWrites() {
 	for {
 		select {
@@ -238,8 +242,8 @@ func (e *Engine) Stop() {
 	})
 }
 
-func (e *Engine) InitLogs() {
-	entries, err := e.db.LoadLogs(context.Background(), maxLogEntries)
+func (e *Engine) InitLogs(ctx context.Context) {
+	entries, err := e.db.LoadLogs(ctx, maxLogEntries)
 	if err != nil {
 		return
 	}
@@ -264,6 +268,7 @@ func (e *Engine) Start(ctx context.Context) {
 	// trace the cross-method call, and cancelling the parent reaps this child
 	// regardless, so the leak it warns about can't occur.
 	ctx, e.cancel = context.WithCancel(ctx) //nolint:gosec // cancel is called in Stop()
+	e.ctx = ctx
 
 	e.writerWG.Add(1)
 	go e.dbWriter(ctx)

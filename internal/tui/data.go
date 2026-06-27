@@ -13,9 +13,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func loadCollapsed(s store.Store) map[int]bool {
+func loadCollapsed(ctx context.Context, s store.Store) map[int]bool {
 	m := make(map[int]bool)
-	raw, err := s.GetPreference(context.Background(), "collapsed_groups")
+	raw, err := s.GetPreference(ctx, "collapsed_groups")
 	if err != nil || raw == "" {
 		return m
 	}
@@ -163,9 +163,9 @@ func (m *Model) loadTabDataCmd() tea.Cmd {
 	m.tabSeq++
 	seq := m.tabSeq
 	st := m.store
+	ctx := m.ctx
 	isAdmin := m.isAdmin
 	return func() tea.Msg {
-		ctx := context.Background()
 		alerts, err := st.GetAllAlerts(ctx)
 		if err != nil {
 			return tabDataMsg{seq: seq, err: err}
@@ -192,6 +192,7 @@ func (m *Model) loadTabDataCmd() tea.Cmd {
 // goroutine. View renders the cached result rather than querying the DB.
 func (m *Model) loadDetailCmd(siteID int) tea.Cmd {
 	eng := m.engine
+	ctx := m.ctx
 	var currentStatus models.Status
 	for _, s := range m.sites {
 		if s.ID == siteID {
@@ -200,9 +201,9 @@ func (m *Model) loadDetailCmd(siteID int) tea.Cmd {
 		}
 	}
 	return func() tea.Msg {
-		changes := eng.GetStateChanges(siteID, 5)
+		changes := eng.GetStateChanges(ctx, siteID, 5)
 		now := time.Now()
-		allChanges := eng.GetStateChangesSince(siteID, now.Add(-stateHistoryLookback))
+		allChanges := eng.GetStateChangesSince(ctx, siteID, now.Add(-stateHistoryLookback))
 		daily := monitor.ComputeDailyBreakdown(allChanges, currentStatus, stateHistoryDays, now)
 		return detailDataMsg{siteID: siteID, changes: changes, dailyDays: daily}
 	}
@@ -212,8 +213,9 @@ func (m *Model) loadDetailCmd(siteID int) tea.Cmd {
 // the UI goroutine.
 func (m *Model) loadHistoryCmd(siteID int) tea.Cmd {
 	eng := m.engine
+	ctx := m.ctx
 	return func() tea.Msg {
-		return historyDataMsg{siteID: siteID, changes: eng.GetStateChanges(siteID, stateHistoryLimit)}
+		return historyDataMsg{siteID: siteID, changes: eng.GetStateChanges(ctx, siteID, stateHistoryLimit)}
 	}
 }
 
@@ -222,12 +224,13 @@ func (m *Model) loadHistoryCmd(siteID int) tea.Cmd {
 // can be recognized and dropped.
 func (m *Model) loadSLACmd(siteID, periodIdx int) tea.Cmd {
 	eng := m.engine
+	ctx := m.ctx
 	since := time.Now().Add(-slaPeriods[periodIdx].duration)
 	return func() tea.Msg {
 		return slaDataMsg{
 			siteID:    siteID,
 			periodIdx: periodIdx,
-			changes:   eng.GetStateChangesSince(siteID, since),
+			changes:   eng.GetStateChangesSince(ctx, siteID, since),
 		}
 	}
 }

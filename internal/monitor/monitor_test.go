@@ -208,7 +208,7 @@ func TestInitHistory_LoadsFromDB(t *testing.T) {
 		{SiteID: 1, LatencyNs: 3000000, IsUp: false},
 	}
 	e := newTestEngine(ms)
-	e.InitHistory()
+	e.InitHistory(context.Background())
 
 	h, ok := e.GetHistory(1)
 	if !ok {
@@ -248,7 +248,7 @@ func TestInitLogs_LoadsFromDB(t *testing.T) {
 		{Message: "old-log-2"},
 	}
 	e := newTestEngine(ms)
-	e.InitLogs()
+	e.InitLogs(context.Background())
 
 	logs := e.GetLogs()
 	if len(logs) != 2 {

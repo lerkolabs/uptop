@@ -141,16 +141,16 @@ func (e *Engine) GetDisplayStatus(site models.Site) string {
 	return string(site.Status)
 }
 
-func (e *Engine) GetStateChanges(siteID int, limit int) []models.StateChange {
-	changes, err := e.db.GetStateChanges(context.Background(), siteID, limit)
+func (e *Engine) GetStateChanges(ctx context.Context, siteID int, limit int) []models.StateChange {
+	changes, err := e.db.GetStateChanges(ctx, siteID, limit)
 	if err != nil {
 		return nil
 	}
 	return changes
 }
 
-func (e *Engine) GetStateChangesSince(siteID int, since time.Time) []models.StateChange {
-	changes, err := e.db.GetStateChangesSince(context.Background(), siteID, since)
+func (e *Engine) GetStateChangesSince(ctx context.Context, siteID int, since time.Time) []models.StateChange {
+	changes, err := e.db.GetStateChangesSince(ctx, siteID, since)
 	if err != nil {
 		return nil
 	}

@@ -179,7 +179,7 @@ func parseTrustedProxies(raw string) []*net.IPNet {
 	return cidrs
 }
 
-func openStore(dbType, dsn string) store.Store {
+func openStore(ctx context.Context, dbType, dsn string) store.Store {
 	var ss *store.SQLStore
 	var err error
 	if dbType == "postgres" {
@@ -201,7 +201,7 @@ func openStore(dbType, dsn string) store.Store {
 	} else {
 		slog.Warn("no UPTOP_ENCRYPTION_KEY set, alert credentials stored unencrypted")
 	}
-	if err := ss.Init(context.Background()); err != nil {
+	if err := ss.Init(ctx); err != nil {
 		slog.Error("database init failed", "err", err)
 		os.Exit(1)
 	}
@@ -223,7 +223,8 @@ func runApply(args []string) {
 		os.Exit(1)
 	}
 
-	s := openStore(*dbType, *dsn)
+	ctx := context.Background()
+	s := openStore(ctx, *dbType, *dsn)
 
 	f, err := config.LoadFile(*filePath)
 	if err != nil {
@@ -231,7 +232,7 @@ func runApply(args []string) {
 		os.Exit(1)
 	}
 
-	changes, err := config.Apply(context.Background(), s, f, config.ApplyOpts{
+	changes, err := config.Apply(ctx, s, f, config.ApplyOpts{
 		DryRun: *dryRun,
 		Prune:  *prune,
 	})
@@ -250,9 +251,10 @@ func runExport(args []string) {
 	dsn := fs.String("dsn", envOrDefault("UPTOP_DB_DSN", "uptop.db"), "Database DSN")
 	_ = fs.Parse(args) // ExitOnError: parse errors exit before returning
 
-	s := openStore(*dbType, *dsn)
+	ctx := context.Background()
+	s := openStore(ctx, *dbType, *dsn)
 
-	f, err := config.Export(context.Background(), s)
+	f, err := config.Export(ctx, s)
 	if err != nil {
 		slog.Error("export failed", "err", err)
 		os.Exit(1)
@@ -281,6 +283,8 @@ func runMigrateSecrets(args []string) {
 		os.Exit(1)
 	}
 
+	ctx := context.Background()
+
 	var ss *store.SQLStore
 	if *dbType == "postgres" {
 		ss, err = store.NewPostgresStore(*dsn)
@@ -291,21 +295,21 @@ func runMigrateSecrets(args []string) {
 		slog.Error("database connection failed", "err", err)
 		os.Exit(1)
 	}
-	if err := ss.Init(context.Background()); err != nil {
+	if err := ss.Init(ctx); err != nil {
 		slog.Error("database init failed", "err", err)
 		os.Exit(1)
 	}
 
 	ss.SetEncryptor(enc)
 
-	alerts, err := ss.GetAllAlerts(context.Background())
+	alerts, err := ss.GetAllAlerts(ctx)
 	if err != nil {
 		slog.Error("failed to load alerts", "err", err)
 		os.Exit(1)
 	}
 	migrated := 0
 	for _, a := range alerts {
-		if err := ss.UpdateAlert(context.Background(), a.ID, a.Name, a.Type, a.Settings); err != nil {
+		if err := ss.UpdateAlert(ctx, a.ID, a.Name, a.Type, a.Settings); err != nil {
 			slog.Error("alert migration failed", "alert", a.Name, "err", err)
 			os.Exit(1)
 		}
@@ -392,15 +396,19 @@ func runServe(args []string) {
 
 	kc := newKeyCache(ss)
 	var s store.Store = &userInvalidatingStore{Store: ss, kc: kc}
-	if err := s.Init(context.Background()); err != nil {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if err := s.Init(ctx); err != nil {
 		slog.Error("database init failed", "err", err)
 		os.Exit(1)
 	}
 	if *demo {
-		seedDemoData(s)
+		seedDemoData(ctx, s)
 	}
 
-	seedKeysFromEnv(s)
+	seedKeysFromEnv(ctx, s)
 
 	if *importKuma != "" {
 		kb, err := importer.LoadKumaFile(*importKuma)
@@ -409,7 +417,7 @@ func runServe(args []string) {
 			os.Exit(1)
 		}
 		backup := importer.ConvertKuma(kb)
-		if err := s.ImportData(context.Background(), backup); err != nil {
+		if err := s.ImportData(ctx, backup); err != nil {
 			slog.Error("import failed", "err", err)
 			os.Exit(1)
 		}
@@ -429,12 +437,9 @@ func runServe(args []string) {
 	}
 	eng.SetMaintRetention(cfg.MaintRetention)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	eng.InitHistory()
-	eng.InitLogs()
-	eng.InitAlertHealth()
+	eng.InitHistory(ctx)
+	eng.InitLogs(ctx)
+	eng.InitAlertHealth(ctx)
 	eng.Start(ctx)
 
 	localTUI := isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
@@ -450,7 +455,7 @@ func runServe(args []string) {
 	sshSrv := startSSHServer(*port, s, eng, kc)
 
 	if localTUI {
-		p := tea.NewProgram(tui.InitialModel(true, s, eng, version), tea.WithAltScreen(), tea.WithMouseCellMotion())
+		p := tea.NewProgram(tui.InitialModel(ctx, true, s, eng, version), tea.WithAltScreen(), tea.WithMouseCellMotion())
 		if _, err := p.Run(); err != nil {
 			slog.Error("TUI failed", "err", err)
 		}
@@ -484,11 +489,11 @@ func startSSHServer(port int, db store.Store, eng *monitor.Engine, kc *keyCache)
 		wish.WithAddress(fmt.Sprintf(":%d", port)),
 		wish.WithHostKeyPath(envOrDefault("UPTOP_SSH_HOST_KEY", ".ssh/id_ed25519")),
 		wish.WithPublicKeyAuth(func(ctx ssh.Context, key ssh.PublicKey) bool {
-			return kc.IsAllowed(key)
+			return kc.IsAllowed(ctx, key)
 		}),
 		wish.WithMiddleware(
 			bm.Middleware(func(s ssh.Session) (tea.Model, []tea.ProgramOption) {
-				return tui.InitialModel(false, db, eng, version), []tea.ProgramOption{tea.WithAltScreen(), tea.WithMouseCellMotion()}
+				return tui.InitialModel(s.Context(), false, db, eng, version), []tea.ProgramOption{tea.WithAltScreen(), tea.WithMouseCellMotion()}
 			}),
 		),
 	)
@@ -504,8 +509,7 @@ func startSSHServer(port int, db store.Store, eng *monitor.Engine, kc *keyCache)
 	return s
 }
 
-func seedDemoData(s store.Store) {
-	ctx := context.Background()
+func seedDemoData(ctx context.Context, s store.Store) {
 	existing, _ := s.GetSites(ctx)
 	if len(existing) > 0 {
 		return
@@ -566,8 +570,8 @@ func newKeyCache(db store.Store) *keyCache {
 	return &keyCache{db: db, ttl: 30 * time.Second}
 }
 
-func (c *keyCache) refresh() {
-	users, err := c.db.GetAllUsers(context.Background())
+func (c *keyCache) refresh(ctx context.Context) {
+	users, err := c.db.GetAllUsers(ctx)
 	if err != nil {
 		// Keep the previous key set: a transient DB error must not lock every
 		// admin out. Revocation still fails closed because Invalidate clears
@@ -600,13 +604,13 @@ func (c *keyCache) Invalidate() {
 	c.mu.Unlock()
 }
 
-func (c *keyCache) IsAllowed(incomingKey ssh.PublicKey) bool {
+func (c *keyCache) IsAllowed(ctx context.Context, incomingKey ssh.PublicKey) bool {
 	c.mu.RLock()
 	stale := time.Since(c.updated) > c.ttl
 	c.mu.RUnlock()
 
 	if stale {
-		c.refresh()
+		c.refresh(ctx)
 	}
 
 	c.mu.RLock()
@@ -652,8 +656,7 @@ func (s *userInvalidatingStore) ImportData(ctx context.Context, data models.Back
 	return err
 }
 
-func seedKeysFromEnv(s store.Store) {
-	ctx := context.Background()
+func seedKeysFromEnv(ctx context.Context, s store.Store) {
 	var keys []string
 
 	if v := os.Getenv("UPTOP_ADMIN_KEY"); v != "" {

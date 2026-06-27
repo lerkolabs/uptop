@@ -14,8 +14,8 @@ type SiteHistory struct {
 	UpChecks    int
 }
 
-func (e *Engine) InitHistory() {
-	all, err := e.db.LoadAllHistory(context.Background(), maxHistoryLen)
+func (e *Engine) InitHistory(ctx context.Context) {
+	all, err := e.db.LoadAllHistory(ctx, maxHistoryLen)
 	if err != nil {
 		e.AddLog("Failed to load check history: " + err.Error())
 		return

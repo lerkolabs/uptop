@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"context"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -604,10 +603,11 @@ func (m *Model) submitSiteForm() tea.Cmd {
 	}
 
 	st := m.store
+	ctx := m.ctx
 	m.state = stateDashboard
 	if m.editID > 0 {
 		m.engine.UpdateSiteConfig(cfg)
-		return writeCmd("Update site", func() error { return st.UpdateSite(context.Background(), cfg) })
+		return writeCmd("Update site", func() error { return st.UpdateSite(ctx, cfg) })
 	}
-	return writeCmd("Add site", func() error { return st.AddSite(context.Background(), cfg) })
+	return writeCmd("Add site", func() error { return st.AddSite(ctx, cfg) })
 }

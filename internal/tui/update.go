@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -76,23 +75,24 @@ func (m *Model) handleConfirmDelete(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// writeDoneMsg reload converges the UI back to the DB state (and the
 		// engine poll loop re-adds a site that is still in the DB).
 		st := m.store
+		ctx := m.ctx
 		id := m.deleteID
 		var cmd tea.Cmd
 		switch m.deleteTab {
 		case tabMonitors:
-			cmd = writeCmd("Delete site", func() error { return st.DeleteSite(context.Background(), id) })
+			cmd = writeCmd("Delete site", func() error { return st.DeleteSite(ctx, id) })
 			m.engine.RemoveSite(id)
 			m.adjustCursor(len(m.sites) - 1)
 		case tabMaint:
-			cmd = writeCmd("Delete maintenance window", func() error { return st.DeleteMaintenanceWindow(context.Background(), id) })
+			cmd = writeCmd("Delete maintenance window", func() error { return st.DeleteMaintenanceWindow(ctx, id) })
 			m.adjustCursor(len(m.maintenanceWindows) - 1)
 		case tabSettings:
 			switch m.settingsSection {
 			case sectionAlerts:
-				cmd = writeCmd("Delete alert", func() error { return st.DeleteAlert(context.Background(), id) })
+				cmd = writeCmd("Delete alert", func() error { return st.DeleteAlert(ctx, id) })
 				m.adjustCursor(len(m.alerts) - 1)
 			case sectionUsers:
-				cmd = writeCmd("Delete user", func() error { return st.DeleteUser(context.Background(), id) })
+				cmd = writeCmd("Delete user", func() error { return st.DeleteUser(ctx, id) })
 				m.adjustCursor(len(m.users) - 1)
 			}
 		}
@@ -232,8 +232,9 @@ func (m *Model) handleTabData(msg tabDataMsg) (tea.Model, tea.Cmd) {
 // surfaces through the engine log (picked up by the next refreshLive).
 func (m *Model) testAlertCmd(id int, name string) tea.Cmd {
 	eng := m.engine
+	ctx := m.ctx
 	return func() tea.Msg {
-		if err := eng.TestAlert(id); err != nil {
+		if err := eng.TestAlert(ctx, id); err != nil {
 			eng.AddLog(fmt.Sprintf("Test alert failed (%s): %v", name, err))
 		}
 		return nil
@@ -635,9 +636,10 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.collapsed[gid] = !m.collapsed[gid]
 			payload := collapsedJSON(m.collapsed)
 			st := m.store
+			ctx := m.ctx
 			m.refreshLive()
 			return m, writeCmd("Save collapsed groups", func() error {
-				return st.SetPreference(context.Background(), "collapsed_groups", payload)
+				return st.SetPreference(ctx, "collapsed_groups", payload)
 			})
 		}
 	case "p":
@@ -645,9 +647,10 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			id := m.sites[m.cursor].ID
 			paused := m.engine.ToggleSitePause(id)
 			st := m.store
+			ctx := m.ctx
 			m.refreshLive()
 			return m, writeCmd("Update pause state", func() error {
-				return st.UpdateSitePaused(context.Background(), id, paused)
+				return st.UpdateSitePaused(ctx, id, paused)
 			})
 		}
 	case "i":
@@ -655,6 +658,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.detailOpen = !m.detailOpen
 			m.recalcLayout()
 			st := m.store
+			ctx := m.ctx
 			open := m.detailOpen
 			var cmd tea.Cmd
 			if m.detailOpen {
@@ -665,7 +669,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if open {
 					v = "true"
 				}
-				return st.SetPreference(context.Background(), "detail_open", v)
+				return st.SetPreference(ctx, "detail_open", v)
 			})
 			if cmd != nil {
 				return m, tea.Batch(cmd, saveCmd)
@@ -682,8 +686,9 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.detailOpen = false
 				m.recalcLayout()
 				st := m.store
+				ctx := m.ctx
 				return m, writeCmd("Save detail preference", func() error {
-					return st.SetPreference(context.Background(), "detail_open", "false")
+					return st.SetPreference(ctx, "detail_open", "false")
 				})
 			}
 		}
@@ -712,10 +717,11 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			isActive := !mw.StartTime.After(now) && (mw.EndTime.IsZero() || mw.EndTime.After(now))
 			if isActive {
 				st := m.store
+				ctx := m.ctx
 				id := mw.ID
 				m.refreshLive()
 				return m, writeCmd("End maintenance", func() error {
-					return st.EndMaintenanceWindow(context.Background(), id)
+					return st.EndMaintenanceWindow(ctx, id)
 				})
 			}
 		}
@@ -724,9 +730,10 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.theme = themes[m.themeIndex]
 		m.st = newStyles(m.theme)
 		st := m.store
+		ctx := m.ctx
 		name := m.theme.Name
 		return m, writeCmd("Save theme", func() error {
-			return st.SetPreference(context.Background(), "theme", name)
+			return st.SetPreference(ctx, "theme", name)
 		})
 	case "d":
 		return m.handleDeleteItem()

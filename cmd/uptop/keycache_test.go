@@ -43,10 +43,10 @@ func TestKeyCache_AllowsKnownDeniesUnknown(t *testing.T) {
 	_, unknown := testKey(t)
 	kc := newKeyCache(&kcMockStore{users: []models.User{{PublicKey: authorized}}})
 
-	if !kc.IsAllowed(known) {
+	if !kc.IsAllowed(context.Background(), known) {
 		t.Error("known key denied")
 	}
-	if kc.IsAllowed(unknown) {
+	if kc.IsAllowed(context.Background(), unknown) {
 		t.Error("unknown key allowed")
 	}
 }
@@ -56,7 +56,7 @@ func TestKeyCache_RetainsKeysOnRefreshError(t *testing.T) {
 	ms := &kcMockStore{users: []models.User{{PublicKey: authorized}}}
 	kc := newKeyCache(ms)
 
-	if !kc.IsAllowed(known) {
+	if !kc.IsAllowed(context.Background(), known) {
 		t.Fatal("known key denied on first refresh")
 	}
 
@@ -67,7 +67,7 @@ func TestKeyCache_RetainsKeysOnRefreshError(t *testing.T) {
 	kc.updated = time.Now().Add(-time.Hour)
 	kc.mu.Unlock()
 
-	if !kc.IsAllowed(known) {
+	if !kc.IsAllowed(context.Background(), known) {
 		t.Error("transient refresh error locked out a previously valid key")
 	}
 }
@@ -77,7 +77,7 @@ func TestKeyCache_FailsClosedAfterInvalidate(t *testing.T) {
 	ms := &kcMockStore{users: []models.User{{PublicKey: authorized}}}
 	kc := newKeyCache(ms)
 
-	if !kc.IsAllowed(known) {
+	if !kc.IsAllowed(context.Background(), known) {
 		t.Fatal("known key denied on first refresh")
 	}
 
@@ -86,7 +86,7 @@ func TestKeyCache_FailsClosedAfterInvalidate(t *testing.T) {
 	ms.err = errors.New("db down")
 	kc.Invalidate()
 
-	if kc.IsAllowed(known) {
+	if kc.IsAllowed(context.Background(), known) {
 		t.Error("revoked key still allowed while DB is down — fails open")
 	}
 }
@@ -97,7 +97,7 @@ func TestUserInvalidatingStore_DeleteDropsKeyCache(t *testing.T) {
 	kc := newKeyCache(ms)
 	s := &userInvalidatingStore{Store: ms, kc: kc}
 
-	if !kc.IsAllowed(known) {
+	if !kc.IsAllowed(context.Background(), known) {
 		t.Fatal("known key denied on first refresh")
 	}
 
@@ -109,7 +109,7 @@ func TestUserInvalidatingStore_DeleteDropsKeyCache(t *testing.T) {
 	ms.users = nil
 	ms.err = errors.New("db down")
 
-	if kc.IsAllowed(known) {
+	if kc.IsAllowed(context.Background(), known) {
 		t.Error("deleted user's key still allowed from stale cache")
 	}
 }

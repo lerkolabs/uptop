@@ -19,8 +19,8 @@ type AlertHealth struct {
 
 // InitAlertHealth restores persisted alert send health so the dashboard shows real
 // "last sent" / health state on startup instead of resetting every channel to "never".
-func (e *Engine) InitAlertHealth() {
-	records, err := e.db.LoadAlertHealth(context.Background())
+func (e *Engine) InitAlertHealth(ctx context.Context) {
+	records, err := e.db.LoadAlertHealth(ctx)
 	if err != nil {
 		return
 	}
@@ -198,7 +198,7 @@ func (e *Engine) triggerAlert(alertID int, title, message string) {
 	if alertID <= 0 {
 		return
 	}
-	cfg, err := e.db.GetAlert(context.Background(), alertID)
+	cfg, err := e.db.GetAlert(e.ctx, alertID)
 	if err != nil {
 		e.AddLog(fmt.Sprintf("Failed to load alert config %d: %v", alertID, err))
 		return
@@ -206,7 +206,7 @@ func (e *Engine) triggerAlert(alertID int, title, message string) {
 	provider := alert.GetProvider(cfg)
 	if provider != nil {
 		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), alertSendTimeout)
+			ctx, cancel := context.WithTimeout(e.ctx, alertSendTimeout)
 			defer cancel()
 			if err := provider.Send(ctx, title, message); err != nil {
 				e.AddLog(fmt.Sprintf("Alert send failed (%s): %v", cfg.Name, err))
@@ -250,8 +250,8 @@ func (e *Engine) GetAlertHealth(alertID int) AlertHealth {
 	return e.alertHealth[alertID]
 }
 
-func (e *Engine) TestAlert(alertID int) error {
-	cfg, err := e.db.GetAlert(context.Background(), alertID)
+func (e *Engine) TestAlert(ctx context.Context, alertID int) error {
+	cfg, err := e.db.GetAlert(ctx, alertID)
 	if err != nil {
 		return fmt.Errorf("failed to load alert: %w", err)
 	}
@@ -259,7 +259,7 @@ func (e *Engine) TestAlert(alertID int) error {
 	if provider == nil {
 		return fmt.Errorf("no provider for type %q", cfg.Type)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), alertSendTimeout)
+	ctx, cancel := context.WithTimeout(ctx, alertSendTimeout)
 	defer cancel()
 	err = provider.Send(ctx, "🧪 Test Alert", fmt.Sprintf("Test notification from uptop for channel '%s'.", cfg.Name))
 	if err != nil {

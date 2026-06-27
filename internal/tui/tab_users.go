@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"context"
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -114,15 +113,16 @@ func (m *Model) initUserHuhForm() tea.Cmd {
 func (m *Model) submitUserForm() tea.Cmd {
 	d := m.userFormData
 	st := m.store
+	ctx := m.ctx
 	id := m.editID
 	username, key, role := d.Username, d.PublicKey, d.Role
 	m.state = stateDashboard
 	if id > 0 {
 		return writeCmd("Update user", func() error {
-			return st.UpdateUser(context.Background(), id, username, key, role)
+			return st.UpdateUser(ctx, id, username, key, role)
 		})
 	}
 	return writeCmd("Add user", func() error {
-		return st.AddUser(context.Background(), username, key, role)
+		return st.AddUser(ctx, username, key, role)
 	})
 }

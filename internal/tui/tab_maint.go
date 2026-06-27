@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -254,9 +253,9 @@ func (m *Model) submitMaintForm() tea.Cmd {
 	}
 
 	st := m.store
+	ctx := m.ctx
 	m.state = stateDashboard
 	return writeCmd("Add maintenance window", func() error {
-		ctx := context.Background()
 		overlaps, _ := st.GetOverlappingMaintenanceWindows(ctx, mw.MonitorID, mw.StartTime, mw.EndTime)
 		if len(overlaps) > 0 {
 			_ = st.SaveLog(ctx, fmt.Sprintf("Overlap: new window %q overlaps with existing %q", mw.Title, overlaps[0].Title))

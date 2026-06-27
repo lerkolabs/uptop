@@ -175,6 +175,7 @@ type Model struct {
 	deleteName string
 	deleteTab  int
 
+	ctx        context.Context
 	collapsed  map[int]bool
 	store      store.Store
 	engine     *monitor.Engine
@@ -213,14 +214,14 @@ type Model struct {
 	version  string
 }
 
-func InitialModel(isAdmin bool, s store.Store, eng *monitor.Engine, version string) Model {
+func InitialModel(ctx context.Context, isAdmin bool, s store.Store, eng *monitor.Engine, version string) Model {
 	vpLogs := viewport.New(100, 20)
 	vpLogs.SetContent("Waiting for logs...")
 	z := zone.New()
 	spring := harmonica.NewSpring(harmonica.FPS(10), 6.0, 0.4)
-	collapsed := loadCollapsed(s)
+	collapsed := loadCollapsed(ctx, s)
 
-	themeName, _ := s.GetPreference(context.Background(), "theme")
+	themeName, _ := s.GetPreference(ctx, "theme")
 	theme := themeByName(themeName)
 	themeIdx := 0
 	for i, t := range themes {
@@ -230,9 +231,10 @@ func InitialModel(isAdmin bool, s store.Store, eng *monitor.Engine, version stri
 		}
 	}
 
-	detailPref, _ := s.GetPreference(context.Background(), "detail_open")
+	detailPref, _ := s.GetPreference(ctx, "detail_open")
 
 	return Model{
+		ctx:             ctx,
 		state:           stateDashboard,
 		logViewport:     vpLogs,
 		maxTableRows:    5,
