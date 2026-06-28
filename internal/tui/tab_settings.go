@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -18,11 +20,13 @@ func (m Model) viewSettingsTab() string {
 
 	var tabs []string
 	for i, name := range sections {
+		var rendered string
 		if i == m.settingsSection {
-			tabs = append(tabs, m.st.activeTab.Render(name))
+			rendered = m.st.activeTab.Render(name)
 		} else {
-			tabs = append(tabs, m.st.inactiveTab.Render(name))
+			rendered = m.st.inactiveTab.Render(name)
 		}
+		tabs = append(tabs, m.zones.Mark(fmt.Sprintf("section-%d", i), rendered))
 	}
 	header := lipgloss.JoinHorizontal(lipgloss.Top, tabs...)
 

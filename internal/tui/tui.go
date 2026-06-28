@@ -197,6 +197,7 @@ type Model struct {
 	lastTabLoad        time.Time // last dispatch of loadTabDataCmd (throttle)
 	tabSeq             int       // seq of the newest issued tab-data load
 
+	logsOpen            bool
 	detailOpen          bool
 	detailChanges       []models.StateChange
 	detailChangesSiteID int
@@ -247,6 +248,7 @@ func InitialModel(ctx context.Context, isAdmin bool, s store.Store, eng *monitor
 		theme:           theme,
 		themeIndex:      themeIdx,
 		st:              newStyles(theme),
+		logsOpen:        true,
 		detailOpen:      detailPref == "true",
 		demoMode:        os.Getenv("UPTOP_DEMO") == "1",
 		version:         version,

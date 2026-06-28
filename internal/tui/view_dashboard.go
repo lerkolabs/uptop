@@ -92,6 +92,8 @@ func (m Model) View() string {
 		return ""
 	case stateDetail:
 		return m.zones.Scan(m.viewDetailPanel())
+	case stateLogs:
+		return m.viewLogsFullscreen()
 	case stateHistory:
 		return m.viewHistoryPanel()
 	case stateSLA:
@@ -152,7 +154,7 @@ func (m Model) viewDashboard() string {
 	var content string
 	switch m.currentTab {
 	case tabMonitors:
-		showSidebar := m.termWidth >= wideBreakpoint
+		showSidebar := m.termWidth >= wideBreakpoint && m.logsOpen
 		if showSidebar {
 			availW := m.termWidth - chromePadH
 			leftW := availW * 70 / 100
@@ -310,7 +312,7 @@ func (m Model) renderFooter(stats dashboardStats) string {
 	switch m.currentTab {
 	case tabMonitors:
 		if m.focusedPanel == panelLogs {
-			keys = "[↑/↓]Scroll [l/Esc]Back [T]Theme [q]Quit"
+			keys = "[↑/↓]Scroll [Enter]Expand [l/Esc]Back [T]Theme [q]Quit"
 		} else if m.detailOpen {
 			keys = "[i]Close [Enter]Expand [h]History [s]SLA [e]Edit [l]Logs [↑/↓]Select [T]Theme [q]Quit"
 		} else {

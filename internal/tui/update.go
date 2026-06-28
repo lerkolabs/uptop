@@ -53,6 +53,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.state == stateFormSite || m.state == stateFormAlert || m.state == stateFormUser || m.state == stateFormMaint {
 		return m.handleFormMsg(msg)
 	}
+	if m.state == stateLogs {
+		return m.handleLogsFullscreen(msg)
+	}
 
 	switch msg := msg.(type) {
 	case tea.MouseMsg:
@@ -239,6 +242,40 @@ func (m *Model) testAlertCmd(id int, name string) tea.Cmd {
 		}
 		return nil
 	}
+}
+
+func (m *Model) handleLogsFullscreen(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "esc", "q":
+			m.state = stateDashboard
+			m.focusedPanel = panelLogs
+		case "ctrl+c":
+			return m, tea.Quit
+		case "f":
+			m.logFilterImportant = !m.logFilterImportant
+			m.refreshLogContent()
+		case "up", "k":
+			m.logViewport.ScrollUp(1)
+		case "down", "j":
+			m.logViewport.ScrollDown(1)
+		case "pgup":
+			m.logViewport.ScrollUp(m.logViewport.Height)
+		case "pgdown":
+			m.logViewport.ScrollDown(m.logViewport.Height)
+		}
+	case tea.MouseMsg:
+		switch msg.Button {
+		case tea.MouseButtonWheelUp:
+			m.logViewport.ScrollUp(3)
+		case tea.MouseButtonWheelDown:
+			m.logViewport.ScrollDown(3)
+		}
+	case tickMsg:
+		m.refreshLogContent()
+	}
+	return m, nil
 }
 
 func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
@@ -579,10 +616,13 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.switchSettingsSection(m.settingsSection + 1)
 		case tabMonitors:
 			if m.focusedPanel == panelLogs {
+				m.logsOpen = false
 				m.focusedPanel = panelMonitors
 			} else {
+				m.logsOpen = true
 				m.focusedPanel = panelLogs
 			}
+			m.recalcLayout()
 		}
 	case "up", "k":
 		if m.currentTab == tabMonitors && m.focusedPanel == panelLogs {
@@ -618,6 +658,12 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "n":
 		return m.handleNewItem()
 	case "enter":
+		if m.currentTab == tabMonitors && m.focusedPanel == panelLogs {
+			m.refreshLogContent()
+			m.logViewport.GotoTop()
+			m.state = stateLogs
+			return m, nil
+		}
 		if m.currentTab == tabMonitors && len(m.sites) > 0 {
 			m.state = stateDetail
 			return m, m.loadDetailCmd(m.sites[m.cursor].ID)
@@ -840,7 +886,41 @@ func (m *Model) handleClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	if m.currentTab == tabSettings {
+		maxSec := 1
+		if m.isAdmin {
+			maxSec = 2
+		}
+		for i := 0; i <= maxSec; i++ {
+			if m.zones.Get(fmt.Sprintf("section-%d", i)).InBounds(msg) {
+				m.switchSettingsSection(i)
+				return m, nil
+			}
+		}
+	}
+
 	if m.currentTab == tabMonitors {
+		sortZones := []struct {
+			zone string
+			col  int
+		}{
+			{"sort-status", sortStatus},
+			{"sort-name", sortName},
+			{"sort-latency", sortLatency},
+		}
+		for _, sz := range sortZones {
+			if m.zones.Get(sz.zone).InBounds(msg) {
+				if m.sortColumn == sz.col {
+					m.sortAsc = !m.sortAsc
+				} else {
+					m.sortColumn = sz.col
+					m.sortAsc = false
+				}
+				m.refreshLive()
+				return m, nil
+			}
+		}
+
 		if m.zones.Get("panel-monitors").InBounds(msg) {
 			m.focusedPanel = panelMonitors
 		} else if m.zones.Get("panel-logs").InBounds(msg) {

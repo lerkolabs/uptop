@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type logSeverity int
@@ -70,6 +71,23 @@ func (m Model) renderLogLine(entry models.LogEntry) string {
 	tag := m.renderLogTag(sev)
 	ts := m.st.subtleStyle.Render(entry.CreatedAt.Local().Format("01/02 15:04"))
 	return fmt.Sprintf("  %s  %s  %s", ts, tag, entry.Message)
+}
+
+func (m Model) viewLogsFullscreen() string {
+	header := m.st.subtleStyle.Render("  Logs") + "\n" + m.divider()
+
+	filterLabel := m.st.subtleStyle.Render("[f] All")
+	if m.logFilterImportant {
+		filterLabel = m.st.subtleStyle.Render("[f] Important only")
+	}
+	countLabel := m.st.subtleStyle.Render(fmt.Sprintf("%d/%d", m.logShown, m.logTotal))
+	footer := m.divider() + "\n  " + m.st.subtleStyle.Render("[Esc] Back") + "  " + filterLabel + "  " + countLabel
+
+	m.logViewport.Width = m.termWidth - chromePadH
+	m.logViewport.Height = m.termHeight - 8
+
+	return lipgloss.NewStyle().Padding(1, 2).Render(
+		header + "\n" + m.logViewport.View() + "\n" + footer)
 }
 
 func (m *Model) refreshLogContent() {

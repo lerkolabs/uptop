@@ -110,6 +110,11 @@ func (m Model) computeLayout() tableLayout {
 		sortName:    colName,
 		sortLatency: colLatency,
 	}
+	sortableKeys := map[colKey]string{
+		colStatus:  "sort-status",
+		colName:    "sort-name",
+		colLatency: "sort-latency",
+	}
 	if sortedKey, ok := sortColMap[m.sortColumn]; ok {
 		arrow := "▼"
 		if m.sortAsc {
@@ -120,6 +125,11 @@ func (m Model) computeLayout() tableLayout {
 				headers[i] = headers[i] + arrow
 				break
 			}
+		}
+	}
+	for i, k := range active {
+		if zoneID, ok := sortableKeys[k]; ok {
+			headers[i] = m.zones.Mark(zoneID, headers[i])
 		}
 	}
 
