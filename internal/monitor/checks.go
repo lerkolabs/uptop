@@ -239,10 +239,24 @@ func (e *Engine) checkGroup(_ context.Context, site models.Site) {
 		status = models.StatusPending
 	}
 
+	var prev models.Status
 	e.applyState(site.ID, func(s *models.Site) {
+		prev = s.Status
 		s.Status = status
+		if status != prev && prev != models.StatusPending {
+			s.StatusChangedAt = time.Now()
+		}
 	})
 	e.recordCheck(site.ID, 0, !status.IsBroken())
+
+	if status != prev && prev != models.StatusPending {
+		e.enqueueWrite(writeStateChange{siteID: site.ID, fromStatus: string(prev), toStatus: string(status)})
+		if status.IsBroken() {
+			e.AddLog(fmt.Sprintf("Group '%s' is %s", site.Name, status))
+		} else if prev.IsBroken() {
+			e.AddLog(fmt.Sprintf("Group '%s' recovered", site.Name))
+		}
+	}
 }
 
 func (e *Engine) EnqueueProbeCheck(siteID int, nodeID string, latencyNs int64, isUp bool) {

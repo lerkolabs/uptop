@@ -445,6 +445,136 @@ func TestEngineStop_Idempotent(t *testing.T) {
 	e.Stop() // must not panic or block
 }
 
+// --- Group 11: Group State History ---
+
+func TestCheckGroup_SavesStateChange(t *testing.T) {
+	ms := newMockStore()
+	e := newTestEngine(ms)
+
+	group := models.Site{
+		SiteConfig: models.SiteConfig{ID: 100, Name: "Infra", Type: "group"},
+		SiteState:  models.SiteState{Status: models.StatusUp},
+	}
+	child := models.Site{
+		SiteConfig: models.SiteConfig{ID: 101, Name: "Server", Type: "ping", ParentID: 100},
+		SiteState:  models.SiteState{Status: models.StatusUp},
+	}
+	injectSite(e, group)
+	injectSite(e, child)
+
+	// Child goes down → group should transition UP→DOWN.
+	child.Status = models.StatusDown
+	injectSite(e, child)
+	e.checkGroup(context.Background(), group)
+
+	s, ok := getSite(e, 100)
+	if !ok {
+		t.Fatal("group not found")
+	}
+	if s.Status != models.StatusDown {
+		t.Errorf("expected DOWN, got %s", s.Status)
+	}
+	if s.StatusChangedAt.IsZero() {
+		t.Error("expected StatusChangedAt to be set")
+	}
+
+	logs := e.GetLogs()
+	found := false
+	for _, l := range logs {
+		if containsStr(l.Message, "Group 'Infra' is DOWN") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected log entry for group state change")
+	}
+
+	// Drain the write channel to verify a state change was enqueued.
+	select {
+	case w := <-e.dbWrites:
+		if w.desc() != "state-change" {
+			// Could be a check write; try one more.
+			select {
+			case w2 := <-e.dbWrites:
+				if w2.desc() != "state-change" {
+					t.Errorf("expected state-change write, got %s then %s", w.desc(), w2.desc())
+				}
+			default:
+				t.Errorf("expected state-change write, got only %s", w.desc())
+			}
+		}
+	default:
+		t.Error("no write enqueued for group state change")
+	}
+}
+
+func TestCheckGroup_NoChangeNoWrite(t *testing.T) {
+	ms := newMockStore()
+	e := newTestEngine(ms)
+
+	group := models.Site{
+		SiteConfig: models.SiteConfig{ID: 100, Name: "Infra", Type: "group"},
+		SiteState:  models.SiteState{Status: models.StatusUp},
+	}
+	child := models.Site{
+		SiteConfig: models.SiteConfig{ID: 101, Name: "Server", Type: "ping", ParentID: 100},
+		SiteState:  models.SiteState{Status: models.StatusUp},
+	}
+	injectSite(e, group)
+	injectSite(e, child)
+
+	e.checkGroup(context.Background(), group)
+
+	// Only a check write should be enqueued, no state-change.
+	drainCount := 0
+	for {
+		select {
+		case w := <-e.dbWrites:
+			if w.desc() == "state-change" {
+				t.Error("state-change write enqueued when status didn't change")
+			}
+			drainCount++
+		default:
+			goto done
+		}
+	}
+done:
+	if drainCount == 0 {
+		t.Error("expected at least a check write")
+	}
+}
+
+func TestCheckGroup_RecoveryLog(t *testing.T) {
+	ms := newMockStore()
+	e := newTestEngine(ms)
+
+	group := models.Site{
+		SiteConfig: models.SiteConfig{ID: 100, Name: "Infra", Type: "group"},
+		SiteState:  models.SiteState{Status: models.StatusDown},
+	}
+	child := models.Site{
+		SiteConfig: models.SiteConfig{ID: 101, Name: "Server", Type: "ping", ParentID: 100},
+		SiteState:  models.SiteState{Status: models.StatusUp},
+	}
+	injectSite(e, group)
+	injectSite(e, child)
+
+	e.checkGroup(context.Background(), group)
+
+	logs := e.GetLogs()
+	found := false
+	for _, l := range logs {
+		if containsStr(l.Message, "Group 'Infra' recovered") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected recovery log entry for group")
+	}
+}
+
 // --- Utilities ---
 
 func containsStr(s, substr string) bool {
