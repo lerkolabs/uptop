@@ -283,8 +283,6 @@ func (e *Engine) Start(ctx context.Context) {
 			default:
 			}
 
-			e.refreshMaintenanceCache(ctx)
-
 			configs, err := e.db.GetSites(ctx)
 			if err != nil {
 				e.AddLog(fmt.Sprintf("Failed to load sites: %v", err))
@@ -326,6 +324,10 @@ func (e *Engine) Start(ctx context.Context) {
 					e.UpdateSiteConfig(cfg)
 				}
 			}
+
+			// Refresh after sites load so the cache covers newly added sites.
+			// On first iteration liveState was empty before the loop above.
+			e.refreshMaintenanceCache(ctx)
 
 			e.mu.RLock()
 			var vanished []int
