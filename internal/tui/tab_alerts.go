@@ -223,7 +223,72 @@ func (m Model) viewAlertsTab() string {
 	summary := fmt.Sprintf("%d channels · %d types · %d sent · %d %s",
 		len(m.alerts), len(types), totalSent, totalFail, failLabel)
 
-	return tbl + "\n  " + m.st.subtleStyle.Render(summary)
+	var detail string
+	if m.cursor < len(m.alerts) {
+		a := m.alerts[m.cursor]
+		h := m.engine.GetAlertHealth(a.ID)
+		detail = m.alertSelectedDetail(a, h)
+	}
+
+	return tbl + "\n  " + detail + "\n  " + m.st.subtleStyle.Render(summary)
+}
+
+func (m Model) alertSelectedDetail(a models.AlertConfig, h monitor.AlertHealth) string {
+	dot := m.st.subtleStyle.Render("  ·  ")
+	label := m.st.subtleStyle
+
+	parts := []string{fmtAlertType(a.Type)}
+	parts = append(parts, m.fmtAlertConfigFull(a))
+
+	if !h.LastSendAt.IsZero() {
+		if h.LastSendOK {
+			parts = append(parts, m.st.specialStyle.Render("●")+" "+label.Render("sent")+" "+m.fmtTimeAgo(h.LastSendAt))
+		} else {
+			parts = append(parts, m.st.dangerStyle.Render("●")+" "+label.Render("failed")+" "+m.fmtTimeAgo(h.LastSendAt))
+		}
+	}
+	if h.SendCount > 0 {
+		parts = append(parts, label.Render(fmt.Sprintf("%d sent, %d failed", h.SendCount, h.FailCount)))
+	}
+
+	return strings.Join(parts, dot)
+}
+
+func (m Model) fmtAlertConfigFull(alert models.AlertConfig) string {
+	switch alert.Type {
+	case "email":
+		host := alert.Settings["host"]
+		to := alert.Settings["to"]
+		if host != "" && to != "" {
+			return fmt.Sprintf("%s → %s", host, to)
+		}
+		if host != "" {
+			return host
+		}
+		return m.st.subtleStyle.Render("—")
+	case "ntfy":
+		topic := alert.Settings["topic"]
+		url := alert.Settings["url"]
+		if url != "" && topic != "" {
+			return fmt.Sprintf("%s/%s", url, topic)
+		}
+		return m.st.subtleStyle.Render("—")
+	case "telegram":
+		if id := alert.Settings["chat_id"]; id != "" {
+			return fmt.Sprintf("chat:%s", id)
+		}
+		return m.st.subtleStyle.Render("—")
+	case "gotify":
+		if url := alert.Settings["url"]; url != "" {
+			return url
+		}
+		return m.st.subtleStyle.Render("—")
+	default:
+		if val, ok := alert.Settings["url"]; ok && val != "" {
+			return maskWebhookURL(val)
+		}
+		return m.st.subtleStyle.Render("—")
+	}
 }
 
 func (m Model) viewAlertDetailPanel() string {
