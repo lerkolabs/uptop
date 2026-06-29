@@ -85,12 +85,6 @@ const (
 )
 
 const (
-	tabMonitors = 0
-	tabMaint    = 1
-	tabSettings = 2
-)
-
-const (
 	sectionAlerts = 0
 	sectionNodes  = 1
 	sectionUsers  = 2
@@ -100,6 +94,7 @@ const (
 	panelMonitors = 0
 	panelLogs     = 1
 	panelDetail   = 2
+	panelMaint    = 3
 )
 
 const (
@@ -114,7 +109,6 @@ type sessionState int
 const (
 	stateDashboard sessionState = iota
 	stateLogs
-	stateUsers
 	stateDetail
 	stateAlertDetail
 	stateFormSite
@@ -124,12 +118,16 @@ const (
 	stateFormMaint
 	stateHistory
 	stateSLA
+	stateSettings
+	stateMaintDetail
 )
 
 type Model struct {
 	state           sessionState
-	currentTab      int
+	returnState     sessionState
 	settingsSection int
+	settingsCursor  int
+	settingsOffset  int
 	cursor          int
 	selectedID      int
 	sortColumn      int
@@ -173,7 +171,9 @@ type Model struct {
 
 	deleteID   int
 	deleteName string
-	deleteTab  int
+	deleteKind string
+
+	maintDetailID int
 
 	ctx        context.Context
 	collapsed  map[int]bool
@@ -199,6 +199,9 @@ type Model struct {
 
 	logsOpen            bool
 	detailOpen          bool
+	maintOpen           bool
+	maintCursor         int
+	maintOffset         int
 	detailChanges       []models.StateChange
 	detailChangesSiteID int
 	detailDailyDays     []monitor.DayReport

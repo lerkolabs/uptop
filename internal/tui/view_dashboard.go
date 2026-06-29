@@ -47,16 +47,13 @@ func (m Model) View() string {
 	switch m.state {
 	case stateConfirmDelete:
 		kind := "monitor"
-		switch m.deleteTab {
-		case tabMaint:
+		switch m.deleteKind {
+		case "maint":
 			kind = "maintenance window"
-		case tabSettings:
-			switch m.settingsSection {
-			case sectionAlerts:
-				kind = "alert"
-			case sectionUsers:
-				kind = "user"
-			}
+		case "alert":
+			kind = "alert"
+		case "user":
+			kind = "user"
 		}
 		msg := m.st.dangerStyle.Render(fmt.Sprintf("Delete %s \"%s\"?", kind, m.deleteName))
 		hint := m.st.subtleStyle.Render("[y] Confirm  [n] Cancel")
@@ -103,6 +100,10 @@ func (m Model) View() string {
 		return m.viewSLAPanel()
 	case stateAlertDetail:
 		return m.viewAlertDetailPanel()
+	case stateSettings:
+		return m.viewSettingsOverlay()
+	case stateMaintDetail:
+		return m.viewMaintDetailPanel()
 	default:
 		return m.zones.Scan(m.viewDashboard())
 	}
@@ -148,63 +149,68 @@ func (m Model) computeStats() dashboardStats {
 	return s
 }
 
+const maintSidebarW = 22
+
+func (m Model) viewMonitorsLayout() string {
+	availW := m.termWidth - chromePadH
+	wide := m.termWidth >= wideBreakpoint
+
+	showMaint := m.maintOpen && wide
+	showLogs := m.logsOpen && wide
+
+	var maintW, logsW, monW int
+	if showMaint {
+		maintW = maintSidebarW
+		if maintW > availW/4 {
+			maintW = availW / 4
+		}
+	}
+	remaining := availW - maintW
+	if showLogs {
+		monW = remaining * 70 / 100
+		logsW = remaining - monW
+	} else {
+		monW = remaining
+	}
+
+	m.contentWidth = monW - 2
+
+	monitors := m.viewSitesTab()
+	monPanel := m.zones.Mark("panel-monitors", m.titledPanel("Monitors", monitors, monW, m.focusedPanel == panelMonitors))
+
+	var topParts []string
+	if showMaint {
+		sidebar := m.viewMaintSidebar(maintW-2, m.maxTableRows)
+		maintPanel := m.zones.Mark("panel-maint", m.titledPanel("Maint", sidebar, maintW, m.focusedPanel == panelMaint))
+		topParts = append(topParts, maintPanel)
+	}
+	topParts = append(topParts, monPanel)
+	if showLogs {
+		logContent := m.viewLogsSidebar(logsW-2, m.maxTableRows)
+		logPanel := m.zones.Mark("panel-logs", m.titledPanel("Logs", logContent, logsW, m.focusedPanel == panelLogs))
+		topParts = append(topParts, logPanel)
+	}
+
+	top := lipgloss.JoinHorizontal(lipgloss.Top, topParts...)
+
+	if m.detailOpen {
+		site := ""
+		if m.cursor < len(m.sites) {
+			site = m.sites[m.cursor].Name
+		}
+		detail := m.viewDetailInline(availW - 2)
+		detailPanel := m.zones.Mark("panel-detail", m.titledPanel(site, detail, availW, m.focusedPanel == panelDetail))
+		return top + "\n" + detailPanel
+	}
+	return top
+}
+
 func (m Model) viewDashboard() string {
 	stats := m.computeStats()
 
-	header := m.renderTabBar(stats)
-	header = m.pulseIndicator() + " " + header
+	header := m.renderStatusLine(stats)
 
-	var content string
-	switch m.currentTab {
-	case tabMonitors:
-		showSidebar := m.termWidth >= wideBreakpoint && m.logsOpen
-		if showSidebar {
-			availW := m.termWidth - chromePadH
-			leftW := availW * 70 / 100
-			rightW := availW - leftW
-			m.contentWidth = leftW - 2
-			monitors := m.viewSitesTab()
-			monPanel := m.zones.Mark("panel-monitors", m.titledPanel("Monitors", monitors, leftW, m.focusedPanel == panelMonitors))
-			sidebarContent := m.viewLogsSidebar(rightW-2, m.maxTableRows)
-			logPanel := m.zones.Mark("panel-logs", m.titledPanel("Logs", sidebarContent, rightW, m.focusedPanel == panelLogs))
-			top := lipgloss.JoinHorizontal(lipgloss.Top, monPanel, logPanel)
-			if m.detailOpen {
-				site := ""
-				if m.cursor < len(m.sites) {
-					site = m.sites[m.cursor].Name
-				}
-				detail := m.viewDetailInline(availW - 2)
-				detailPanel := m.zones.Mark("panel-detail", m.titledPanel(site, detail, availW, m.focusedPanel == panelDetail))
-				content = top + "\n" + detailPanel
-			} else {
-				content = top
-			}
-		} else {
-			m.contentWidth = m.termWidth - 2
-			monitors := m.viewSitesTab()
-			availW := m.termWidth - chromePadH
-			monPanel := m.zones.Mark("panel-monitors", m.titledPanel("Monitors", monitors, availW, m.focusedPanel == panelMonitors))
-			if m.detailOpen {
-				site := ""
-				if m.cursor < len(m.sites) {
-					site = m.sites[m.cursor].Name
-				}
-				detail := m.viewDetailInline(availW - 2)
-				detailPanel := m.zones.Mark("panel-detail", m.titledPanel(site, detail, availW, m.focusedPanel == panelDetail))
-				content = monPanel + "\n" + detailPanel
-			} else {
-				content = monPanel
-			}
-		}
-	case tabMaint:
-		m.contentWidth = m.termWidth
-		availW := m.termWidth - chromePadH
-		content = m.titledPanel("Maintenance", m.viewMaintTab(), availW, true)
-	case tabSettings:
-		m.contentWidth = m.termWidth
-		availW := m.termWidth - chromePadH
-		content = m.titledPanel("Settings", m.viewSettingsTab(), availW, true)
-	}
+	content := m.viewMonitorsLayout()
 
 	content = strings.TrimSpace(content)
 	footer := m.renderFooter(stats)
@@ -216,74 +222,17 @@ func (m Model) viewDashboard() string {
 		availHeight = 5
 	}
 
-	divW := m.termWidth - chromePadH
-	if divW < 40 {
-		divW = 40
-	}
-	tabDivider := m.st.subtleStyle.Render(strings.Repeat("─", divW))
-
-	contentHeight := availHeight - lipgloss.Height(header) - 1 - lipgloss.Height(footer)
+	contentHeight := availHeight - lipgloss.Height(header) - lipgloss.Height(footer)
 	if contentHeight < 1 {
 		contentHeight = 1
 	}
 	paddedContent := lipgloss.NewStyle().Height(contentHeight).MaxHeight(contentHeight).Render(content)
 
-	return outerPad.Render(lipgloss.JoinVertical(lipgloss.Top, header, tabDivider, paddedContent, footer))
+	return outerPad.Render(lipgloss.JoinVertical(lipgloss.Top, header, paddedContent, footer))
 }
 
-type tabEntry struct {
-	name  string
-	count int
-	warn  int
-}
-
-func (m Model) renderTabBar(stats dashboardStats) string {
-	settingsCount := len(m.alerts) + len(m.nodes)
-	settingsWarn := stats.offlineNodes
-	for _, a := range m.alerts {
-		h := m.engine.GetAlertHealth(a.ID)
-		if !h.LastSendOK && !h.LastSendAt.IsZero() {
-			settingsWarn++
-		}
-	}
-	if m.isAdmin {
-		settingsCount += len(m.users)
-	}
-	tabs := []tabEntry{
-		{"Monitors", stats.totalMonitors, stats.downCount + stats.lateCount},
-		{"Maint", len(m.maintenanceWindows), stats.activeMaint},
-		{"Settings", settingsCount, settingsWarn},
-	}
-
-	countStyle := lipgloss.NewStyle().Foreground(m.theme.Muted)
-
-	var renderedTabs []string
-	for i, t := range tabs {
-		label := t.name
-		if t.count > 0 {
-			badge := countStyle.Render(fmt.Sprintf(" %d", t.count))
-			if t.warn > 0 {
-				badge = m.st.dangerStyle.Render(fmt.Sprintf(" %d", t.warn))
-			}
-			label += badge
-		}
-
-		var rendered string
-		if i == m.currentTab {
-			rendered = m.st.activeTab.Render(label)
-		} else {
-			rendered = m.st.inactiveTab.Render(label)
-		}
-		renderedTabs = append(renderedTabs, m.zones.Mark(fmt.Sprintf("tab-%d", i), rendered))
-	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs...)
-}
-
-func (m Model) renderFooter(stats dashboardStats) string {
-	if m.filterMode {
-		cursor := lipgloss.NewStyle().Foreground(m.theme.Accent).Render("│")
-		return "\n" + m.st.titleStyle.Render("/") + " " + m.filterText + cursor + "  " + m.st.subtleStyle.Render("[Enter]Apply [Esc]Clear")
-	}
+func (m Model) renderStatusLine(stats dashboardStats) string {
+	dot := m.st.subtleStyle.Render(" · ")
 
 	upCount := stats.totalMonitors - stats.downCount - stats.lateCount
 	var upStr string
@@ -294,9 +243,14 @@ func (m Model) renderFooter(stats dashboardStats) string {
 	} else {
 		upStr = m.st.specialStyle.Render(fmt.Sprintf("%d/%d UP", upCount, stats.totalMonitors))
 	}
-	statusParts := []string{upStr}
+
+	parts := []string{m.pulseIndicator() + " " + upStr}
+
 	if stats.lateCount > 0 {
-		statusParts = append(statusParts, m.st.warnStyle.Render(fmt.Sprintf("%d LATE", stats.lateCount)))
+		parts = append(parts, m.st.warnStyle.Render(fmt.Sprintf("%d late", stats.lateCount)))
+	}
+	if stats.activeMaint > 0 {
+		parts = append(parts, m.st.maintStyle.Render(fmt.Sprintf("%d maint", stats.activeMaint)))
 	}
 	if len(m.nodes) > 0 {
 		online := 0
@@ -305,48 +259,45 @@ func (m Model) renderFooter(stats dashboardStats) string {
 				online++
 			}
 		}
-		probeLabel := "probes"
+		label := "probes"
 		if online == 1 {
-			probeLabel = "probe"
+			label = "probe"
 		}
-		statusParts = append(statusParts, fmt.Sprintf("%d %s", online, probeLabel))
+		parts = append(parts, fmt.Sprintf("%d %s", online, label))
 	}
-	statusLine := strings.Join(statusParts, m.st.subtleStyle.Render(" · "))
+
+	left := strings.Join(parts, dot)
+	ver := m.st.subtleStyle.Render("v" + m.version)
+
+	padW := m.termWidth - chromePadH - lipgloss.Width(left) - lipgloss.Width(ver)
+	if padW < 2 {
+		padW = 2
+	}
+
+	return left + strings.Repeat(" ", padW) + ver
+}
+
+func (m Model) renderFooter(_ dashboardStats) string {
+	if m.filterMode {
+		cursor := lipgloss.NewStyle().Foreground(m.theme.Accent).Render("│")
+		return "\n" + m.st.titleStyle.Render("/") + " " + m.filterText + cursor + "  " + m.st.subtleStyle.Render("[Enter]Apply [Esc]Clear")
+	}
 
 	var keys string
-	switch m.currentTab {
-	case tabMonitors:
-		if m.focusedPanel == panelLogs {
-			keys = "[↑/↓]Scroll [Enter]Expand [l/Esc]Back [T]Theme [q]Quit"
-		} else if m.detailOpen {
-			keys = "[i]Close [Enter]Expand [h]History [s]SLA [e]Edit [l]Logs [↑/↓]Select [T]Theme [q]Quit"
-		} else {
-			keys = "[/]Filter [i]Info [Enter]Detail [</>]Sort [r]Reverse [n]New [e]Edit [d]Del [l]Logs [T]Theme [Tab]Switch [q]Quit"
-		}
-	case tabMaint:
-		keys = "[n]New [x]End [d]Del [T]Theme [Tab]Switch [q]Quit"
-	case tabSettings:
-		switch m.settingsSection {
-		case sectionAlerts:
-			keys = "[n]New [e]Edit [i]Info [d]Del [t]Test [←/→]Section [T]Theme [Tab]Switch [q]Quit"
-		case sectionUsers:
-			keys = "[n]Add [d]Revoke [←/→]Section [T]Theme [Tab]Switch [q]Quit"
-		default:
-			keys = "[←/→]Section [T]Theme [Tab]Switch [q]Quit"
-		}
-	default:
-		keys = "[T]Theme [Tab]Switch [q]Quit"
+	if m.focusedPanel == panelMaint {
+		keys = "[n]New [x]End [d]Del [Esc]Back [S]Settings [T]Theme [q]Quit"
+	} else if m.focusedPanel == panelLogs {
+		keys = "[↑/↓]Scroll [Enter]Expand [l/Esc]Back [S]Settings [T]Theme [q]Quit"
+	} else if m.detailOpen {
+		keys = "[i]Close [Enter]Expand [h]History [s]SLA [e]Edit [m]Maint [l]Logs [S]Settings [T]Theme [q]Quit"
+	} else {
+		keys = "[/]Filter [i]Info [Enter]Detail [n]New [e]Edit [d]Del [m]Maint [l]Logs [S]Settings [T]Theme [q]Quit"
 	}
 
-	ver := m.st.subtleStyle.Render("v" + m.version)
-	line := statusLine + "  " + m.st.subtleStyle.Render(keys) + "  " + ver
-	if m.filterText != "" && m.currentTab == tabMonitors {
-		line = m.st.subtleStyle.Render(fmt.Sprintf("filter: %s", m.filterText)) + "  " + statusLine + "  " + m.st.subtleStyle.Render(keys) + "  " + ver
+	line := m.st.subtleStyle.Render(keys)
+	if m.filterText != "" {
+		line = m.st.subtleStyle.Render(fmt.Sprintf("filter: %s  ", m.filterText)) + line
 	}
 
-	divW := m.termWidth - chromePadH
-	if divW < 40 {
-		divW = 40
-	}
-	return m.st.subtleStyle.Render(strings.Repeat("─", divW)) + "\n" + line
+	return "\n" + line
 }

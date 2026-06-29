@@ -292,10 +292,14 @@ func (m Model) fmtAlertConfigFull(alert models.AlertConfig) string {
 }
 
 func (m Model) viewAlertDetailPanel() string {
-	if m.cursor >= len(m.alerts) {
+	idx := m.cursor
+	if m.returnState == stateSettings {
+		idx = m.settingsCursor
+	}
+	if idx >= len(m.alerts) {
 		return ""
 	}
-	a := m.alerts[m.cursor]
+	a := m.alerts[idx]
 	h := m.engine.GetAlertHealth(a.ID)
 
 	var b strings.Builder
@@ -604,7 +608,12 @@ func (m *Model) submitAlertForm() tea.Cmd {
 	ctx := m.ctx
 	id := m.editID
 	name, aType := d.Name, d.AlertType
-	m.state = stateDashboard
+	if m.returnState == stateSettings {
+		m.state = stateSettings
+	} else {
+		m.state = stateDashboard
+	}
+	m.returnState = 0
 	if id > 0 {
 		return writeCmd("Update alert", func() error {
 			return st.UpdateAlert(ctx, id, name, aType, settings)

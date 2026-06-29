@@ -266,7 +266,7 @@ func TestConfirmDelete_WritesOffUIGoroutine(t *testing.T) {
 	m := newTestModel(ms)
 	m.sites = []models.Site{{SiteConfig: models.SiteConfig{ID: 4, Name: "s"}}}
 	m.state = stateConfirmDelete
-	m.deleteTab = 0
+	m.deleteKind = "site"
 	m.deleteID = 4
 
 	updated, cmd := (&m).handleConfirmDelete(keyMsg("y"))

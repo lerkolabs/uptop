@@ -50,3 +50,7 @@ func max(a, b int) int {
 	}
 	return b
 }
+
+func placeOverlay(fg string, termW, termH int) string {
+	return lipgloss.Place(termW, termH, lipgloss.Center, lipgloss.Center, fg)
+}

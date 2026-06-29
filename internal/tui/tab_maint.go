@@ -20,50 +20,6 @@ type maintFormData struct {
 	CustomHours string
 }
 
-func (m Model) fmtMaintStatus(mw models.MaintenanceWindow) string {
-	now := time.Now()
-	if mw.StartTime.After(now) {
-		return m.st.warnStyle.Render("SCHEDULED")
-	}
-	if !mw.EndTime.IsZero() && mw.EndTime.Before(now) {
-		return m.st.subtleStyle.Render("ENDED")
-	}
-	return m.st.specialStyle.Render("ACTIVE")
-}
-
-func (m Model) fmtMaintType(t string) string {
-	if t == "incident" {
-		return m.st.dangerStyle.Render("incident")
-	}
-	return m.st.maintStyle.Render("maintenance")
-}
-
-func fmtMaintMonitorW(monitorID int, sites []models.Site, maxW int) string {
-	if monitorID == 0 {
-		return "All"
-	}
-	for _, s := range sites {
-		if s.ID == monitorID {
-			return limitStr(s.Name, maxW)
-		}
-	}
-	return fmt.Sprintf("#%d", monitorID)
-}
-
-func (m Model) fmtMaintTime(t time.Time, colW int) string {
-	if t.IsZero() {
-		return m.st.subtleStyle.Render("—")
-	}
-	now := time.Now()
-	if t.Year() == now.Year() && t.YearDay() == now.YearDay() {
-		return t.Format("15:04")
-	}
-	if colW >= 14 {
-		return t.Format("15:04 Jan 02")
-	}
-	return t.Format("Jan 02")
-}
-
 func (m Model) isMonitorInMaintenance(monitorID int) bool {
 	for _, mw := range m.maintenanceWindows {
 		if mw.Type != "maintenance" {
@@ -86,64 +42,6 @@ func (m Model) isMonitorInMaintenance(monitorID int) bool {
 		}
 	}
 	return false
-}
-
-func (m Model) viewMaintTab() string {
-	if len(m.maintenanceWindows) == 0 {
-		return m.emptyState("No maintenance windows or incidents.", "[n] Create one")
-	}
-
-	var headers []string
-	var widths []int
-	if m.isWide() {
-		headers = []string{"#", "TITLE", "TYPE", "MONITORS", "STATUS", "STARTED", "ENDS"}
-		widths = []int{4, 24, 14, 22, 12, 16, 16}
-	} else {
-		headers = []string{"#", "TITLE", "TYPE", "MON", "ST", "START", "ENDS"}
-		widths = []int{4, 14, 13, 14, 11, 14, 14}
-	}
-	titleW := widths[1]
-	monW := widths[3]
-	timeW := widths[5]
-
-	tbl := m.renderTable(
-		headers,
-		len(m.maintenanceWindows),
-		func(start, end int) [][]string {
-			var rows [][]string
-			allSites := m.engine.GetAllSites()
-			for i := start; i < end; i++ {
-				mw := m.maintenanceWindows[i]
-				rows = append(rows, []string{
-					strconv.Itoa(i + 1),
-					m.zones.Mark(fmt.Sprintf("maint-%d", i), limitStr(mw.Title, titleW-2)),
-					m.fmtMaintType(mw.Type),
-					fmtMaintMonitorW(mw.MonitorID, allSites, monW-2),
-					m.fmtMaintStatus(mw),
-					m.fmtMaintTime(mw.StartTime, timeW),
-					m.fmtMaintTime(mw.EndTime, timeW),
-				})
-			}
-			return rows
-		},
-		widths,
-		nil,
-	)
-
-	now := time.Now()
-	var active, scheduled, ended int
-	for _, mw := range m.maintenanceWindows {
-		if mw.StartTime.After(now) {
-			scheduled++
-		} else if !mw.EndTime.IsZero() && mw.EndTime.Before(now) {
-			ended++
-		} else {
-			active++
-		}
-	}
-	summary := fmt.Sprintf("%d active · %d scheduled · %d ended", active, scheduled, ended)
-
-	return tbl + "\n  " + m.st.subtleStyle.Render(summary)
 }
 
 func (m *Model) initMaintHuhForm() tea.Cmd {

@@ -125,7 +125,7 @@ func (m *Model) refreshLive() {
 	m.sites = ordered
 	m.refreshLogContent()
 
-	if m.currentTab == tabMonitors && m.selectedID != 0 {
+	if m.selectedID != 0 {
 		for i, s := range m.sites {
 			if s.ID == m.selectedID {
 				m.cursor = i
@@ -137,7 +137,7 @@ func (m *Model) refreshLive() {
 }
 
 func (m *Model) syncSelectedID() {
-	if m.currentTab == tabMonitors && m.cursor < len(m.sites) {
+	if m.cursor < len(m.sites) {
 		m.selectedID = m.sites[m.cursor].ID
 	}
 }
