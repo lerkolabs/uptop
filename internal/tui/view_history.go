@@ -152,7 +152,7 @@ func (m Model) viewHistoryPanel() string {
 	var b strings.Builder
 
 	header := "  " + m.st.titleStyle.Render("STATE HISTORY: "+m.historySiteName)
-	header += "  " + m.st.subtleStyle.Render("[q] Back")
+	header += "  " + m.st.subtleStyle.Render("[q/Esc] Back")
 	b.WriteString(header + "\n")
 
 	divWidth := m.dividerWidth()

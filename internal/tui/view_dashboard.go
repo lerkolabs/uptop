@@ -48,12 +48,15 @@ func (m Model) View() string {
 	case stateConfirmDelete:
 		kind := "monitor"
 		switch m.deleteTab {
-		case 1:
-			kind = "alert"
-		case 4:
+		case tabMaint:
 			kind = "maintenance window"
-		case 5:
-			kind = "user"
+		case tabSettings:
+			switch m.settingsSection {
+			case sectionAlerts:
+				kind = "alert"
+			case sectionUsers:
+				kind = "user"
+			}
 		}
 		msg := m.st.dangerStyle.Render(fmt.Sprintf("Delete %s \"%s\"?", kind, m.deleteName))
 		hint := m.st.subtleStyle.Render("[y] Confirm  [n] Cancel")

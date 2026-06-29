@@ -49,13 +49,13 @@ func siteOrder(s models.Site) int {
 		return 3
 	}
 	switch s.Status {
-	case "DOWN", "SSL EXP":
+	case models.StatusDown, models.StatusSSLExp:
 		return 0
-	case "STALE":
+	case models.StatusStale:
 		return 1
-	case "LATE":
+	case models.StatusLate:
 		return 1
-	case "PENDING":
+	case models.StatusPending:
 		return 3
 	default:
 		return 2

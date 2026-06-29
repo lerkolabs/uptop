@@ -7,16 +7,10 @@ import (
 )
 
 func (m Model) viewSettingsTab() string {
-	maxSections := 2
-	if m.isAdmin {
-		maxSections = 3
-	}
-
 	sections := []string{"Alerts", "Nodes"}
 	if m.isAdmin {
 		sections = append(sections, "Users")
 	}
-	_ = maxSections
 
 	var tabs []string
 	for i, name := range sections {

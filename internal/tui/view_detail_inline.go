@@ -57,8 +57,7 @@ func (m Model) viewDetailTwoCol(site models.Site, hist monitor.SiteHistory, widt
 		b.WriteString(l + " " + divChar + " " + r + "\n")
 	}
 
-	keys := m.st.subtleStyle.Render("[h] History  [s] SLA  [e] Edit  [esc] Close")
-	b.WriteString("  " + keys + "\n")
+	b.WriteString("  " + m.detailKeys() + "\n")
 
 	return lipgloss.NewStyle().Width(width).MaxWidth(width).Render(b.String())
 }
@@ -293,10 +292,13 @@ func (m Model) viewDetailSingleCol(site models.Site, hist monitor.SiteHistory, w
 		b.WriteString("  " + m.st.subtleStyle.Render("30d") + " " + m.uptimeTimeline(m.detailDailyDays, timelineW) + "\n")
 	}
 
-	keys := m.st.subtleStyle.Render("[h] History  [s] SLA  [e] Edit  [esc] Close")
-	b.WriteString("  " + keys + "\n")
+	b.WriteString("  " + m.detailKeys() + "\n")
 
 	return lipgloss.NewStyle().Width(width).MaxWidth(width).Render(b.String())
+}
+
+func (m Model) detailKeys() string {
+	return m.st.subtleStyle.Render("[h] History  [s] SLA  [e] Edit  [q/Esc] Back")
 }
 
 func (m Model) fmtStatusWord(status string) string {

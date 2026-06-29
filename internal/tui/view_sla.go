@@ -25,7 +25,7 @@ func (m Model) viewSLAPanel() string {
 	var b strings.Builder
 
 	header := "  " + m.st.titleStyle.Render("SLA REPORT: "+m.slaSiteName)
-	header += "  " + m.st.subtleStyle.Render("[q] Back")
+	header += "  " + m.st.subtleStyle.Render("[q/Esc] Back")
 	b.WriteString(header + "\n")
 	b.WriteString(m.divider() + "\n")
 

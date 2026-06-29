@@ -81,7 +81,7 @@ func (m Model) viewLogsFullscreen() string {
 		filterLabel = m.st.subtleStyle.Render("[f] Important only")
 	}
 	countLabel := m.st.subtleStyle.Render(fmt.Sprintf("%d/%d", m.logShown, m.logTotal))
-	footer := m.divider() + "\n  " + m.st.subtleStyle.Render("[Esc] Back") + "  " + filterLabel + "  " + countLabel
+	footer := m.divider() + "\n  " + m.st.subtleStyle.Render("[q/Esc] Back") + "  " + filterLabel + "  " + countLabel
 
 	m.logViewport.Width = m.termWidth - chromePadH
 	m.logViewport.Height = m.termHeight - 8
