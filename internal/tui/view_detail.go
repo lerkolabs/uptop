@@ -68,7 +68,9 @@ func (m Model) viewDetailPanel() string {
 	if site.Port > 0 {
 		left = append(left, row("Port", strconv.Itoa(site.Port)))
 	}
-	left = append(left, row("Interval", fmt.Sprintf("%ds", site.Interval)))
+	if site.Interval > 0 {
+		left = append(left, row("Interval", fmt.Sprintf("%ds", site.Interval)))
+	}
 	if site.MaxRetries > 0 {
 		left = append(left, row("Retries", m.fmtRetries(site)))
 	}
@@ -212,64 +214,66 @@ func (m Model) viewDetailPanel() string {
 	}
 	bottomColW := graphW
 
-	// Left: latency + histogram
-	var graphLines []string
 	sectionLabel := func(title string) string {
 		return m.st.titleStyle.Render("  " + title)
 	}
 
-	graphLines = append(graphLines, sectionLabel("LATENCY"))
-	if site.Type == "push" {
-		sparkW := bottomColW - 4
-		if sparkW > detailSparkWidth {
-			sparkW = detailSparkWidth
-		}
-		graphLines = append(graphLines, "  "+m.heartbeatSparkline(hist.Statuses, sparkW, nil))
-		if len(hist.Statuses) > 0 {
-			up := 0
-			for _, s := range hist.Statuses {
-				if s {
-					up++
+	// Left: latency + histogram (skip for groups — they have no own checks)
+	var graphLines []string
+	if site.Type != "group" {
+		graphLines = append(graphLines, sectionLabel("LATENCY"))
+		if site.Type == "push" {
+			sparkW := bottomColW - 4
+			if sparkW > detailSparkWidth {
+				sparkW = detailSparkWidth
+			}
+			graphLines = append(graphLines, "  "+m.heartbeatSparkline(hist.Statuses, sparkW, nil))
+			if len(hist.Statuses) > 0 {
+				up := 0
+				for _, s := range hist.Statuses {
+					if s {
+						up++
+					}
 				}
+				graphLines = append(graphLines, fmt.Sprintf("  %s %d/%d checks up",
+					m.st.subtleStyle.Render("Heartbeats"), up, len(hist.Statuses)))
 			}
-			graphLines = append(graphLines, fmt.Sprintf("  %s %d/%d checks up",
-				m.st.subtleStyle.Render("Heartbeats"), up, len(hist.Statuses)))
-		}
-	} else {
-		sparkW := bottomColW - 4
-		if sparkW > detailSparkWidth {
-			sparkW = detailSparkWidth
-		}
-		graphLines = append(graphLines, "  "+m.latencySparkline(hist.Latencies, hist.Statuses, sparkW, nil))
-		var minL, maxL, total time.Duration
-		count := 0
-		for i, l := range hist.Latencies {
-			if i < len(hist.Statuses) && !hist.Statuses[i] {
-				continue
+		} else {
+			sparkW := bottomColW - 4
+			if sparkW > detailSparkWidth {
+				sparkW = detailSparkWidth
 			}
-			if count == 0 {
-				minL, maxL = l, l
-			} else if l < minL {
-				minL = l
-			} else if l > maxL {
-				maxL = l
+			graphLines = append(graphLines, "  "+m.latencySparkline(hist.Latencies, hist.Statuses, sparkW, nil))
+			var minL, maxL, total time.Duration
+			count := 0
+			for i, l := range hist.Latencies {
+				if i < len(hist.Statuses) && !hist.Statuses[i] {
+					continue
+				}
+				if count == 0 {
+					minL, maxL = l, l
+				} else if l < minL {
+					minL = l
+				} else if l > maxL {
+					maxL = l
+				}
+				total += l
+				count++
 			}
-			total += l
-			count++
+			if count > 0 {
+				avg := total / time.Duration(count)
+				graphLines = append(graphLines, fmt.Sprintf("  %s %dms  %s %dms  %s %dms",
+					m.st.subtleStyle.Render("Min"), minL.Milliseconds(),
+					m.st.subtleStyle.Render("Avg"), avg.Milliseconds(),
+					m.st.subtleStyle.Render("Max"), maxL.Milliseconds()))
+			}
 		}
-		if count > 0 {
-			avg := total / time.Duration(count)
-			graphLines = append(graphLines, fmt.Sprintf("  %s %dms  %s %dms  %s %dms",
-				m.st.subtleStyle.Render("Min"), minL.Milliseconds(),
-				m.st.subtleStyle.Render("Avg"), avg.Milliseconds(),
-				m.st.subtleStyle.Render("Max"), maxL.Milliseconds()))
-		}
-	}
 
-	if site.Type != "push" && len(hist.Latencies) > 5 {
-		graphLines = append(graphLines, "")
-		graphLines = append(graphLines, sectionLabel("DISTRIBUTION"))
-		graphLines = append(graphLines, m.latencyHistogram(hist.Latencies, hist.Statuses, bottomColW))
+		if site.Type != "push" && len(hist.Latencies) > 5 {
+			graphLines = append(graphLines, "")
+			graphLines = append(graphLines, sectionLabel("DISTRIBUTION"))
+			graphLines = append(graphLines, m.latencyHistogram(hist.Latencies, hist.Statuses, bottomColW))
+		}
 	}
 
 	// Right: state changes
@@ -308,13 +312,17 @@ func (m Model) viewDetailPanel() string {
 		changeLines = append(changeLines, "")
 	}
 
-	graphCol := lipgloss.NewStyle().Width(graphW).Render(strings.Join(graphLines, "\n"))
-	changeCol := lipgloss.NewStyle().Width(changeW).Render(strings.Join(changeLines, "\n"))
-	b.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, graphCol, changeCol) + "\n")
+	if len(graphLines) > 0 {
+		graphCol := lipgloss.NewStyle().Width(graphW).Render(strings.Join(graphLines, "\n"))
+		changeCol := lipgloss.NewStyle().Width(changeW).Render(strings.Join(changeLines, "\n"))
+		b.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, graphCol, changeCol) + "\n")
+	} else {
+		b.WriteString(strings.Join(changeLines, "\n") + "\n")
+	}
 
 	b.WriteString("\n")
 	b.WriteString(m.divider() + "\n")
-	b.WriteString(m.st.subtleStyle.Render("  [q/Esc] Back  [e] Edit  [h] History  [s] SLA  [click] Inspect"))
+	b.WriteString(m.st.subtleStyle.Render("  [e] Edit  [h] History  [s] SLA  [click] Inspect  [q/Esc] Back"))
 
 	// Wrap in a viewport for scrolling
 	content := b.String()

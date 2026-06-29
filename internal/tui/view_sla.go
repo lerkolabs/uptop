@@ -24,8 +24,7 @@ var slaPeriods = []struct {
 func (m Model) viewSLAPanel() string {
 	var b strings.Builder
 
-	header := "  " + m.st.titleStyle.Render("SLA REPORT: "+m.slaSiteName)
-	header += "  " + m.st.subtleStyle.Render("[q/Esc] Back")
+	header := "  " + m.st.subtleStyle.Render("SLA >") + " " + m.st.titleStyle.Render(m.slaSiteName)
 	b.WriteString(header + "\n")
 	b.WriteString(m.divider() + "\n")
 
@@ -74,7 +73,7 @@ func (m Model) viewSLAPanel() string {
 		}
 	}
 	b.WriteString("  " + strings.Join(keys, "  "))
-	b.WriteString("  " + m.st.subtleStyle.Render("[j/k/↑/↓] Scroll  [q/Esc] Back"))
+	b.WriteString("  " + m.st.subtleStyle.Render("[↑/↓] Scroll  [q/Esc] Back"))
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }
@@ -87,7 +86,7 @@ func (m Model) buildSLADailyContent() string {
 		barWidth = 10
 	}
 
-	b.WriteString("  " + m.st.subtleStyle.Render("DAILY BREAKDOWN") + "\n")
+	b.WriteString("  " + m.st.titleStyle.Render("DAILY BREAKDOWN") + "\n")
 	for _, day := range m.slaDailyBreakdown {
 		dateStr := day.Date.Format("Jan 02")
 		bar := m.uptimeBar(day.UptimePct, barWidth)

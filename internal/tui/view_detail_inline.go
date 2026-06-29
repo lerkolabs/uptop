@@ -298,15 +298,23 @@ func (m Model) viewDetailSingleCol(site models.Site, hist monitor.SiteHistory, w
 }
 
 func (m Model) detailKeys() string {
-	return m.st.subtleStyle.Render("[h] History  [s] SLA  [e] Edit  [q/Esc] Back")
+	return m.st.subtleStyle.Render("[e] Edit  [h] History  [s] SLA  [q/Esc] Back")
 }
 
 func (m Model) fmtStatusWord(status string) string {
 	switch status {
-	case "DOWN":
-		return m.st.dangerStyle.Render("DOWN")
+	case "DOWN", "SSL EXP":
+		return m.st.dangerStyle.Render(status)
 	case "UP":
 		return m.st.specialStyle.Render("UP")
+	case "LATE":
+		return m.st.warnStyle.Render("LATE")
+	case "STALE":
+		return m.st.staleStyle.Render("STALE")
+	case "PENDING":
+		return m.st.subtleStyle.Render("PENDING")
+	case "PAUSED":
+		return m.st.warnStyle.Render("PAUSED")
 	default:
 		return m.st.subtleStyle.Render(status)
 	}

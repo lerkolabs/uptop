@@ -941,8 +941,11 @@ func (m *Model) handleClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		if m.zones.Get(fmt.Sprintf("%s-%d", prefix, i)).InBounds(msg) {
 			m.cursor = i
 			m.syncSelectedID()
-			if m.detailOpen && m.currentTab == tabMonitors {
-				return m, m.loadDetailCmd(m.sites[m.cursor].ID)
+			if m.currentTab == tabMonitors {
+				m.focusedPanel = panelMonitors
+				if m.detailOpen {
+					return m, m.loadDetailCmd(m.sites[m.cursor].ID)
+				}
 			}
 			return m, nil
 		}

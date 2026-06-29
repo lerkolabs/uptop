@@ -198,10 +198,12 @@ func (m Model) viewDashboard() string {
 		}
 	case tabMaint:
 		m.contentWidth = m.termWidth
-		content = m.viewMaintTab()
+		availW := m.termWidth - chromePadH
+		content = m.titledPanel("Maintenance", m.viewMaintTab(), availW, true)
 	case tabSettings:
 		m.contentWidth = m.termWidth
-		content = m.viewSettingsTab()
+		availW := m.termWidth - chromePadH
+		content = m.titledPanel("Settings", m.viewSettingsTab(), availW, true)
 	}
 
 	content = strings.TrimSpace(content)

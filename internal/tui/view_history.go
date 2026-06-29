@@ -151,8 +151,7 @@ func (m Model) buildHistoryContent() string {
 func (m Model) viewHistoryPanel() string {
 	var b strings.Builder
 
-	header := "  " + m.st.titleStyle.Render("STATE HISTORY: "+m.historySiteName)
-	header += "  " + m.st.subtleStyle.Render("[q/Esc] Back")
+	header := "  " + m.st.subtleStyle.Render("History >") + " " + m.st.titleStyle.Render(m.historySiteName)
 	b.WriteString(header + "\n")
 
 	divWidth := m.dividerWidth()
@@ -186,7 +185,7 @@ func (m Model) viewHistoryPanel() string {
 		parts = append(parts, "avg outage "+fmtDuration(avg))
 	}
 	b.WriteString("  " + m.st.subtleStyle.Render(strings.Join(parts, " │ ")) + "\n")
-	b.WriteString("  " + m.st.subtleStyle.Render("[j/k/↑/↓] Scroll  [q/Esc] Back"))
+	b.WriteString("  " + m.st.subtleStyle.Render("[↑/↓] Scroll  [q/Esc] Back"))
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }

@@ -328,7 +328,7 @@ func (m Model) viewAlertDetailPanel() string {
 	}
 
 	b.WriteString(m.divider() + "\n")
-	b.WriteString(m.st.subtleStyle.Render("  CONFIGURATION") + "\n")
+	b.WriteString(m.st.titleStyle.Render("  CONFIGURATION") + "\n")
 	// Render through the same allowlist the backup export uses — this panel
 	// ends up in screen shares and asciinema recordings. Keys are sorted so
 	// rows don't reshuffle every render.
@@ -348,7 +348,7 @@ func (m Model) viewAlertDetailPanel() string {
 	}
 
 	b.WriteString(m.divider() + "\n")
-	b.WriteString(m.st.subtleStyle.Render("  [q/Esc] Back  [e] Edit  [t] Test"))
+	b.WriteString(m.st.subtleStyle.Render("  [e] Edit  [t] Test  [q/Esc] Back"))
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }

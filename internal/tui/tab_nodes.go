@@ -14,13 +14,13 @@ func (m Model) viewNodesTab() string {
 	var headers []string
 	var widths []int
 	if m.isWide() {
-		headers = []string{"NAME", "REGION", "LAST SEEN", "VERSION", "STATUS"}
-		widths = []int{24, 14, 16, 12, 10}
+		headers = []string{"#", "NAME", "REGION", "LAST SEEN", "VERSION", "STATUS"}
+		widths = []int{4, 24, 14, 16, 12, 10}
 	} else {
-		headers = []string{"NAME", "REGION", "SEEN", "VER", "STATUS"}
-		widths = []int{16, 10, 10, 8, 8}
+		headers = []string{"#", "NAME", "REGION", "SEEN", "VER", "STATUS"}
+		widths = []int{4, 16, 10, 10, 8, 8}
 	}
-	nameW := widths[0]
+	nameW := widths[1]
 
 	tbl := m.renderTable(
 		headers,
@@ -43,7 +43,7 @@ func (m Model) viewNodesTab() string {
 					version = m.st.subtleStyle.Render("—")
 				}
 				status := m.fmtNodeStatus(node.LastSeen)
-				rows = append(rows, []string{name, region, lastSeen, version, status})
+				rows = append(rows, []string{fmt.Sprintf("%d", i+1), name, region, lastSeen, version, status})
 			}
 			return rows
 		},
