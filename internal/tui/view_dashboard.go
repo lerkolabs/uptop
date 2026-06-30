@@ -201,7 +201,14 @@ func (m Model) viewMonitorsLayout() string {
 		topParts = append(topParts, detailPanel)
 	}
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, topParts...)
+	top := lipgloss.JoinHorizontal(lipgloss.Top, topParts...)
+
+	if m.logsOpen {
+		logContent := m.viewLogsStrip(availW-2, logsStripHeight-2)
+		logPanel := m.zones.Mark("panel-logs", m.titledPanel("Logs", logContent, availW, m.focusedPanel == panelLogs))
+		return top + "\n" + logPanel
+	}
+	return top
 }
 
 func (m Model) viewDashboard() string {
@@ -285,12 +292,14 @@ func (m Model) renderFooter(_ dashboardStats) string {
 	var keys string
 	if m.focusedPanel == panelMaint {
 		keys = "[n]New [x]End [d]Del [Esc]Back [S]Settings [T]Theme [q]Quit"
+	} else if m.focusedPanel == panelLogs {
+		keys = "[↑/↓]Scroll [Enter]Expand [l/Esc]Back [S]Settings [T]Theme [q]Quit"
 	} else if m.detailOpen && m.detailMode == detailSLA {
-		keys = "[1-4]Period [Esc]Back [S]Settings [T]Theme [q]Quit"
+		keys = "[1-4]Period [Esc]Back [l]Logs [S]Settings [T]Theme [q]Quit"
 	} else if m.detailOpen && m.detailMode == detailHistory {
-		keys = "[Esc]Back [S]Settings [T]Theme [q]Quit"
+		keys = "[Esc]Back [l]Logs [S]Settings [T]Theme [q]Quit"
 	} else if m.detailOpen {
-		keys = "[i]Close [Enter]Expand [h]History [s]SLA [e]Edit [m]Maint [l]Logs [S]Settings [T]Theme [q]Quit"
+		keys = "[i]Close [h]History [s]SLA [e]Edit [m]Maint [l]Logs [S]Settings [T]Theme [q]Quit"
 	} else {
 		keys = "[/]Filter [i]Info [Enter]Detail [n]New [e]Edit [d]Del [m]Maint [l]Logs [S]Settings [T]Theme [q]Quit"
 	}

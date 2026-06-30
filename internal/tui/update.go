@@ -155,10 +155,15 @@ func (m *Model) handleFormMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+const logsStripHeight = 6
+
 func (m *Model) recalcLayout() {
 	chrome := chromeBase
 	if m.filterMode || m.filterText != "" {
 		chrome++
+	}
+	if m.logsOpen {
+		chrome += logsStripHeight
 	}
 	m.maxTableRows = m.termHeight - chrome
 	if m.maxTableRows < 1 {
@@ -751,10 +756,14 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.recalcLayout()
 		}
 	case "l":
-		m.refreshLogContent()
-		m.logViewport.GotoTop()
-		m.state = stateLogs
-		return m, nil
+		if m.logsOpen {
+			m.logsOpen = false
+			m.focusedPanel = panelMonitors
+		} else {
+			m.logsOpen = true
+			m.focusedPanel = panelLogs
+		}
+		m.recalcLayout()
 	case "up", "k":
 		if m.focusedPanel == panelMaint {
 			m.scrollMaintCursor(-1)
@@ -818,8 +827,23 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if len(m.sites) > 0 {
-			m.state = stateDetail
-			return m, m.loadDetailCmd(m.sites[m.cursor].ID)
+			site := m.sites[m.cursor]
+			if site.Type == "group" {
+				m.collapsed[site.ID] = !m.collapsed[site.ID]
+				payload := collapsedJSON(m.collapsed)
+				st := m.store
+				ctx := m.ctx
+				m.refreshLive()
+				return m, writeCmd("Save collapsed groups", func() error {
+					return st.SetPreference(ctx, "collapsed_groups", payload)
+				})
+			}
+			if !m.detailOpen {
+				m.detailOpen = true
+				m.detailMode = detailDefault
+				m.recalcLayout()
+			}
+			return m, m.loadDetailCmd(site.ID)
 		}
 	case "e":
 		return m.handleEditItem()
