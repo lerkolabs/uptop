@@ -277,36 +277,46 @@ func (m Model) renderStatusLine(stats dashboardStats) string {
 	return left + strings.Repeat(" ", padW) + ver
 }
 
+func (m Model) hotkey(key, desc string) string {
+	k := lipgloss.NewStyle().Foreground(m.theme.Accent).Render(key)
+	d := m.st.subtleStyle.Render(desc)
+	return k + " " + d
+}
+
 func (m Model) renderFooter(_ dashboardStats) string {
+	dot := m.st.subtleStyle.Render(" · ")
+
 	if m.filterMode {
 		cursor := lipgloss.NewStyle().Foreground(m.theme.Accent).Render("│")
-		return "\n" + m.st.titleStyle.Render("/") + " " + m.filterText + cursor + "  " + m.st.subtleStyle.Render("[Enter]Apply [Esc]Clear")
+		keys := m.hotkey("Enter", "Apply") + dot + m.hotkey("Esc", "Clear")
+		return "\n" + m.st.titleStyle.Render("/") + " " + m.filterText + cursor + "  " + keys
 	}
 
-	var keys string
+	var parts []string
 	if m.focusedPanel == panelMaint {
-		keys = "[n]New [x]End [d]Del [Esc]Back [S]Settings [T]Theme [q]Quit"
+		parts = []string{m.hotkey("n", "New"), m.hotkey("x", "End"), m.hotkey("d", "Del"), m.hotkey("Esc", "Back")}
 	} else if m.focusedPanel == panelLogs {
-		keys = "[↑/↓]Scroll [Enter]Expand [l/Esc]Back [S]Settings [T]Theme [q]Quit"
+		parts = []string{m.hotkey("↑/↓", "Scroll"), m.hotkey("Enter", "Expand"), m.hotkey("l/Esc", "Back")}
 	} else if m.detailOpen && m.detailMode == detailSLA {
-		keys = "[1-4]Period [Esc]Back [l]Logs [S]Settings [T]Theme [q]Quit"
+		parts = []string{m.hotkey("1-4", "Period"), m.hotkey("Esc", "Back")}
 	} else if m.detailOpen && m.detailMode == detailHistory {
-		keys = "[Esc]Back [l]Logs [S]Settings [T]Theme [q]Quit"
+		parts = []string{m.hotkey("Esc", "Back")}
 	} else if m.detailOpen {
-		keys = "[Enter]Close [h]History [s]SLA [e]Edit [m]Maint [l]Logs [S]Settings [T]Theme [q]Quit"
+		parts = []string{m.hotkey("Enter", "Close"), m.hotkey("h", "History"), m.hotkey("s", "SLA"), m.hotkey("e", "Edit"), m.hotkey("m", "Maint")}
 	} else {
-		groupHint := ""
+		parts = []string{m.hotkey("/", "Filter"), m.hotkey("Enter", "Detail")}
 		if m.cursor < len(m.sites) && m.sites[m.cursor].Type == "group" {
 			if m.collapsed[m.sites[m.cursor].ID] {
-				groupHint = " [Space]Expand"
+				parts = append(parts, m.hotkey("Space", "Expand"))
 			} else {
-				groupHint = " [Space]Collapse"
+				parts = append(parts, m.hotkey("Space", "Collapse"))
 			}
 		}
-		keys = "[/]Filter [Enter]Detail" + groupHint + " [n]New [e]Edit [d]Del [m]Maint [l]Logs [S]Settings [T]Theme [q]Quit"
+		parts = append(parts, m.hotkey("n", "New"), m.hotkey("e", "Edit"), m.hotkey("d", "Del"), m.hotkey("m", "Maint"))
 	}
+	parts = append(parts, m.hotkey("l", "Logs"), m.hotkey("S", "Settings"), m.hotkey("T", "Theme"), m.hotkey("q", "Quit"))
 
-	line := m.st.subtleStyle.Render(keys)
+	line := strings.Join(parts, dot)
 	if m.filterText != "" {
 		line = m.st.subtleStyle.Render(fmt.Sprintf("filter: %s  ", m.filterText)) + line
 	}
