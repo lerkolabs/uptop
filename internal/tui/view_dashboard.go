@@ -295,7 +295,15 @@ func (m Model) renderFooter(_ dashboardStats) string {
 	} else if m.detailOpen {
 		keys = "[i]Close [h]History [s]SLA [e]Edit [m]Maint [l]Logs [S]Settings [T]Theme [q]Quit"
 	} else {
-		keys = "[/]Filter [i]Info [Enter]Detail [n]New [e]Edit [d]Del [m]Maint [l]Logs [S]Settings [T]Theme [q]Quit"
+		enterHint := "[Enter]Detail"
+		if m.cursor < len(m.sites) && m.sites[m.cursor].Type == "group" {
+			if m.collapsed[m.sites[m.cursor].ID] {
+				enterHint = "[Enter]Expand"
+			} else {
+				enterHint = "[Enter]Collapse"
+			}
+		}
+		keys = "[/]Filter [i]Info " + enterHint + " [n]New [e]Edit [d]Del [m]Maint [l]Logs [S]Settings [T]Theme [q]Quit"
 	}
 
 	line := m.st.subtleStyle.Render(keys)
