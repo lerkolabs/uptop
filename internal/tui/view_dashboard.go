@@ -293,7 +293,7 @@ func (m Model) renderFooter(_ dashboardStats) string {
 	} else if m.detailOpen && m.detailMode == detailHistory {
 		keys = "[Esc]Back [l]Logs [S]Settings [T]Theme [q]Quit"
 	} else if m.detailOpen {
-		keys = "[i]Close [h]History [s]SLA [e]Edit [m]Maint [l]Logs [S]Settings [T]Theme [q]Quit"
+		keys = "[Enter]Close [h]History [s]SLA [e]Edit [m]Maint [l]Logs [S]Settings [T]Theme [q]Quit"
 	} else {
 		groupHint := ""
 		if m.cursor < len(m.sites) && m.sites[m.cursor].Type == "group" {
@@ -303,7 +303,7 @@ func (m Model) renderFooter(_ dashboardStats) string {
 				groupHint = " [Space]Collapse"
 			}
 		}
-		keys = "[/]Filter [i]Info [Enter]Detail" + groupHint + " [n]New [e]Edit [d]Del [m]Maint [l]Logs [S]Settings [T]Theme [q]Quit"
+		keys = "[/]Filter [Enter]Detail" + groupHint + " [n]New [e]Edit [d]Del [m]Maint [l]Logs [S]Settings [T]Theme [q]Quit"
 	}
 
 	line := m.st.subtleStyle.Render(keys)

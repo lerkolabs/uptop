@@ -650,13 +650,27 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if len(m.sites) > 0 {
-			site := m.sites[m.cursor]
-			if !m.detailOpen {
-				m.detailOpen = true
-				m.detailMode = detailDefault
-				m.recalcLayout()
+			m.detailOpen = !m.detailOpen
+			m.detailMode = detailDefault
+			m.recalcLayout()
+			st := m.store
+			ctx := m.ctx
+			open := m.detailOpen
+			var cmd tea.Cmd
+			if m.detailOpen {
+				cmd = m.loadDetailCmd(m.sites[m.cursor].ID)
 			}
-			return m, m.loadDetailCmd(site.ID)
+			saveCmd := writeCmd("Save detail preference", func() error {
+				v := "false"
+				if open {
+					v = "true"
+				}
+				return st.SetPreference(ctx, "detail_open", v)
+			})
+			if cmd != nil {
+				return m, tea.Batch(cmd, saveCmd)
+			}
+			return m, saveCmd
 		}
 	case "e":
 		return m.handleEditItem()
@@ -682,29 +696,6 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, writeCmd("Update pause state", func() error {
 				return st.UpdateSitePaused(ctx, id, paused)
 			})
-		}
-	case "i":
-		if len(m.sites) > 0 {
-			m.detailOpen = !m.detailOpen
-			m.recalcLayout()
-			st := m.store
-			ctx := m.ctx
-			open := m.detailOpen
-			var cmd tea.Cmd
-			if m.detailOpen {
-				cmd = m.loadDetailCmd(m.sites[m.cursor].ID)
-			}
-			saveCmd := writeCmd("Save detail preference", func() error {
-				v := "false"
-				if open {
-					v = "true"
-				}
-				return st.SetPreference(ctx, "detail_open", v)
-			})
-			if cmd != nil {
-				return m, tea.Batch(cmd, saveCmd)
-			}
-			return m, saveCmd
 		}
 	case "esc":
 		if m.focusedPanel != panelMonitors {
