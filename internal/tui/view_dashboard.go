@@ -156,9 +156,9 @@ func (m Model) viewMonitorsLayout() string {
 	wide := m.termWidth >= wideBreakpoint
 
 	showMaint := m.maintOpen && wide
-	showLogs := m.logsOpen && wide
+	showDetail := m.detailOpen && wide
 
-	var maintW, logsW, monW int
+	var maintW, detailW, monW int
 	if showMaint {
 		maintW = maintSidebarW
 		if maintW > availW/4 {
@@ -166,9 +166,9 @@ func (m Model) viewMonitorsLayout() string {
 		}
 	}
 	remaining := availW - maintW
-	if showLogs {
-		monW = remaining * 70 / 100
-		logsW = remaining - monW
+	if showDetail {
+		monW = remaining * 45 / 100
+		detailW = remaining - monW
 	} else {
 		monW = remaining
 	}
@@ -185,24 +185,17 @@ func (m Model) viewMonitorsLayout() string {
 		topParts = append(topParts, maintPanel)
 	}
 	topParts = append(topParts, monPanel)
-	if showLogs {
-		logContent := m.viewLogsSidebar(logsW-2, m.maxTableRows)
-		logPanel := m.zones.Mark("panel-logs", m.titledPanel("Logs", logContent, logsW, m.focusedPanel == panelLogs))
-		topParts = append(topParts, logPanel)
-	}
-
-	top := lipgloss.JoinHorizontal(lipgloss.Top, topParts...)
-
-	if m.detailOpen {
+	if showDetail {
 		site := ""
 		if m.cursor < len(m.sites) {
 			site = m.sites[m.cursor].Name
 		}
-		detail := m.viewDetailInline(availW - 2)
-		detailPanel := m.zones.Mark("panel-detail", m.titledPanel(site, detail, availW, m.focusedPanel == panelDetail))
-		return top + "\n" + detailPanel
+		detail := m.viewDetailInline(detailW - 2)
+		detailPanel := m.zones.Mark("panel-detail", m.titledPanel(site, detail, detailW, m.focusedPanel == panelDetail))
+		topParts = append(topParts, detailPanel)
 	}
-	return top
+
+	return lipgloss.JoinHorizontal(lipgloss.Top, topParts...)
 }
 
 func (m Model) viewDashboard() string {
@@ -286,8 +279,6 @@ func (m Model) renderFooter(_ dashboardStats) string {
 	var keys string
 	if m.focusedPanel == panelMaint {
 		keys = "[n]New [x]End [d]Del [Esc]Back [S]Settings [T]Theme [q]Quit"
-	} else if m.focusedPanel == panelLogs {
-		keys = "[↑/↓]Scroll [Enter]Expand [l/Esc]Back [S]Settings [T]Theme [q]Quit"
 	} else if m.detailOpen {
 		keys = "[i]Close [Enter]Expand [h]History [s]SLA [e]Edit [m]Maint [l]Logs [S]Settings [T]Theme [q]Quit"
 	} else {

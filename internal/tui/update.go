@@ -155,15 +155,10 @@ func (m *Model) handleFormMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-const detailInlineHeight = 12
-
 func (m *Model) recalcLayout() {
 	chrome := chromeBase
 	if m.filterMode || m.filterText != "" {
 		chrome++
-	}
-	if m.detailOpen {
-		chrome += detailInlineHeight
 	}
 	m.maxTableRows = m.termHeight - chrome
 	if m.maxTableRows < 1 {
@@ -259,7 +254,7 @@ func (m *Model) handleLogsFullscreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "esc", "q":
 			m.state = stateDashboard
-			m.focusedPanel = panelLogs
+			m.focusedPanel = panelMonitors
 		case "ctrl+c":
 			return m, tea.Quit
 		case "f":
@@ -756,14 +751,10 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.recalcLayout()
 		}
 	case "l":
-		if m.focusedPanel == panelLogs {
-			m.logsOpen = false
-			m.focusedPanel = panelMonitors
-		} else {
-			m.logsOpen = true
-			m.focusedPanel = panelLogs
-		}
-		m.recalcLayout()
+		m.refreshLogContent()
+		m.logViewport.GotoTop()
+		m.state = stateLogs
+		return m, nil
 	case "up", "k":
 		if m.focusedPanel == panelMaint {
 			m.scrollMaintCursor(-1)
