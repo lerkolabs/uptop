@@ -14,9 +14,16 @@ func (m Model) viewDetailInline(width int) string {
 	if m.cursor >= len(m.sites) {
 		return ""
 	}
-	site := m.sites[m.cursor]
-	hist, _ := m.engine.GetHistory(site.ID)
-	return m.viewDetailSidebar(site, hist, width)
+	switch m.detailMode {
+	case detailSLA:
+		return m.viewSLASidebar(width)
+	case detailHistory:
+		return m.viewHistorySidebar(width)
+	default:
+		site := m.sites[m.cursor]
+		hist, _ := m.engine.GetHistory(site.ID)
+		return m.viewDetailSidebar(site, hist, width)
+	}
 }
 
 func (m Model) viewDetailSidebar(site models.Site, hist monitor.SiteHistory, width int) string {
@@ -206,7 +213,7 @@ func (m Model) detailTypeLine(site models.Site) []string {
 }
 
 func (m Model) detailKeys() string {
-	return m.st.subtleStyle.Render("[e] Edit  [h] History  [s] SLA  [q/Esc] Back")
+	return m.st.subtleStyle.Render("[e] Edit  [h] History  [s] SLA  [Esc] Back")
 }
 
 func (m Model) fmtStatusWord(status string) string {
@@ -226,4 +233,142 @@ func (m Model) fmtStatusWord(status string) string {
 	default:
 		return m.st.subtleStyle.Render(status)
 	}
+}
+
+func (m Model) viewSLASidebar(width int) string {
+	var b strings.Builder
+	label := m.st.subtleStyle
+	innerW := width - 4
+	if innerW < 20 {
+		innerW = 20
+	}
+
+	period := slaPeriods[m.slaPeriodIdx]
+	b.WriteString("  " + label.Render("Period: Last "+period.label) + "\n\n")
+
+	r := m.slaReport
+	barWidth := innerW - 25
+	if barWidth < 10 {
+		barWidth = 10
+	}
+	bar := m.uptimeBar(r.UptimePct, barWidth)
+	uptimeColor := m.st.specialStyle
+	if r.UptimePct < uptimeExcellentPct {
+		uptimeColor = m.st.warnStyle
+	}
+	if r.UptimePct < uptimeGoodPct {
+		uptimeColor = m.st.dangerStyle
+	}
+	fmt.Fprintf(&b, "  %-14s %s  %s\n", label.Render("Uptime"), uptimeColor.Render(fmtPct(r.UptimePct)+"%"), bar)
+	fmt.Fprintf(&b, "  %-14s %s\n", label.Render("Downtime"), fmtDuration(r.Downtime))
+	fmt.Fprintf(&b, "  %-14s %d\n", label.Render("Outages"), r.OutageCount)
+
+	if r.OutageCount > 0 {
+		fmt.Fprintf(&b, "  %-14s %s\n", label.Render("Longest"), fmtDuration(r.LongestOut))
+		fmt.Fprintf(&b, "  %-14s %s\n", label.Render("MTTR"), fmtDuration(r.MTTR))
+		fmt.Fprintf(&b, "  %-14s %s\n", label.Render("MTBF"), fmtDuration(r.MTBF))
+	}
+
+	b.WriteString("\n")
+
+	if len(m.slaDailyBreakdown) > 0 {
+		b.WriteString("  " + m.st.titleStyle.Render("DAILY BREAKDOWN") + "\n")
+		dayBarW := innerW - 20
+		if dayBarW < 10 {
+			dayBarW = 10
+		}
+		for _, day := range m.slaDailyBreakdown {
+			dateStr := day.Date.Format("Jan 02")
+			dayBar := m.uptimeBar(day.UptimePct, dayBarW)
+			pctStr := fmtPct(day.UptimePct) + "%"
+			color := m.st.specialStyle
+			if day.UptimePct < uptimeExcellentPct {
+				color = m.st.warnStyle
+			}
+			if day.UptimePct < uptimeGoodPct {
+				color = m.st.dangerStyle
+			}
+			fmt.Fprintf(&b, "  %-8s %s %s\n", label.Render(dateStr), dayBar, color.Render(pctStr))
+		}
+	}
+
+	b.WriteString("\n")
+
+	var keys []string
+	for i, p := range slaPeriods {
+		k := fmt.Sprintf("[%s] %s", p.key, p.label)
+		if i == m.slaPeriodIdx {
+			keys = append(keys, m.st.titleStyle.Render(k))
+		} else {
+			keys = append(keys, label.Render(k))
+		}
+	}
+	b.WriteString("  " + strings.Join(keys, " ") + "\n")
+	b.WriteString("  " + label.Render("[Esc] Back") + "\n")
+
+	return lipgloss.NewStyle().Width(width).MaxWidth(width).Render(b.String())
+}
+
+func (m Model) viewHistorySidebar(width int) string {
+	var b strings.Builder
+	label := m.st.subtleStyle
+	innerW := width - 4
+	if innerW < 20 {
+		innerW = 20
+	}
+
+	sparkline := m.stateChangeSparkline(m.historyChanges, innerW)
+	if sparkline != "" {
+		b.WriteString("  " + sparkline + "\n\n")
+	}
+
+	if len(m.historyChanges) == 0 {
+		b.WriteString("  " + label.Render("No state changes recorded") + "\n")
+	} else {
+		reasonW := innerW - 45
+		if reasonW < 10 {
+			reasonW = 10
+		}
+		for i, sc := range m.historyChanges {
+			ts := sc.ChangedAt.Format("01/02 15:04")
+
+			arrow := label.Render(sc.FromStatus) + " → "
+			switch sc.ToStatus {
+			case string(models.StatusUp):
+				arrow += m.st.specialStyle.Render(sc.ToStatus)
+			case string(models.StatusLate):
+				arrow += m.st.warnStyle.Render(sc.ToStatus)
+			case string(models.StatusStale):
+				arrow += m.st.staleStyle.Render(sc.ToStatus)
+			default:
+				arrow += m.st.dangerStyle.Render(sc.ToStatus)
+			}
+
+			durStr := ""
+			if dur := computeOutageDuration(m.historyChanges, i); dur > 0 {
+				durStr = m.st.warnStyle.Render(fmtDuration(dur))
+			}
+
+			reason := ""
+			if sc.ErrorReason != "" && sc.ToStatus != string(models.StatusUp) {
+				reason = m.st.dangerStyle.Render(limitStr(sc.ErrorReason, reasonW))
+			}
+
+			fmt.Fprintf(&b, "  %-12s %s  %s %s\n", ts, arrow, durStr, reason)
+		}
+	}
+
+	b.WriteString("\n")
+
+	stats := computeHistoryStats(m.historyChanges)
+	statParts := []string{fmt.Sprintf("%d events", stats.totalEvents)}
+	if stats.outageCount > 0 {
+		statParts = append(statParts, fmt.Sprintf("%d outages", stats.outageCount))
+		avg := stats.totalDowntime / time.Duration(stats.outageCount)
+		statParts = append(statParts, "avg "+fmtDuration(avg))
+	}
+	b.WriteString("  " + label.Render(strings.Join(statParts, " │ ")) + "\n")
+	b.WriteString("  " + label.Render("[Esc] Back") + "\n")
+
+	return lipgloss.NewStyle().Width(width).MaxWidth(width).Render(b.String())
 }

@@ -98,6 +98,12 @@ const (
 )
 
 const (
+	detailDefault = 0
+	detailSLA     = 1
+	detailHistory = 2
+)
+
+const (
 	sortStatus  = 0
 	sortName    = 1
 	sortLatency = 2
@@ -138,6 +144,7 @@ type Model struct {
 	termHeight      int
 	contentWidth    int
 	focusedPanel    int
+	detailMode      int
 	logScrollOffset int
 	editID          int
 	editToken       string

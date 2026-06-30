@@ -771,6 +771,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.syncSelectedID()
 			if m.detailOpen && m.cursor < len(m.sites) {
+				m.detailMode = detailDefault
 				return m, m.loadDetailCmd(m.sites[m.cursor].ID)
 			}
 		}
@@ -791,6 +792,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.syncSelectedID()
 			if m.detailOpen && m.cursor < len(m.sites) {
+				m.detailMode = detailDefault
 				return m, m.loadDetailCmd(m.sites[m.cursor].ID)
 			}
 		}
@@ -870,8 +872,11 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		if m.focusedPanel != panelMonitors {
 			m.focusedPanel = panelMonitors
+		} else if m.detailOpen && m.detailMode != detailDefault {
+			m.detailMode = detailDefault
 		} else if m.detailOpen {
 			m.detailOpen = false
+			m.detailMode = detailDefault
 			m.recalcLayout()
 			st := m.store
 			ctx := m.ctx
@@ -885,17 +890,25 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.historySiteName = site.Name
 			m.historySiteID = site.ID
 			m.historyChanges = nil
-			m.historyViewport = viewport.New(
-				m.termWidth-chromePadH,
-				m.termHeight-10,
-			)
-			m.historyViewport.SetContent("\n  Loading state history...")
-			m.state = stateHistory
+			m.detailMode = detailHistory
 			return m, m.loadHistoryCmd(site.ID)
 		}
 	case "s":
 		if m.detailOpen && m.cursor < len(m.sites) {
-			return m, m.openSLAView(m.sites[m.cursor])
+			site := m.sites[m.cursor]
+			m.slaSiteName = site.Name
+			m.slaSiteID = site.ID
+			m.slaPeriodIdx = 2
+			m.detailMode = detailSLA
+			return m, m.loadSLACmd(site.ID, m.slaPeriodIdx)
+		}
+	case "1", "2", "3", "4":
+		if m.detailOpen && m.detailMode == detailSLA {
+			idx := int(msg.String()[0]-'0') - 1
+			if idx >= 0 && idx < len(slaPeriods) {
+				m.slaPeriodIdx = idx
+				return m, m.loadSLACmd(m.slaSiteID, idx)
+			}
 		}
 	case "x":
 		if m.focusedPanel == panelMaint {

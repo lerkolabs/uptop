@@ -186,12 +186,18 @@ func (m Model) viewMonitorsLayout() string {
 	}
 	topParts = append(topParts, monPanel)
 	if showDetail {
-		site := ""
+		title := ""
 		if m.cursor < len(m.sites) {
-			site = m.sites[m.cursor].Name
+			title = m.sites[m.cursor].Name
+		}
+		switch m.detailMode {
+		case detailSLA:
+			title = "SLA · " + title
+		case detailHistory:
+			title = "History · " + title
 		}
 		detail := m.viewDetailInline(detailW - 2)
-		detailPanel := m.zones.Mark("panel-detail", m.titledPanel(site, detail, detailW, m.focusedPanel == panelDetail))
+		detailPanel := m.zones.Mark("panel-detail", m.titledPanel(title, detail, detailW, m.focusedPanel == panelDetail))
 		topParts = append(topParts, detailPanel)
 	}
 
@@ -279,6 +285,10 @@ func (m Model) renderFooter(_ dashboardStats) string {
 	var keys string
 	if m.focusedPanel == panelMaint {
 		keys = "[n]New [x]End [d]Del [Esc]Back [S]Settings [T]Theme [q]Quit"
+	} else if m.detailOpen && m.detailMode == detailSLA {
+		keys = "[1-4]Period [Esc]Back [S]Settings [T]Theme [q]Quit"
+	} else if m.detailOpen && m.detailMode == detailHistory {
+		keys = "[Esc]Back [S]Settings [T]Theme [q]Quit"
 	} else if m.detailOpen {
 		keys = "[i]Close [Enter]Expand [h]History [s]SLA [e]Edit [m]Maint [l]Logs [S]Settings [T]Theme [q]Quit"
 	} else {
