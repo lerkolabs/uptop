@@ -90,14 +90,8 @@ func (m Model) View() string {
 			return lipgloss.NewStyle().Padding(1, 2).Render(header + "\n\n" + m.huhForm.View() + "\n" + footer)
 		}
 		return ""
-	case stateDetail:
-		return m.zones.Scan(m.viewDetailPanel())
 	case stateLogs:
 		return m.viewLogsFullscreen()
-	case stateHistory:
-		return m.viewHistoryPanel()
-	case stateSLA:
-		return m.viewSLAPanel()
 	case stateAlertDetail:
 		return m.viewAlertDetailPanel()
 	case stateSettings:

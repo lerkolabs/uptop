@@ -118,11 +118,10 @@ func TestDetailLoad_CachesAndViewDoesNoIO(t *testing.T) {
 	m := newTestModel(ms)
 	m.sites = []models.Site{{SiteConfig: models.SiteConfig{ID: 1, Name: "site"}, SiteState: models.SiteState{Status: "DOWN"}}}
 	m.cursor = 0
-	m.state = stateDetail
+	m.detailOpen = true
 	m.termWidth = 120
 	m.termHeight = 40
 
-	// Entering detail dispatches the load Cmd.
 	cmd := m.loadDetailCmd(1)
 	if cmd == nil {
 		t.Fatal("loadDetailCmd returned nil")
@@ -136,16 +135,14 @@ func TestDetailLoad_CachesAndViewDoesNoIO(t *testing.T) {
 		t.Fatalf("expected exactly 1 store hit from the load Cmd, got %d", ms.stateChangeCalls)
 	}
 
-	// Apply the msg through Update (caches into the model).
 	updated, _ := m.Update(dd)
 	m = updated.(Model)
 	if m.detailChangesSiteID != 1 || len(m.detailChanges) != 1 {
 		t.Fatalf("detail changes not cached: id=%d n=%d", m.detailChangesSiteID, len(m.detailChanges))
 	}
 
-	// Render the detail panel several times — it must read the cache, not the DB.
 	for i := 0; i < 3; i++ {
-		_ = m.viewDetailPanel()
+		_ = m.viewDetailInline(80)
 	}
 	if ms.stateChangeCalls != 1 {
 		t.Errorf("View performed DB IO: store hit %d times (want 1, from the Cmd only)", ms.stateChangeCalls)
@@ -202,16 +199,16 @@ func TestHistoryKey_LoadsOffUIGoroutine(t *testing.T) {
 	ms := &tuiMockStore{stateChanges: []models.StateChange{{FromStatus: "UP", ToStatus: "DOWN"}}}
 	m := newTestModel(ms)
 	m.sites = []models.Site{{SiteConfig: models.SiteConfig{ID: 7, Name: "site"}}}
-	m.state = stateDetail
+	m.detailOpen = true
 	m.termWidth, m.termHeight = 120, 40
 
-	updated, cmd := (&m).handleDetailKey(keyMsg("h"))
+	updated, cmd := (&m).handleDashboardKey(keyMsg("h"))
 	if ms.stateChangeCalls != 0 {
 		t.Fatal("history keypress hit the store synchronously in Update")
 	}
 	got := updated.(*Model)
-	if got.state != stateHistory || got.historySiteID != 7 {
-		t.Fatalf("history view not opened: state=%v siteID=%d", got.state, got.historySiteID)
+	if got.detailMode != detailHistory || got.historySiteID != 7 {
+		t.Fatalf("history mode not set: mode=%v siteID=%d", got.detailMode, got.historySiteID)
 	}
 	if cmd == nil {
 		t.Fatal("expected a history load Cmd")
@@ -229,7 +226,6 @@ func TestHistoryKey_LoadsOffUIGoroutine(t *testing.T) {
 		t.Fatal("history reply not folded into the model")
 	}
 
-	// A reply for a previously opened site must not clobber the current one.
 	m2.historySiteID = 9
 	stale, _ := m2.Update(historyDataMsg{siteID: 7, changes: nil})
 	if m3 := stale.(Model); len(m3.historyChanges) != 1 {
@@ -241,20 +237,15 @@ func TestSLAData_DropsStaleReply(t *testing.T) {
 	m := newTestModel(&tuiMockStore{})
 	m.termWidth, m.termHeight = 120, 40
 	m.sites = []models.Site{{SiteConfig: models.SiteConfig{ID: 3}, SiteState: models.SiteState{Status: "UP"}}}
+	m.detailOpen = true
+	m.slaSiteID = 3
+	m.slaPeriodIdx = 2
 
-	if cmd := (&m).openSLAView(m.sites[0]); cmd == nil {
-		t.Fatal("openSLAView should return a load Cmd")
-	}
-
-	// Reply for a different period than currently selected → dropped.
-	// (slaDataMsg routes through a pointer-receiver handler, so Update
-	// returns *Model on this path.)
 	updated, _ := m.Update(slaDataMsg{siteID: 3, periodIdx: 0})
 	if mm := updated.(*Model); mm.slaDailyBreakdown != nil {
 		t.Error("stale SLA reply (old period) was applied")
 	}
 
-	// Matching reply → report computed.
 	updated, _ = updated.(*Model).Update(slaDataMsg{siteID: 3, periodIdx: m.slaPeriodIdx})
 	if mm := updated.(*Model); mm.slaDailyBreakdown == nil {
 		t.Error("matching SLA reply was not applied")
@@ -314,12 +305,12 @@ func TestDetailRefreshCmd_OnlyWhileDetailOpen(t *testing.T) {
 	m := newTestModel(ms)
 	m.sites = []models.Site{{SiteConfig: models.SiteConfig{ID: 5, Name: "site"}}}
 
-	m.state = stateDashboard
+	m.detailOpen = false
 	if (&m).detailRefreshCmd() != nil {
 		t.Error("refresh Cmd issued outside the detail view")
 	}
 
-	m.state = stateDetail
+	m.detailOpen = true
 	cmd := (&m).detailRefreshCmd()
 	if cmd == nil {
 		t.Fatal("open detail panel should refresh on the tab-data cadence")

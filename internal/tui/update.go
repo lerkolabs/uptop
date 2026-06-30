@@ -6,7 +6,6 @@ import (
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/monitor"
-	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 )
@@ -20,9 +19,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tabDataMsg:
 		return m.handleTabData(msg)
 	case detailDataMsg:
-		// Drop replies for a site the user has already navigated away from,
-		// so a slow load can't clobber the panel currently on screen.
-		if m.state == stateDetail && m.cursor < len(m.sites) && m.sites[m.cursor].ID != msg.siteID {
+		if m.detailOpen && m.cursor < len(m.sites) && m.sites[m.cursor].ID != msg.siteID {
 			return m, nil
 		}
 		m.detailChanges = msg.changes
@@ -31,11 +28,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case historyDataMsg:
 		if msg.siteID != m.historySiteID {
-			return m, nil // stale reply for a previously opened history
+			return m, nil
 		}
 		m.historyChanges = msg.changes
-		m.historyViewport.SetContent(m.buildHistoryContent())
-		m.historyViewport.GotoTop()
 		return m, nil
 	case slaDataMsg:
 		return m.handleSLAData(msg)
@@ -177,10 +172,6 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.recalcLayout()
 	m.logViewport.Width = msg.Width - chromePadH
 	m.logViewport.Height = msg.Height - (chromePadV + chromeHeader + chromeFooter + 2)
-	m.historyViewport.Width = msg.Width - chromePadH
-	m.historyViewport.Height = msg.Height - 10
-	m.slaViewport.Width = msg.Width - chromePadH
-	m.slaViewport.Height = msg.Height - 16
 	if m.huhForm != nil {
 		formHeight := msg.Height - 7
 		if formHeight < 5 {
@@ -212,7 +203,7 @@ func (m *Model) handleTick(t time.Time) (tea.Model, tea.Cmd) {
 // tab-data cadence, so a flap that happens while the panel is on screen shows
 // up without leaving and re-entering. Nil when no detail panel is open.
 func (m *Model) detailRefreshCmd() tea.Cmd {
-	if m.state != stateDetail || m.cursor >= len(m.sites) {
+	if !m.detailOpen || m.cursor >= len(m.sites) {
 		return nil
 	}
 	return m.loadDetailCmd(m.sites[m.cursor].ID)
@@ -288,30 +279,6 @@ func (m *Model) handleLogsFullscreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	if m.state == stateHistory {
-		switch msg.Button {
-		case tea.MouseButtonWheelUp:
-			m.historyViewport.ScrollUp(3)
-		case tea.MouseButtonWheelDown:
-			m.historyViewport.ScrollDown(3)
-		}
-		return m, nil
-	}
-	if m.state == stateSLA {
-		switch msg.Button {
-		case tea.MouseButtonWheelUp:
-			m.slaViewport.ScrollUp(3)
-		case tea.MouseButtonWheelDown:
-			m.slaViewport.ScrollDown(3)
-		}
-		return m, nil
-	}
-	if m.state == stateDetail {
-		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
-			return m.handleSparklineClick(msg)
-		}
-		return m, nil
-	}
 	if m.state != stateDashboard {
 		return m, nil
 	}
@@ -367,12 +334,6 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch m.state {
-	case stateDetail:
-		return m.handleDetailKey(msg)
-	case stateHistory:
-		return m.handleHistoryKey(msg)
-	case stateSLA:
-		return m.handleSLAKey(msg)
 	case stateAlertDetail:
 		return m.handleAlertDetailKey(msg)
 	case stateSettings:
@@ -417,115 +378,6 @@ func (m *Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "up", "k":
-		m.detailViewport.ScrollUp(1)
-		return m, nil
-	case "down", "j":
-		m.detailViewport.ScrollDown(1)
-		return m, nil
-	case "pgup":
-		m.detailViewport.ScrollUp(m.detailViewport.Height / 2)
-		return m, nil
-	case "pgdown":
-		m.detailViewport.ScrollDown(m.detailViewport.Height / 2)
-		return m, nil
-	case "esc":
-		if m.sparkTooltipIdx >= 0 {
-			m.sparkTooltipIdx = -1
-			return m, nil
-		}
-		m.sparkTooltipIdx = -1
-		m.state = stateDashboard
-	case "i":
-		m.sparkTooltipIdx = -1
-		m.state = stateDashboard
-	case "e":
-		return m.handleEditItem()
-	case "h":
-		if m.cursor < len(m.sites) {
-			site := m.sites[m.cursor]
-			m.historySiteName = site.Name
-			m.historySiteID = site.ID
-			m.historyChanges = nil
-			m.historyViewport = viewport.New(
-				m.termWidth-chromePadH,
-				m.termHeight-10,
-			)
-			m.historyViewport.SetContent("\n  Loading state history...")
-			m.state = stateHistory
-			return m, m.loadHistoryCmd(site.ID)
-		}
-	case "s":
-		if m.cursor < len(m.sites) {
-			return m, m.openSLAView(m.sites[m.cursor])
-		}
-	case "q":
-		m.state = stateDashboard
-	}
-	return m, nil
-}
-
-func (m *Model) handleSparklineClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	if m.cursor >= len(m.sites) {
-		return m, nil
-	}
-	site := m.sites[m.cursor]
-	hist, _ := m.engine.GetHistory(site.ID)
-
-	if zi := m.zones.Get("spark-latency"); zi != nil && !zi.IsZero() && zi.InBounds(msg) {
-		x, _ := zi.Pos(msg)
-		m.sparkTooltipIdx = resolveSparklineIndex(x, detailSparkWidth, len(hist.Latencies))
-		return m, nil
-	}
-	if zi := m.zones.Get("spark-heartbeat"); zi != nil && !zi.IsZero() && zi.InBounds(msg) {
-		x, _ := zi.Pos(msg)
-		m.sparkTooltipIdx = resolveSparklineIndex(x, detailSparkWidth, len(hist.Statuses))
-		return m, nil
-	}
-
-	m.sparkTooltipIdx = -1
-	return m, nil
-}
-
-func (m *Model) handleSLAKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "q", "esc":
-		m.state = stateDetail
-	case "1", "2", "3", "4":
-		idx := int(msg.String()[0]-'0') - 1
-		if idx >= 0 && idx < len(slaPeriods) {
-			m.slaPeriodIdx = idx
-			return m, m.loadSLACmd(m.slaSiteID, idx)
-		}
-	case "up", "k":
-		m.slaViewport.ScrollUp(1)
-	case "down", "j":
-		m.slaViewport.ScrollDown(1)
-	case "pgup":
-		m.slaViewport.HalfPageUp()
-	case "pgdown":
-		m.slaViewport.HalfPageDown()
-	case "ctrl+c":
-		return m, tea.Quit
-	}
-	return m, nil
-}
-
-func (m *Model) openSLAView(site models.Site) tea.Cmd {
-	m.slaSiteName = site.Name
-	m.slaSiteID = site.ID
-	m.slaPeriodIdx = 2 // default 30d
-	m.slaViewport = viewport.New(
-		m.termWidth-chromePadH,
-		m.termHeight-16,
-	)
-	m.slaViewport.SetContent("\n  Loading SLA report...")
-	m.state = stateSLA
-	return m.loadSLACmd(site.ID, m.slaPeriodIdx)
-}
-
 // handleSLAData folds an async SLA load into the model. The SLA math itself is
 // pure CPU and cheap, so it runs here; only the state-change read happens in
 // the Cmd. Replies for a different site or period than currently selected are
@@ -546,35 +398,6 @@ func (m *Model) handleSLAData(msg slaDataMsg) (tea.Model, tea.Cmd) {
 
 	m.slaReport = monitor.ComputeSLA(msg.changes, currentStatus, period.duration)
 	m.slaDailyBreakdown = monitor.ComputeDailyBreakdown(msg.changes, currentStatus, period.days, time.Now())
-
-	m.slaViewport = viewport.New(
-		m.termWidth-chromePadH,
-		m.termHeight-16,
-	)
-	m.slaViewport.SetContent(m.buildSLADailyContent())
-	m.slaViewport.GotoTop()
-	return m, nil
-}
-
-func (m *Model) handleHistoryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "q", "esc":
-		m.state = stateDetail
-	case "up", "k":
-		m.historyViewport.ScrollUp(1)
-	case "down", "j":
-		m.historyViewport.ScrollDown(1)
-	case "pgup":
-		m.historyViewport.HalfPageUp()
-	case "pgdown":
-		m.historyViewport.HalfPageDown()
-	case "home", "g":
-		m.historyViewport.GotoTop()
-	case "end", "G":
-		m.historyViewport.GotoBottom()
-	case "ctrl+c":
-		return m, tea.Quit
-	}
 	return m, nil
 }
 

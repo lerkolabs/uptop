@@ -1,12 +1,10 @@
 package tui
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
-	"github.com/charmbracelet/lipgloss"
 )
 
 type historyStats struct {
@@ -104,88 +102,4 @@ func (m Model) stateChangeSparkline(changes []models.StateChange, width int) str
 		}
 	}
 	return sb.String()
-}
-
-func (m Model) buildHistoryContent() string {
-	var b strings.Builder
-
-	reasonWidth := m.termWidth - chromePadH - 55
-	if reasonWidth < 10 {
-		reasonWidth = 10
-	}
-	if reasonWidth > 60 {
-		reasonWidth = 60
-	}
-
-	for i, sc := range m.historyChanges {
-		ts := sc.ChangedAt.Format("2006-01-02 15:04")
-
-		arrow := m.st.subtleStyle.Render(sc.FromStatus) + " → "
-		switch sc.ToStatus {
-		case string(models.StatusUp):
-			arrow += m.st.specialStyle.Render(sc.ToStatus)
-		case string(models.StatusLate):
-			arrow += m.st.warnStyle.Render(sc.ToStatus)
-		case string(models.StatusStale):
-			arrow += m.st.staleStyle.Render(sc.ToStatus)
-		default:
-			arrow += m.st.dangerStyle.Render(sc.ToStatus)
-		}
-
-		durStr := ""
-		if dur := computeOutageDuration(m.historyChanges, i); dur > 0 {
-			durStr = m.st.warnStyle.Render("outage " + fmtDuration(dur))
-		}
-
-		reason := ""
-		if sc.ErrorReason != "" && sc.ToStatus != string(models.StatusUp) {
-			reason = m.st.dangerStyle.Render(limitStr(sc.ErrorReason, reasonWidth))
-		}
-
-		fmt.Fprintf(&b, "  %-18s %s  %-12s %s\n", ts, arrow, durStr, reason)
-	}
-
-	return b.String()
-}
-
-func (m Model) viewHistoryPanel() string {
-	var b strings.Builder
-
-	header := "  " + m.st.subtleStyle.Render("History >") + " " + m.st.titleStyle.Render(m.historySiteName)
-	b.WriteString(header + "\n")
-
-	divWidth := m.dividerWidth()
-	b.WriteString(m.divider() + "\n")
-
-	sparkline := m.stateChangeSparkline(m.historyChanges, divWidth)
-	if sparkline != "" {
-		b.WriteString("  " + sparkline + "\n")
-		b.WriteString(m.divider() + "\n")
-	}
-
-	fmt.Fprintf(&b, "  %-18s %-17s %-12s %s\n",
-		m.st.subtleStyle.Render("TIME"),
-		m.st.subtleStyle.Render("TRANSITION"),
-		m.st.subtleStyle.Render("DURATION"),
-		m.st.subtleStyle.Render("REASON"))
-
-	if len(m.historyChanges) == 0 {
-		b.WriteString("\n  " + m.st.subtleStyle.Render("No state changes recorded") + "\n")
-	} else {
-		b.WriteString(m.historyViewport.View())
-	}
-
-	b.WriteString("\n" + m.divider() + "\n")
-
-	stats := computeHistoryStats(m.historyChanges)
-	parts := []string{fmt.Sprintf("%d events", stats.totalEvents)}
-	if stats.outageCount > 0 {
-		parts = append(parts, fmt.Sprintf("%d outages", stats.outageCount))
-		avg := stats.totalDowntime / time.Duration(stats.outageCount)
-		parts = append(parts, "avg outage "+fmtDuration(avg))
-	}
-	b.WriteString("  " + m.st.subtleStyle.Render(strings.Join(parts, " │ ")) + "\n")
-	b.WriteString("  " + m.st.subtleStyle.Render("[↑/↓] Scroll  [q/Esc] Back"))
-
-	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }

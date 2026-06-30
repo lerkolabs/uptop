@@ -80,8 +80,6 @@ const (
 	chromeFooter = 2 // footer: "\n" prefix + text line
 	chromeTable  = 3 // renderTable "\n" prefix + top border + header + bottom border (lipgloss collapses two into three rendered lines)
 	chromeBase   = chromePadV + chromeHeader + chromeGaps + chromeFooter + chromeTable
-
-	detailSparkWidth = 40
 )
 
 const (
@@ -113,19 +111,16 @@ const (
 type sessionState int
 
 const (
-	stateDashboard sessionState = iota
-	stateLogs
-	stateDetail
-	stateAlertDetail
-	stateFormSite
-	stateFormAlert
-	stateFormUser
-	stateConfirmDelete
-	stateFormMaint
-	stateHistory
-	stateSLA
-	stateSettings
-	stateMaintDetail
+	stateDashboard     sessionState = 0
+	stateLogs          sessionState = 1
+	stateAlertDetail   sessionState = 3
+	stateFormSite      sessionState = 4
+	stateFormAlert     sessionState = 5
+	stateFormUser      sessionState = 6
+	stateConfirmDelete sessionState = 7
+	stateFormMaint     sessionState = 8
+	stateSettings      sessionState = 11
+	stateMaintDetail   sessionState = 12
 )
 
 type Model struct {
@@ -161,12 +156,10 @@ type Model struct {
 	logTotal           int
 	logShown           int
 
-	historyViewport viewport.Model
 	historyChanges  []models.StateChange
 	historySiteName string
 	historySiteID   int
 
-	slaViewport       viewport.Model
 	slaReport         monitor.SLAReport
 	slaDailyBreakdown []monitor.DayReport
 	slaSiteName       string
@@ -212,12 +205,9 @@ type Model struct {
 	detailChanges       []models.StateChange
 	detailChangesSiteID int
 	detailDailyDays     []monitor.DayReport
-	detailViewport      viewport.Model
 
 	filterMode bool
 	filterText string
-
-	sparkTooltipIdx int // clicked sparkline data index, -1 = none
 
 	// demoMode renders a stable status dot instead of the animated pulse so
 	// screenshots/recordings don't capture the spinner mid-frame. Set via UPTOP_DEMO=1.
@@ -245,24 +235,23 @@ func InitialModel(ctx context.Context, isAdmin bool, s store.Store, eng *monitor
 	detailPref, _ := s.GetPreference(ctx, "detail_open")
 
 	return Model{
-		ctx:             ctx,
-		state:           stateDashboard,
-		logViewport:     vpLogs,
-		maxTableRows:    5,
-		isAdmin:         isAdmin,
-		store:           s,
-		engine:          eng,
-		zones:           z,
-		pulseSpring:     spring,
-		collapsed:       collapsed,
-		theme:           theme,
-		themeIndex:      themeIdx,
-		st:              newStyles(theme),
-		logsOpen:        true,
-		detailOpen:      detailPref == "true",
-		demoMode:        os.Getenv("UPTOP_DEMO") == "1",
-		version:         version,
-		sparkTooltipIdx: -1,
+		ctx:          ctx,
+		state:        stateDashboard,
+		logViewport:  vpLogs,
+		maxTableRows: 5,
+		isAdmin:      isAdmin,
+		store:        s,
+		engine:       eng,
+		zones:        z,
+		pulseSpring:  spring,
+		collapsed:    collapsed,
+		theme:        theme,
+		themeIndex:   themeIdx,
+		st:           newStyles(theme),
+		logsOpen:     true,
+		detailOpen:   detailPref == "true",
+		demoMode:     os.Getenv("UPTOP_DEMO") == "1",
+		version:      version,
 	}
 }
 
