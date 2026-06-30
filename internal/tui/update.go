@@ -651,16 +651,6 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if len(m.sites) > 0 {
 			site := m.sites[m.cursor]
-			if site.Type == "group" {
-				m.collapsed[site.ID] = !m.collapsed[site.ID]
-				payload := collapsedJSON(m.collapsed)
-				st := m.store
-				ctx := m.ctx
-				m.refreshLive()
-				return m, writeCmd("Save collapsed groups", func() error {
-					return st.SetPreference(ctx, "collapsed_groups", payload)
-				})
-			}
 			if !m.detailOpen {
 				m.detailOpen = true
 				m.detailMode = detailDefault
