@@ -298,6 +298,18 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	if m.focusedPanel == panelDetail && m.detailOpen {
+		if msg.Button == tea.MouseButtonWheelUp {
+			m.detailScrollOffset -= 3
+		} else {
+			m.detailScrollOffset += 3
+		}
+		if m.detailScrollOffset < 0 {
+			m.detailScrollOffset = 0
+		}
+		return m, nil
+	}
+
 	listLen := m.currentListLen()
 	if msg.Button == tea.MouseButtonWheelUp {
 		if m.cursor > 0 {
@@ -588,6 +600,13 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.recalcLayout()
 	case "up", "k":
+		if m.focusedPanel == panelDetail && m.detailOpen {
+			m.detailScrollOffset--
+			if m.detailScrollOffset < 0 {
+				m.detailScrollOffset = 0
+			}
+			return m, nil
+		}
 		if m.focusedPanel == panelMaint {
 			m.scrollMaintCursor(-1)
 			return m, nil
@@ -604,10 +623,15 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.syncSelectedID()
 			if m.detailOpen && m.cursor < len(m.sites) {
 				m.detailMode = detailDefault
+				m.detailScrollOffset = 0
 				return m, m.loadDetailCmd(m.sites[m.cursor].ID)
 			}
 		}
 	case "down", "j":
+		if m.focusedPanel == panelDetail && m.detailOpen {
+			m.detailScrollOffset++
+			return m, nil
+		}
 		if m.focusedPanel == panelMaint {
 			m.scrollMaintCursor(1)
 			return m, nil
@@ -625,6 +649,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.syncSelectedID()
 			if m.detailOpen && m.cursor < len(m.sites) {
 				m.detailMode = detailDefault
+				m.detailScrollOffset = 0
 				return m, m.loadDetailCmd(m.sites[m.cursor].ID)
 			}
 		}
@@ -652,6 +677,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.sites) > 0 {
 			m.detailOpen = !m.detailOpen
 			m.detailMode = detailDefault
+			m.detailScrollOffset = 0
 			m.recalcLayout()
 			st := m.store
 			ctx := m.ctx
@@ -702,9 +728,11 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.focusedPanel = panelMonitors
 		} else if m.detailOpen && m.detailMode != detailDefault {
 			m.detailMode = detailDefault
+			m.detailScrollOffset = 0
 		} else if m.detailOpen {
 			m.detailOpen = false
 			m.detailMode = detailDefault
+			m.detailScrollOffset = 0
 			m.recalcLayout()
 			st := m.store
 			ctx := m.ctx
@@ -719,6 +747,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.historySiteID = site.ID
 			m.historyChanges = nil
 			m.detailMode = detailHistory
+			m.detailScrollOffset = 0
 			return m, m.loadHistoryCmd(site.ID)
 		}
 	case "s":
@@ -728,6 +757,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.slaSiteID = site.ID
 			m.slaPeriodIdx = 2
 			m.detailMode = detailSLA
+			m.detailScrollOffset = 0
 			return m, m.loadSLACmd(site.ID, m.slaPeriodIdx)
 		}
 	case "1", "2", "3", "4":
@@ -735,6 +765,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			idx := int(msg.String()[0]-'0') - 1
 			if idx >= 0 && idx < len(slaPeriods) {
 				m.slaPeriodIdx = idx
+				m.detailScrollOffset = 0
 				return m, m.loadSLACmd(m.slaSiteID, idx)
 			}
 		}
@@ -860,6 +891,7 @@ func (m *Model) handleClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.syncSelectedID()
 			m.focusedPanel = panelMonitors
 			if m.detailOpen {
+				m.detailScrollOffset = 0
 				return m, m.loadDetailCmd(m.sites[m.cursor].ID)
 			}
 			return m, nil

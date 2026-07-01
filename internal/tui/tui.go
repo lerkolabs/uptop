@@ -160,11 +160,12 @@ type Model struct {
 	historySiteName string
 	historySiteID   int
 
-	slaReport         monitor.SLAReport
-	slaDailyBreakdown []monitor.DayReport
-	slaSiteName       string
-	slaSiteID         int
-	slaPeriodIdx      int
+	slaReport          monitor.SLAReport
+	slaDailyBreakdown  []monitor.DayReport
+	slaSiteName        string
+	slaSiteID          int
+	slaPeriodIdx       int
+	detailScrollOffset int
 
 	isAdmin bool
 	zones   *zone.Manager

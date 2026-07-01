@@ -235,7 +235,7 @@ func (m Model) fmtStatusWord(status string) string {
 	}
 }
 
-func (m Model) viewSLASidebar(width, height int) string {
+func (m Model) viewSLASidebar(width, _ int) string {
 	var b strings.Builder
 	label := m.st.subtleStyle
 	innerW := width - 4
@@ -277,21 +277,7 @@ func (m Model) viewSLASidebar(width, height int) string {
 		if dayBarW < 10 {
 			dayBarW = 10
 		}
-		slaChrome := 14
-		if r.OutageCount > 0 {
-			slaChrome += 3
-		}
-		maxDaily := len(m.slaDailyBreakdown)
-		if height > 0 && height-slaChrome < maxDaily {
-			maxDaily = height - slaChrome
-			if maxDaily < 1 {
-				maxDaily = 1
-			}
-		}
-		for i, day := range m.slaDailyBreakdown {
-			if i >= maxDaily {
-				break
-			}
+		for _, day := range m.slaDailyBreakdown {
 			dateStr := day.Date.Format("Jan 02")
 			dayBar := m.uptimeBar(day.UptimePct, dayBarW)
 			pctStr := fmtPct(day.UptimePct) + "%"
