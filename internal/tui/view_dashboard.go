@@ -159,8 +159,9 @@ func (m Model) viewMonitorsLayout() string {
 
 	m.contentWidth = monW - 2
 
+	monTargetH := m.maxTableRows + 5
 	monitors := m.viewSitesTab()
-	monPanel := m.zones.Mark("panel-monitors", m.titledPanel("Monitors", monitors, monW, m.focusedPanel == panelMonitors))
+	monPanel := m.zones.Mark("panel-monitors", m.titledPanelH("Monitors", monitors, "", monW, monTargetH, 0, m.focusedPanel == panelMonitors))
 
 	var topParts []string
 	topParts = append(topParts, monPanel)
