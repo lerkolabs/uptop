@@ -868,32 +868,32 @@ func (m *Model) handleClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 	if m.bottomPanel == bottomMaint && m.zones.Get("panel-maint").InBounds(msg) {
 		m.focusedPanel = panelMaint
+		_, relY := m.zones.Get("panel-maint").Pos(msg)
+		row := relY - 2
+		windows := m.activeMaintWindows()
+		if row >= 0 && row < len(windows) {
+			m.maintCursor = row
+		}
 		return m, nil
 	} else if m.zones.Get("panel-monitors").InBounds(msg) {
 		m.focusedPanel = panelMonitors
+		_, relY := m.zones.Get("panel-monitors").Pos(msg)
+		row := relY - 4 + m.tableOffset
+		if row >= 0 && row < len(m.sites) {
+			m.cursor = row
+			m.syncSelectedID()
+			if m.detailOpen {
+				m.detailScrollOffset = 0
+				return m, m.loadDetailCmd(m.sites[m.cursor].ID)
+			}
+		}
+		return m, nil
 	} else if m.zones.Get("panel-logs").InBounds(msg) {
 		m.focusedPanel = panelLogs
 		return m, nil
 	} else if m.detailOpen && m.zones.Get("panel-detail").InBounds(msg) {
 		m.focusedPanel = panelDetail
 		return m, nil
-	}
-
-	end := m.tableOffset + m.maxTableRows
-	if end > len(m.sites) {
-		end = len(m.sites)
-	}
-	for i := m.tableOffset; i < end; i++ {
-		if m.zones.Get(fmt.Sprintf("site-%d", i)).InBounds(msg) {
-			m.cursor = i
-			m.syncSelectedID()
-			m.focusedPanel = panelMonitors
-			if m.detailOpen {
-				m.detailScrollOffset = 0
-				return m, m.loadDetailCmd(m.sites[m.cursor].ID)
-			}
-			return m, nil
-		}
 	}
 
 	return m, nil
