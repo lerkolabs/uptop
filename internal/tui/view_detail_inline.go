@@ -32,7 +32,7 @@ func (m Model) viewDetailFullscreen() string {
 		return ""
 	}
 
-	totalW := m.termWidth - chromePadH
+	availW := m.termWidth - chromePadH
 	site := m.sites[m.cursor]
 
 	var title string
@@ -45,55 +45,37 @@ func (m Model) viewDetailFullscreen() string {
 		title = site.Name
 	}
 
-	var breadcrumb string
 	if site.ParentID > 0 {
 		for _, s := range m.sites {
 			if s.ID == site.ParentID {
-				breadcrumb = m.st.subtleStyle.Render("Monitors > "+s.Name+" > ") + m.st.titleStyle.Render(site.Name)
+				title = s.Name + " > " + title
 				break
 			}
 		}
 	}
-	if breadcrumb == "" {
-		breadcrumb = m.st.subtleStyle.Render("Monitors > ") + m.st.titleStyle.Render(title)
-	}
 
-	header := "  " + breadcrumb + "\n" + m.divider()
+	innerW := availW - 2
 
 	var content string
 	switch m.detailMode {
 	case detailSLA:
-		content = m.viewSLASidebar(totalW, 0)
+		content = m.viewSLASidebar(innerW, 0)
 	case detailHistory:
-		content = m.viewHistorySidebar(totalW, 0)
+		content = m.viewHistorySidebar(innerW, 0)
 	default:
 		hist, _ := m.engine.GetHistory(site.ID)
-		content = m.buildDetailContent(site, hist, totalW, true)
+		content = m.buildDetailContent(site, hist, innerW, true)
 	}
 
-	footer := m.divider() + "\n" + m.detailFooter(totalW)
+	footer := m.detailFooter(innerW)
 
-	contentLines := strings.Split(content, "\n")
-	contentH := m.termHeight - 8
-	if contentH < 5 {
-		contentH = 5
+	panelH := m.termHeight - chromePadV
+	if panelH < 10 {
+		panelH = 10
 	}
-
-	if m.detailScrollOffset > len(contentLines)-contentH {
-		m.detailScrollOffset = len(contentLines) - contentH
-	}
-	if m.detailScrollOffset < 0 {
-		m.detailScrollOffset = 0
-	}
-
-	end := m.detailScrollOffset + contentH
-	if end > len(contentLines) {
-		end = len(contentLines)
-	}
-	visible := strings.Join(contentLines[m.detailScrollOffset:end], "\n")
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(
-		header + "\n" + visible + "\n" + footer)
+		m.titledPanelH(title, content, footer, availW, panelH, m.detailScrollOffset, true))
 }
 
 func (m Model) buildDetailContent(site models.Site, hist monitor.SiteHistory, width int, fullscreen bool) string {
