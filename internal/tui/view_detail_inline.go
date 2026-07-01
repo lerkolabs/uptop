@@ -53,7 +53,11 @@ func (m Model) viewDetailSidebar(site models.Site, hist monitor.SiteHistory, wid
 	}
 
 	// Uptime + retries
-	uptimeParts := []string{label.Render("Uptime") + " " + m.fmtUptime(hist.Statuses)}
+	uptimeStr := m.fmtUptime(hist.Statuses)
+	if m.isMonitorInMaintenance(site.ID) {
+		uptimeStr = m.st.subtleStyle.Render("—")
+	}
+	uptimeParts := []string{label.Render("Uptime") + " " + uptimeStr}
 	if site.Type != "group" && site.MaxRetries > 0 {
 		uptimeParts = append(uptimeParts, label.Render("Retries")+" "+m.fmtRetries(site))
 	}

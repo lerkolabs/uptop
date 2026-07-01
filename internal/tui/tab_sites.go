@@ -299,7 +299,7 @@ func (m Model) viewSitesTab() string {
 					colType:    typeIcon(site.Type, false) + " " + site.Type,
 					colStatus:  m.fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)),
 					colLatency: m.fmtLatency(site.Latency),
-					colUptime:  m.fmtUptime(hist.Statuses),
+					colUptime:  m.fmtUptimeMaint(hist.Statuses, site.ID),
 					colHistory: spark,
 					colSSL:     m.fmtSSL(site),
 					colRetries: m.fmtRetries(site),

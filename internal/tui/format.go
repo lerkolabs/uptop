@@ -104,6 +104,13 @@ func (m Model) fmtLatency(d time.Duration) string {
 	return m.st.dangerStyle.Render(s)
 }
 
+func (m Model) fmtUptimeMaint(statuses []bool, siteID int) string {
+	if m.isMonitorInMaintenance(siteID) {
+		return m.st.subtleStyle.Render("—")
+	}
+	return m.fmtUptime(statuses)
+}
+
 func (m Model) fmtUptime(statuses []bool) string {
 	if len(statuses) == 0 {
 		return m.st.subtleStyle.Render("—")
