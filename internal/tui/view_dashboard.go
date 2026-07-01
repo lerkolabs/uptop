@@ -161,7 +161,7 @@ func (m Model) viewMonitorsLayout() string {
 	}
 	remaining := availW - maintW
 	if showDetail {
-		monW = remaining * 45 / 100
+		monW = remaining * 60 / 100
 		detailW = remaining - monW
 	} else {
 		monW = remaining
