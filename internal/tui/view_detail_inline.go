@@ -229,8 +229,8 @@ func (m Model) detailFooter(width int) string {
 				keys = append(keys, label.Render(k))
 			}
 		}
+		keys = append(keys, label.Render("[Esc] Back"))
 		lines = append(lines, "  "+strings.Join(keys, " "))
-		lines = append(lines, "  "+label.Render("[Esc] Back"))
 	case detailHistory:
 		lines = append(lines, "  "+label.Render("[Esc] Back"))
 	default:
