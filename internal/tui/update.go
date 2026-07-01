@@ -231,6 +231,7 @@ func (m *Model) handleTabData(msg tabDataMsg) (tea.Model, tea.Cmd) {
 	}
 	m.nodes = msg.nodes
 	m.maintenanceWindows = msg.maint
+	m.buildMaintSet()
 	m.clampCursor()
 	return m, nil
 }

@@ -123,6 +123,7 @@ func (m *Model) refreshLive() {
 		ordered = filterSites(ordered, m.filterText)
 	}
 	m.sites = ordered
+	m.buildMaintSet()
 	m.refreshLogContent()
 
 	if m.selectedID != 0 {

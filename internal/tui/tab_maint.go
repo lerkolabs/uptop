@@ -21,27 +21,36 @@ type maintFormData struct {
 }
 
 func (m Model) isMonitorInMaintenance(monitorID int) bool {
+	return m.maintSet[monitorID]
+}
+
+func (m *Model) buildMaintSet() {
+	set := make(map[int]bool)
+	now := time.Now()
 	for _, mw := range m.maintenanceWindows {
 		if mw.Type != "maintenance" {
 			continue
 		}
-		now := time.Now()
 		if mw.StartTime.After(now) {
 			continue
 		}
 		if !mw.EndTime.IsZero() && mw.EndTime.Before(now) {
 			continue
 		}
-		if mw.MonitorID == 0 || mw.MonitorID == monitorID {
-			return true
+		if mw.MonitorID == 0 {
+			for _, s := range m.sites {
+				set[s.ID] = true
+			}
+			break
 		}
+		set[mw.MonitorID] = true
 		for _, s := range m.sites {
-			if s.ID == monitorID && s.ParentID > 0 && mw.MonitorID == s.ParentID {
-				return true
+			if s.ParentID == mw.MonitorID {
+				set[s.ID] = true
 			}
 		}
 	}
-	return false
+	m.maintSet = set
 }
 
 func (m *Model) initMaintHuhForm() tea.Cmd {

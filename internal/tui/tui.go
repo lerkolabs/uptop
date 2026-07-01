@@ -207,6 +207,7 @@ type Model struct {
 	lastTabLoad        time.Time // last dispatch of loadTabDataCmd (throttle)
 	tabSeq             int       // seq of the newest issued tab-data load
 
+	maintSet            map[int]bool
 	bottomPanel         bottomPanel
 	detailOpen          bool
 	maintCursor         int

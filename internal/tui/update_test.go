@@ -389,3 +389,86 @@ func TestDetailRefreshCmd_OnlyWhileDetailOpen(t *testing.T) {
 		t.Error("refresh Cmd issued for an out-of-range cursor")
 	}
 }
+
+func TestBuildMaintSet_GlobalWindow(t *testing.T) {
+	m := newTestModel(&tuiMockStore{})
+	m.sites = []models.Site{
+		{SiteConfig: models.SiteConfig{ID: 1, Name: "a"}},
+		{SiteConfig: models.SiteConfig{ID: 2, Name: "b"}},
+	}
+	m.maintenanceWindows = []models.MaintenanceWindow{
+		{ID: 1, MonitorID: 0, Type: "maintenance", StartTime: time.Now().Add(-time.Hour)},
+	}
+	m.buildMaintSet()
+	if !m.maintSet[1] || !m.maintSet[2] {
+		t.Error("global maint window should mark all monitors")
+	}
+}
+
+func TestBuildMaintSet_TargetedWindow(t *testing.T) {
+	m := newTestModel(&tuiMockStore{})
+	m.sites = []models.Site{
+		{SiteConfig: models.SiteConfig{ID: 1, Name: "a"}},
+		{SiteConfig: models.SiteConfig{ID: 2, Name: "b"}},
+	}
+	m.maintenanceWindows = []models.MaintenanceWindow{
+		{ID: 1, MonitorID: 1, Type: "maintenance", StartTime: time.Now().Add(-time.Hour)},
+	}
+	m.buildMaintSet()
+	if !m.maintSet[1] {
+		t.Error("targeted window should mark monitor 1")
+	}
+	if m.maintSet[2] {
+		t.Error("targeted window should NOT mark monitor 2")
+	}
+}
+
+func TestBuildMaintSet_GroupPropagates(t *testing.T) {
+	m := newTestModel(&tuiMockStore{})
+	m.sites = []models.Site{
+		{SiteConfig: models.SiteConfig{ID: 10, Name: "group", Type: "group"}},
+		{SiteConfig: models.SiteConfig{ID: 11, Name: "child1", ParentID: 10}},
+		{SiteConfig: models.SiteConfig{ID: 12, Name: "child2", ParentID: 10}},
+		{SiteConfig: models.SiteConfig{ID: 20, Name: "other"}},
+	}
+	m.maintenanceWindows = []models.MaintenanceWindow{
+		{ID: 1, MonitorID: 10, Type: "maintenance", StartTime: time.Now().Add(-time.Hour)},
+	}
+	m.buildMaintSet()
+	if !m.maintSet[10] || !m.maintSet[11] || !m.maintSet[12] {
+		t.Error("group maint window should mark group + children")
+	}
+	if m.maintSet[20] {
+		t.Error("unrelated monitor should NOT be marked")
+	}
+}
+
+func TestBuildMaintSet_ExpiredIgnored(t *testing.T) {
+	m := newTestModel(&tuiMockStore{})
+	m.sites = []models.Site{
+		{SiteConfig: models.SiteConfig{ID: 1, Name: "a"}},
+	}
+	m.maintenanceWindows = []models.MaintenanceWindow{
+		{ID: 1, MonitorID: 1, Type: "maintenance",
+			StartTime: time.Now().Add(-2 * time.Hour),
+			EndTime:   time.Now().Add(-1 * time.Hour)},
+	}
+	m.buildMaintSet()
+	if m.maintSet[1] {
+		t.Error("expired maint window should not mark monitor")
+	}
+}
+
+func TestBuildMaintSet_IncidentIgnored(t *testing.T) {
+	m := newTestModel(&tuiMockStore{})
+	m.sites = []models.Site{
+		{SiteConfig: models.SiteConfig{ID: 1, Name: "a"}},
+	}
+	m.maintenanceWindows = []models.MaintenanceWindow{
+		{ID: 1, MonitorID: 0, Type: "incident", StartTime: time.Now().Add(-time.Hour)},
+	}
+	m.buildMaintSet()
+	if m.maintSet[1] {
+		t.Error("incident windows should not mark monitors as in maintenance")
+	}
+}

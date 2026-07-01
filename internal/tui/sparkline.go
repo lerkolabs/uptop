@@ -156,9 +156,8 @@ func resolveSparklineIndex(x, sparkWidth, dataLen int) int {
 }
 
 func (m Model) groupSparkline(groupID int, width int, bg lipgloss.TerminalColor) string {
-	allSites := m.engine.GetAllSites()
 	var childStatuses [][]bool
-	for _, s := range allSites {
+	for _, s := range m.sites {
 		if s.ParentID == groupID && !s.Paused && !m.isMonitorInMaintenance(s.ID) {
 			hist, _ := m.engine.GetHistory(s.ID)
 			if len(hist.Statuses) > 0 {
@@ -209,9 +208,8 @@ func (m Model) groupSparkline(groupID int, width int, bg lipgloss.TerminalColor)
 }
 
 func (m Model) groupUptime(groupID int) string {
-	allSites := m.engine.GetAllSites()
 	var allStatuses [][]bool
-	for _, s := range allSites {
+	for _, s := range m.sites {
 		if s.ParentID == groupID && !s.Paused && !m.isMonitorInMaintenance(s.ID) {
 			hist, _ := m.engine.GetHistory(s.ID)
 			if len(hist.Statuses) > 0 {
