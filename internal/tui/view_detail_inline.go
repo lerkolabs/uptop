@@ -143,8 +143,6 @@ func (m Model) viewDetailSidebar(site models.Site, hist monitor.SiteHistory, wid
 		b.WriteString("  " + label.Render("No state changes") + "\n")
 	}
 
-	b.WriteString("\n  " + m.detailKeys() + "\n")
-
 	return lipgloss.NewStyle().Width(width).MaxWidth(width).Render(b.String())
 }
 
@@ -214,6 +212,33 @@ func (m Model) detailTypeLine(site models.Site) []string {
 
 func (m Model) detailKeys() string {
 	return m.st.subtleStyle.Render("[e] Edit  [h] History  [s] SLA  [Esc] Back")
+}
+
+func (m Model) detailFooter(width int) string {
+	label := m.st.subtleStyle
+	var lines []string
+
+	switch m.detailMode {
+	case detailSLA:
+		var keys []string
+		for i, p := range slaPeriods {
+			k := fmt.Sprintf("[%s] %s", p.key, p.label)
+			if i == m.slaPeriodIdx {
+				keys = append(keys, m.st.titleStyle.Render(k))
+			} else {
+				keys = append(keys, label.Render(k))
+			}
+		}
+		lines = append(lines, "  "+strings.Join(keys, " "))
+		lines = append(lines, "  "+label.Render("[Esc] Back"))
+	case detailHistory:
+		lines = append(lines, "  "+label.Render("[Esc] Back"))
+	default:
+		lines = append(lines, "  "+m.detailKeys())
+	}
+
+	content := strings.Join(lines, "\n")
+	return lipgloss.NewStyle().Width(width).MaxWidth(width).Render(content)
 }
 
 func (m Model) fmtStatusWord(status string) string {
@@ -292,20 +317,6 @@ func (m Model) viewSLASidebar(width, _ int) string {
 		}
 	}
 
-	b.WriteString("\n")
-
-	var keys []string
-	for i, p := range slaPeriods {
-		k := fmt.Sprintf("[%s] %s", p.key, p.label)
-		if i == m.slaPeriodIdx {
-			keys = append(keys, m.st.titleStyle.Render(k))
-		} else {
-			keys = append(keys, label.Render(k))
-		}
-	}
-	b.WriteString("  " + strings.Join(keys, " ") + "\n")
-	b.WriteString("  " + label.Render("[Esc] Back") + "\n")
-
 	return lipgloss.NewStyle().Width(width).MaxWidth(width).Render(b.String())
 }
 
@@ -368,7 +379,6 @@ func (m Model) viewHistorySidebar(width, _ int) string {
 		statParts = append(statParts, "avg "+fmtDuration(avg))
 	}
 	b.WriteString("  " + label.Render(strings.Join(statParts, " │ ")) + "\n")
-	b.WriteString("  " + label.Render("[Esc] Back") + "\n")
 
 	return lipgloss.NewStyle().Width(width).MaxWidth(width).Render(b.String())
 }

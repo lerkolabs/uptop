@@ -6,7 +6,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func (m Model) titledPanelH(title, content string, width, height, scrollOffset int, focused bool) string {
+func (m Model) titledPanelH(title, content, footer string, width, height, scrollOffset int, focused bool) string {
 	if height <= 0 {
 		return m.titledPanel(title, content, width, focused)
 	}
@@ -40,7 +40,13 @@ func (m Model) titledPanelH(title, content string, width, height, scrollOffset i
 	inner := contentStyle.Render(content)
 	contentLines := strings.Split(inner, "\n")
 
-	bodyH := height - 2
+	var footerLines []string
+	if footer != "" {
+		footerRendered := contentStyle.Render(footer)
+		footerLines = strings.Split(footerRendered, "\n")
+	}
+
+	bodyH := height - 2 - len(footerLines)
 	if bodyH < 1 {
 		bodyH = 1
 	}
@@ -58,13 +64,21 @@ func (m Model) titledPanelH(title, content string, width, height, scrollOffset i
 	}
 	visible := contentLines[scrollOffset:end]
 
+	borderLine := func(line string) string {
+		return bc.Render("│") + line + strings.Repeat(" ", max(0, innerW-lipgloss.Width(line))) + bc.Render("│")
+	}
+	emptyLine := borderLine(strings.Repeat(" ", innerW))
+
 	var lines []string
 	lines = append(lines, top)
 	for _, line := range visible {
-		lines = append(lines, bc.Render("│")+line+strings.Repeat(" ", max(0, innerW-lipgloss.Width(line)))+bc.Render("│"))
+		lines = append(lines, borderLine(line))
 	}
-	for len(lines) < height-1 {
-		lines = append(lines, bc.Render("│")+strings.Repeat(" ", innerW)+bc.Render("│"))
+	for len(lines) < height-1-len(footerLines) {
+		lines = append(lines, emptyLine)
+	}
+	for _, line := range footerLines {
+		lines = append(lines, borderLine(line))
 	}
 	lines = append(lines, bottom)
 
