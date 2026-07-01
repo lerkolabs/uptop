@@ -162,6 +162,27 @@ func (m Model) fmtRetries(site models.Site) string {
 	return s
 }
 
+func (m Model) fmtStatusDot(status models.Status, paused bool, inMaint bool) string {
+	if paused {
+		return m.st.warnStyle.Render("◇")
+	}
+	if inMaint {
+		return m.st.maintStyle.Render("◼")
+	}
+	switch status {
+	case models.StatusDown, models.StatusSSLExp:
+		return m.st.dangerStyle.Render("▼")
+	case models.StatusLate:
+		return m.st.warnStyle.Render("◆")
+	case models.StatusStale:
+		return m.st.staleStyle.Render("◆")
+	case models.StatusPending:
+		return m.st.subtleStyle.Render("○")
+	default:
+		return m.st.specialStyle.Render("▲")
+	}
+}
+
 func (m Model) fmtStatus(status models.Status, paused bool, inMaint bool) string {
 	if paused {
 		return m.st.warnStyle.Render("◇ PAUSED")

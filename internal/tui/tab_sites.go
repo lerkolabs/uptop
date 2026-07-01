@@ -34,10 +34,9 @@ type siteFormData struct {
 type colKey int
 
 const (
-	colNum colKey = iota
+	colDot colKey = iota
 	colName
 	colType
-	colStatus
 	colLatency
 	colUptime
 	colHistory
@@ -55,16 +54,17 @@ type columnDef struct {
 }
 
 var siteColumns = []columnDef{
-	{colNum, "#", "#", 4, 4, 0},
+	{colDot, "", "", 3, 3, 0},
 	{colName, "NAME", "NAME", 0, 0, 0},
-	{colType, "TYPE", "TYPE", 10, 8, mediumBreakpoint},
-	{colStatus, "STATUS", "STATUS", 10, 10, 0},
+	{colType, "TYPE", "TYPE", 10, 8, 0},
 	{colLatency, "LATENCY", "LAT", 10, 7, 0},
-	{colUptime, "UPTIME", "UP%", 8, 8, mediumBreakpoint},
-	{colHistory, "HISTORY", "HISTORY", 0, 0, mediumBreakpoint},
-	{colSSL, "SSL", "SSL", 7, 5, wideBreakpoint},
-	{colRetries, "RETRIES", "RT", 9, 5, wideBreakpoint},
+	{colUptime, "UPTIME", "UP%", 8, 8, 0},
+	{colHistory, "HISTORY", "HISTORY", 0, 0, 0},
+	{colSSL, "SSL", "SSL", 7, 5, 0},
+	{colRetries, "RETRIES", "RT", 9, 5, 0},
 }
+
+var columnDropOrder = []colKey{colHistory, colRetries, colSSL, colUptime, colType}
 
 type tableLayout struct {
 	nameW, sparkW int
@@ -76,17 +76,51 @@ type tableLayout struct {
 func (m Model) computeLayout() tableLayout {
 	wide := m.isWide()
 
-	var active []colKey
-	var headers []string
-	var widths []int
-	var fixed int
-
 	cw := m.contentWidth
 	if cw == 0 {
 		cw = m.termWidth
 	}
+
+	dropped := make(map[colKey]bool)
+	minNameW := 20
+	minSparkW := 12
+
+	for attempt := 0; attempt <= len(columnDropOrder); attempt++ {
+		var fixed int
+		var flexCount int
+		for _, c := range siteColumns {
+			if dropped[c.key] {
+				continue
+			}
+			w := c.narrowW
+			if wide {
+				w = c.wideW
+			}
+			if w > 0 {
+				fixed += w
+			} else {
+				flexCount++
+			}
+		}
+		numCols := len(siteColumns) - len(dropped)
+		borderOverhead := 2 + (numCols - 1)
+		avail := cw - chromePadH - 2 - borderOverhead - fixed
+		minFlex := minNameW
+		if flexCount > 1 {
+			minFlex += minSparkW
+		}
+		if avail >= minFlex || attempt >= len(columnDropOrder) {
+			break
+		}
+		dropped[columnDropOrder[attempt]] = true
+	}
+
+	var active []colKey
+	var headers []string
+	var widths []int
+	var fixed int
 	for _, c := range siteColumns {
-		if c.minTerm > 0 && cw < c.minTerm {
+		if dropped[c.key] {
 			continue
 		}
 		active = append(active, c.key)
@@ -106,12 +140,12 @@ func (m Model) computeLayout() tableLayout {
 	}
 
 	sortColMap := map[int]colKey{
-		sortStatus:  colStatus,
+		sortStatus:  colDot,
 		sortName:    colName,
 		sortLatency: colLatency,
 	}
 	sortableKeys := map[colKey]string{
-		colStatus:  "sort-status",
+		colDot:     "sort-status",
 		colName:    "sort-name",
 		colLatency: "sort-latency",
 	}
@@ -245,11 +279,11 @@ func (m Model) viewSitesTab() string {
 				if site.Type == "group" {
 					groupRows[i-start] = true
 					icon := typeIcon("group", m.collapsed[site.ID])
+					inMaint := m.isMonitorInMaintenance(site.ID)
 					cells := map[colKey]string{
-						colNum:     strconv.Itoa(i + 1),
+						colDot:     m.fmtStatusDot(site.Status, site.Paused, inMaint),
 						colName:    m.zones.Mark(fmt.Sprintf("site-%d", i), icon+" "+limitStr(site.Name, nameW-4)),
 						colType:    "group",
-						colStatus:  m.fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)),
 						colLatency: m.st.subtleStyle.Render("—"),
 						colUptime:  m.groupUptime(site.ID),
 						colHistory: m.groupSparkline(site.ID, sparkWidth, rowBg),
@@ -293,11 +327,11 @@ func (m Model) viewSitesTab() string {
 					spark = m.latencySparkline(hist.Latencies, hist.Statuses, sparkWidth, rowBg)
 				}
 
+				inMaint := m.isMonitorInMaintenance(site.ID)
 				cells := map[colKey]string{
-					colNum:     strconv.Itoa(i + 1),
+					colDot:     m.fmtStatusDot(site.Status, site.Paused, inMaint),
 					colName:    m.zones.Mark(fmt.Sprintf("site-%d", i), name),
 					colType:    typeIcon(site.Type, false) + " " + site.Type,
-					colStatus:  m.fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID)),
 					colLatency: m.fmtLatency(site.Latency),
 					colUptime:  m.fmtUptimeMaint(hist.Statuses, site.ID),
 					colHistory: spark,
