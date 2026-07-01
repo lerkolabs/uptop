@@ -6,6 +6,18 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+func (m Model) titledPanelH(title, content string, width, height int, focused bool) string {
+	s := m.titledPanel(title, content, width, focused)
+	if height <= 0 {
+		return s
+	}
+	lines := strings.Split(s, "\n")
+	if len(lines) <= height {
+		return s
+	}
+	return strings.Join(lines[:height-1], "\n") + "\n" + lines[len(lines)-1]
+}
+
 func (m Model) titledPanel(title, content string, width int, focused bool) string {
 	borderColor := m.theme.Border
 	titleColor := m.theme.Muted

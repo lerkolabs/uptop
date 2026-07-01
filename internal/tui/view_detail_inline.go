@@ -10,23 +10,23 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func (m Model) viewDetailInline(width int) string {
+func (m Model) viewDetailInline(width, height int) string {
 	if m.cursor >= len(m.sites) {
 		return ""
 	}
 	switch m.detailMode {
 	case detailSLA:
-		return m.viewSLASidebar(width)
+		return m.viewSLASidebar(width, height)
 	case detailHistory:
-		return m.viewHistorySidebar(width)
+		return m.viewHistorySidebar(width, height)
 	default:
 		site := m.sites[m.cursor]
 		hist, _ := m.engine.GetHistory(site.ID)
-		return m.viewDetailSidebar(site, hist, width)
+		return m.viewDetailSidebar(site, hist, width, height)
 	}
 }
 
-func (m Model) viewDetailSidebar(site models.Site, hist monitor.SiteHistory, width int) string {
+func (m Model) viewDetailSidebar(site models.Site, hist monitor.SiteHistory, width, _ int) string {
 	dot := m.st.subtleStyle.Render(" · ")
 	label := m.st.subtleStyle
 	var b strings.Builder
@@ -235,7 +235,7 @@ func (m Model) fmtStatusWord(status string) string {
 	}
 }
 
-func (m Model) viewSLASidebar(width int) string {
+func (m Model) viewSLASidebar(width, height int) string {
 	var b strings.Builder
 	label := m.st.subtleStyle
 	innerW := width - 4
@@ -277,7 +277,21 @@ func (m Model) viewSLASidebar(width int) string {
 		if dayBarW < 10 {
 			dayBarW = 10
 		}
-		for _, day := range m.slaDailyBreakdown {
+		slaChrome := 14
+		if r.OutageCount > 0 {
+			slaChrome += 3
+		}
+		maxDaily := len(m.slaDailyBreakdown)
+		if height > 0 && height-slaChrome < maxDaily {
+			maxDaily = height - slaChrome
+			if maxDaily < 1 {
+				maxDaily = 1
+			}
+		}
+		for i, day := range m.slaDailyBreakdown {
+			if i >= maxDaily {
+				break
+			}
 			dateStr := day.Date.Format("Jan 02")
 			dayBar := m.uptimeBar(day.UptimePct, dayBarW)
 			pctStr := fmtPct(day.UptimePct) + "%"
@@ -309,7 +323,7 @@ func (m Model) viewSLASidebar(width int) string {
 	return lipgloss.NewStyle().Width(width).MaxWidth(width).Render(b.String())
 }
 
-func (m Model) viewHistorySidebar(width int) string {
+func (m Model) viewHistorySidebar(width, _ int) string {
 	var b strings.Builder
 	label := m.st.subtleStyle
 	innerW := width - 4

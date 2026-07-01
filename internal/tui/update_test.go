@@ -142,7 +142,7 @@ func TestDetailLoad_CachesAndViewDoesNoIO(t *testing.T) {
 	}
 
 	for i := 0; i < 3; i++ {
-		_ = m.viewDetailInline(80)
+		_ = m.viewDetailInline(80, 30)
 	}
 	if ms.stateChangeCalls != 1 {
 		t.Errorf("View performed DB IO: store hit %d times (want 1, from the Cmd only)", ms.stateChangeCalls)

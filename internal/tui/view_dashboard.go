@@ -190,8 +190,9 @@ func (m Model) viewMonitorsLayout() string {
 		case detailHistory:
 			title = "History · " + title
 		}
-		detail := m.viewDetailInline(detailW - 2)
-		detailPanel := m.zones.Mark("panel-detail", m.titledPanel(title, detail, detailW, m.focusedPanel == panelDetail))
+		monHeight := lipgloss.Height(monPanel)
+		detail := m.viewDetailInline(detailW-2, monHeight)
+		detailPanel := m.zones.Mark("panel-detail", m.titledPanelH(title, detail, detailW, monHeight, m.focusedPanel == panelDetail))
 		topParts = append(topParts, detailPanel)
 	}
 
