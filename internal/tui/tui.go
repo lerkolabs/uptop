@@ -95,6 +95,14 @@ const (
 	panelMaint    = 3
 )
 
+type bottomPanel int
+
+const (
+	bottomNone bottomPanel = iota
+	bottomLogs
+	bottomMaint
+)
+
 const (
 	detailDefault = 0
 	detailSLA     = 1
@@ -198,11 +206,9 @@ type Model struct {
 	lastTabLoad        time.Time // last dispatch of loadTabDataCmd (throttle)
 	tabSeq             int       // seq of the newest issued tab-data load
 
-	logsOpen            bool
+	bottomPanel         bottomPanel
 	detailOpen          bool
-	maintOpen           bool
 	maintCursor         int
-	maintOffset         int
 	detailChanges       []models.StateChange
 	detailChangesSiteID int
 	detailDailyDays     []monitor.DayReport
@@ -249,7 +255,7 @@ func InitialModel(ctx context.Context, isAdmin bool, s store.Store, eng *monitor
 		theme:        theme,
 		themeIndex:   themeIdx,
 		st:           newStyles(theme),
-		logsOpen:     true,
+		bottomPanel:  bottomLogs,
 		detailOpen:   detailPref == "true",
 		demoMode:     os.Getenv("UPTOP_DEMO") == "1",
 		version:      version,

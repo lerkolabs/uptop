@@ -85,6 +85,15 @@ func (m Model) viewMaintDetailPanel() string {
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }
 
+func (m Model) monitorNameByID(id int) string {
+	for _, s := range m.engine.GetAllSites() {
+		if s.ID == id {
+			return s.Name
+		}
+	}
+	return fmt.Sprintf("#%d", id)
+}
+
 func (m Model) activeMaintWindows() []models.MaintenanceWindow {
 	now := time.Now()
 	var out []models.MaintenanceWindow
@@ -97,31 +106,28 @@ func (m Model) activeMaintWindows() []models.MaintenanceWindow {
 	return out
 }
 
-func (m Model) viewMaintSidebar(width, maxLines int) string {
+func (m Model) viewMaintStrip(width, maxLines int) string {
 	windows := m.activeMaintWindows()
 	if len(windows) == 0 {
-		return m.st.subtleStyle.Render(" No active maintenance")
+		return m.st.subtleStyle.Render("  No active maintenance")
 	}
 
-	contentW := width - 2
-	if contentW < 10 {
-		contentW = 10
-	}
-
-	start := m.maintOffset
-	if start > len(windows) {
-		start = len(windows)
-	}
-	linesUsed := 0
-	end := start
-	for end < len(windows) && linesUsed+2 <= maxLines {
-		linesUsed += 2
-		end++
-	}
-
-	var lines []string
 	now := time.Now()
-	for i := start; i < end; i++ {
+	titleW := 30
+	monW := 20
+	if width < 80 {
+		titleW = width / 3
+		monW = width / 5
+	}
+
+	end := maxLines
+	if end > len(windows) {
+		end = len(windows)
+	}
+
+	style := lipgloss.NewStyle().Width(width).MaxWidth(width)
+	var lines []string
+	for i := 0; i < end; i++ {
 		mw := windows[i]
 		selected := m.focusedPanel == panelMaint && i == m.maintCursor
 
@@ -134,37 +140,40 @@ func (m Model) viewMaintSidebar(width, maxLines int) string {
 			icon = m.st.warnStyle.Render("○")
 		}
 
-		title := limitStr(mw.Title, contentW-3)
-		titleLine := " " + icon + " " + title
+		title := limitStr(mw.Title, titleW)
 
-		var detail string
+		monName := "All Monitors"
+		if mw.MonitorID > 0 {
+			monName = m.monitorNameByID(mw.MonitorID)
+		}
+		monName = limitStr(monName, monW)
+
+		var status string
 		if isActive {
 			if mw.EndTime.IsZero() {
-				detail = m.st.subtleStyle.Render("active · indefinite")
+				status = m.st.subtleStyle.Render("active · indefinite")
 			} else {
-				remaining := time.Until(mw.EndTime)
-				detail = m.st.subtleStyle.Render("active · " + fmtDuration(remaining))
+				status = m.st.subtleStyle.Render("active · " + fmtDuration(time.Until(mw.EndTime)) + " left")
 			}
 		} else {
-			detail = m.st.subtleStyle.Render(mw.StartTime.Format("Jan 02") + " · " + fmtDuration(mw.EndTime.Sub(mw.StartTime)))
+			status = m.st.subtleStyle.Render("scheduled · " + mw.StartTime.Format("Jan 02 15:04"))
 		}
-		detailLine := "   " + limitStr(detail, contentW-3)
+
+		line := fmt.Sprintf(" %s %-*s  %-*s  %s", icon, titleW, title, monW, m.st.subtleStyle.Render(monName), status)
 
 		if selected {
-			sel := m.st.tableSelectedStyle
-			titleLine = sel.Render(lipgloss.NewStyle().Width(contentW).Render(titleLine))
-			detailLine = sel.Render(lipgloss.NewStyle().Width(contentW).Render(detailLine))
+			line = m.st.tableSelectedStyle.Render(lipgloss.NewStyle().Width(width).Render(line))
 		}
 
-		lines = append(lines, titleLine, detailLine)
+		lines = append(lines, line)
 	}
 
-	if len(windows) > end-start {
-		more := fmt.Sprintf(" %d more", len(windows)-(end-start))
+	if len(windows) > end {
+		more := fmt.Sprintf("  %d more", len(windows)-end)
 		lines = append(lines, m.st.subtleStyle.Render(more))
 	}
 
-	return strings.Join(lines, "\n")
+	return style.Render(strings.Join(lines, "\n"))
 }
 
 func (m *Model) scrollMaintCursor(delta int) {
@@ -179,15 +188,5 @@ func (m *Model) scrollMaintCursor(delta int) {
 	}
 	if m.maintCursor >= total {
 		m.maintCursor = total - 1
-	}
-	if m.maintCursor < m.maintOffset {
-		m.maintOffset = m.maintCursor
-	}
-	visible := m.maxTableRows / 2
-	if visible < 1 {
-		visible = 1
-	}
-	if m.maintCursor >= m.maintOffset+visible {
-		m.maintOffset = m.maintCursor - visible + 1
 	}
 }

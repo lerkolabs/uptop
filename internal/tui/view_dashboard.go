@@ -143,28 +143,18 @@ func (m Model) computeStats() dashboardStats {
 	return s
 }
 
-const maintSidebarW = 22
-
 func (m Model) viewMonitorsLayout() string {
 	availW := m.termWidth - chromePadH
 	wide := m.termWidth >= wideBreakpoint
 
-	showMaint := m.maintOpen && wide
 	showDetail := m.detailOpen && wide
 
-	var maintW, detailW, monW int
-	if showMaint {
-		maintW = maintSidebarW
-		if maintW > availW/4 {
-			maintW = availW / 4
-		}
-	}
-	remaining := availW - maintW
+	var detailW, monW int
 	if showDetail {
-		monW = remaining * 60 / 100
-		detailW = remaining - monW
+		monW = availW * 60 / 100
+		detailW = availW - monW
 	} else {
-		monW = remaining
+		monW = availW
 	}
 
 	m.contentWidth = monW - 2
@@ -173,11 +163,6 @@ func (m Model) viewMonitorsLayout() string {
 	monPanel := m.zones.Mark("panel-monitors", m.titledPanel("Monitors", monitors, monW, m.focusedPanel == panelMonitors))
 
 	var topParts []string
-	if showMaint {
-		sidebar := m.viewMaintSidebar(maintW-2, m.maxTableRows)
-		maintPanel := m.zones.Mark("panel-maint", m.titledPanel("Maint", sidebar, maintW, m.focusedPanel == panelMaint))
-		topParts = append(topParts, maintPanel)
-	}
 	topParts = append(topParts, monPanel)
 	if showDetail {
 		title := ""
@@ -199,10 +184,15 @@ func (m Model) viewMonitorsLayout() string {
 
 	top := lipgloss.JoinHorizontal(lipgloss.Top, topParts...)
 
-	if m.logsOpen {
+	switch m.bottomPanel {
+	case bottomLogs:
 		logContent := m.viewLogsStrip(availW-2, logsStripHeight-2)
 		logPanel := m.zones.Mark("panel-logs", m.titledPanel("Logs", logContent, availW, m.focusedPanel == panelLogs))
 		return top + "\n" + logPanel
+	case bottomMaint:
+		maintContent := m.viewMaintStrip(availW-2, logsStripHeight-2)
+		maintPanel := m.zones.Mark("panel-maint", m.titledPanel("Maint", maintContent, availW, m.focusedPanel == panelMaint))
+		return top + "\n" + maintPanel
 	}
 	return top
 }
@@ -296,7 +286,7 @@ func (m Model) renderFooter(_ dashboardStats) string {
 
 	var parts []string
 	if m.focusedPanel == panelMaint {
-		parts = []string{m.hotkey("n", "New"), m.hotkey("x", "End"), m.hotkey("d", "Del"), m.hotkey("Esc", "Back")}
+		parts = []string{m.hotkey("n", "New"), m.hotkey("Enter", "Detail"), m.hotkey("x", "End"), m.hotkey("d", "Del"), m.hotkey("m/Esc", "Back")}
 	} else if m.focusedPanel == panelLogs {
 		parts = []string{m.hotkey("↑/↓", "Scroll"), m.hotkey("Enter", "Expand"), m.hotkey("l/Esc", "Back")}
 	} else if m.detailOpen && m.detailMode == detailSLA {
@@ -304,7 +294,7 @@ func (m Model) renderFooter(_ dashboardStats) string {
 	} else if m.detailOpen && m.detailMode == detailHistory {
 		parts = []string{m.hotkey("Esc", "Back")}
 	} else if m.detailOpen {
-		parts = []string{m.hotkey("Enter", "Close"), m.hotkey("h", "History"), m.hotkey("s", "SLA"), m.hotkey("e", "Edit"), m.hotkey("m", "Maint")}
+		parts = []string{m.hotkey("Enter", "Close"), m.hotkey("h", "History"), m.hotkey("s", "SLA"), m.hotkey("e", "Edit")}
 	} else {
 		parts = []string{m.hotkey("/", "Filter"), m.hotkey("Enter", "Detail")}
 		if m.cursor < len(m.sites) && m.sites[m.cursor].Type == "group" {
@@ -314,9 +304,9 @@ func (m Model) renderFooter(_ dashboardStats) string {
 				parts = append(parts, m.hotkey("Space", "Collapse"))
 			}
 		}
-		parts = append(parts, m.hotkey("n", "New"), m.hotkey("e", "Edit"), m.hotkey("d", "Del"), m.hotkey("m", "Maint"))
+		parts = append(parts, m.hotkey("n", "New"), m.hotkey("e", "Edit"), m.hotkey("d", "Del"))
 	}
-	parts = append(parts, m.hotkey("l", "Logs"), m.hotkey("S", "Settings"), m.hotkey("T", "Theme"), m.hotkey("q", "Quit"))
+	parts = append(parts, m.hotkey("m", "Maint"), m.hotkey("l", "Logs"), m.hotkey("S", "Settings"), m.hotkey("T", "Theme"), m.hotkey("q", "Quit"))
 
 	line := strings.Join(parts, dot)
 	if m.filterText != "" {

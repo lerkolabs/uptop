@@ -157,7 +157,7 @@ func (m *Model) recalcLayout() {
 	if m.filterMode || m.filterText != "" {
 		chrome++
 	}
-	if m.logsOpen {
+	if m.bottomPanel != bottomNone {
 		chrome += logsStripHeight
 	}
 	m.maxTableRows = m.termHeight - chrome
@@ -580,22 +580,20 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.sortAsc = !m.sortAsc
 		m.refreshLive()
 	case "m":
-		if m.termWidth >= wideBreakpoint {
-			if m.focusedPanel == panelMaint {
-				m.maintOpen = false
-				m.focusedPanel = panelMonitors
-			} else {
-				m.maintOpen = true
-				m.focusedPanel = panelMaint
-			}
-			m.recalcLayout()
-		}
-	case "l":
-		if m.logsOpen {
-			m.logsOpen = false
+		if m.bottomPanel == bottomMaint {
+			m.bottomPanel = bottomNone
 			m.focusedPanel = panelMonitors
 		} else {
-			m.logsOpen = true
+			m.bottomPanel = bottomMaint
+			m.focusedPanel = panelMaint
+		}
+		m.recalcLayout()
+	case "l":
+		if m.bottomPanel == bottomLogs {
+			m.bottomPanel = bottomNone
+			m.focusedPanel = panelMonitors
+		} else {
+			m.bottomPanel = bottomLogs
 			m.focusedPanel = panelLogs
 		}
 		m.recalcLayout()
@@ -868,7 +866,7 @@ func (m *Model) handleClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if m.maintOpen && m.zones.Get("panel-maint").InBounds(msg) {
+	if m.bottomPanel == bottomMaint && m.zones.Get("panel-maint").InBounds(msg) {
 		m.focusedPanel = panelMaint
 		return m, nil
 	} else if m.zones.Get("panel-monitors").InBounds(msg) {
