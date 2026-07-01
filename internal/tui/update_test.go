@@ -300,6 +300,70 @@ func TestWriteDoneMsg_LogsErrorAndReloads(t *testing.T) {
 	}
 }
 
+func TestEnterNarrowTerminal_OpensFullscreen(t *testing.T) {
+	ms := &tuiMockStore{stateChanges: []models.StateChange{{FromStatus: "UP", ToStatus: "DOWN"}}}
+	m := newTestModel(ms)
+	m.sites = []models.Site{{SiteConfig: models.SiteConfig{ID: 1, Name: "site"}, SiteState: models.SiteState{Status: "UP"}}}
+	m.termWidth = 80 // narrow, below wideBreakpoint (120)
+	m.termHeight = 40
+	m.focusedPanel = panelMonitors
+
+	updated, cmd := (&m).handleDashboardKey(keyMsg("enter"))
+	got := updated.(*Model)
+	if got.state != stateDetailFullscreen {
+		t.Fatalf("expected stateDetailFullscreen, got %d", got.state)
+	}
+	if cmd == nil {
+		t.Fatal("expected a detail load Cmd")
+	}
+}
+
+func TestEnterWideTerminal_TogglesSidebar(t *testing.T) {
+	ms := &tuiMockStore{stateChanges: []models.StateChange{{FromStatus: "UP", ToStatus: "DOWN"}}}
+	m := newTestModel(ms)
+	m.sites = []models.Site{{SiteConfig: models.SiteConfig{ID: 1, Name: "site"}, SiteState: models.SiteState{Status: "UP"}}}
+	m.termWidth = 140 // wide, above wideBreakpoint (120)
+	m.termHeight = 40
+	m.focusedPanel = panelMonitors
+
+	updated, _ := (&m).handleDashboardKey(keyMsg("enter"))
+	got := updated.(*Model)
+	if got.state != stateDashboard {
+		t.Fatalf("expected stateDashboard, got %d", got.state)
+	}
+	if !got.detailOpen {
+		t.Fatal("expected detailOpen to be true")
+	}
+}
+
+func TestDetailFullscreen_EscReturnsToDashboard(t *testing.T) {
+	m := newTestModel(&tuiMockStore{})
+	m.state = stateDetailFullscreen
+	m.sites = []models.Site{{SiteConfig: models.SiteConfig{ID: 1, Name: "site"}}}
+
+	updated, _ := (&m).handleDetailFullscreen(tea.KeyMsg{Type: tea.KeyEsc})
+	got := updated.(*Model)
+	if got.state != stateDashboard {
+		t.Fatalf("expected stateDashboard after Esc, got %d", got.state)
+	}
+	if got.focusedPanel != panelMonitors {
+		t.Fatalf("expected panelMonitors focus, got %d", got.focusedPanel)
+	}
+}
+
+func TestDetailRefreshCmd_FiresForFullscreen(t *testing.T) {
+	ms := &tuiMockStore{stateChanges: []models.StateChange{{FromStatus: "UP", ToStatus: "DOWN"}}}
+	m := newTestModel(ms)
+	m.sites = []models.Site{{SiteConfig: models.SiteConfig{ID: 5, Name: "site"}}}
+	m.state = stateDetailFullscreen
+	m.detailOpen = false
+
+	cmd := (&m).detailRefreshCmd()
+	if cmd == nil {
+		t.Fatal("detailRefreshCmd should fire for stateDetailFullscreen")
+	}
+}
+
 func TestDetailRefreshCmd_OnlyWhileDetailOpen(t *testing.T) {
 	ms := &tuiMockStore{stateChanges: []models.StateChange{{FromStatus: "UP", ToStatus: "DOWN"}}}
 	m := newTestModel(ms)

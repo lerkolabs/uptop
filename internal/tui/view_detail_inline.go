@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -22,20 +23,90 @@ func (m Model) viewDetailInline(width, height int) string {
 	default:
 		site := m.sites[m.cursor]
 		hist, _ := m.engine.GetHistory(site.ID)
-		return m.viewDetailSidebar(site, hist, width, height)
+		return m.buildDetailContent(site, hist, width, false)
 	}
 }
 
-func (m Model) viewDetailSidebar(site models.Site, hist monitor.SiteHistory, width, _ int) string {
+func (m Model) viewDetailFullscreen() string {
+	if m.cursor >= len(m.sites) {
+		return ""
+	}
+
+	totalW := m.termWidth - chromePadH
+	site := m.sites[m.cursor]
+
+	var title string
+	switch m.detailMode {
+	case detailSLA:
+		title = "SLA · " + site.Name
+	case detailHistory:
+		title = "History · " + site.Name
+	default:
+		title = site.Name
+	}
+
+	var breadcrumb string
+	if site.ParentID > 0 {
+		for _, s := range m.sites {
+			if s.ID == site.ParentID {
+				breadcrumb = m.st.subtleStyle.Render("Monitors > "+s.Name+" > ") + m.st.titleStyle.Render(site.Name)
+				break
+			}
+		}
+	}
+	if breadcrumb == "" {
+		breadcrumb = m.st.subtleStyle.Render("Monitors > ") + m.st.titleStyle.Render(title)
+	}
+
+	header := "  " + breadcrumb + "\n" + m.divider()
+
+	var content string
+	switch m.detailMode {
+	case detailSLA:
+		content = m.viewSLASidebar(totalW, 0)
+	case detailHistory:
+		content = m.viewHistorySidebar(totalW, 0)
+	default:
+		hist, _ := m.engine.GetHistory(site.ID)
+		content = m.buildDetailContent(site, hist, totalW, true)
+	}
+
+	footer := m.divider() + "\n" + m.detailFooter(totalW)
+
+	contentLines := strings.Split(content, "\n")
+	contentH := m.termHeight - 8
+	if contentH < 5 {
+		contentH = 5
+	}
+
+	if m.detailScrollOffset > len(contentLines)-contentH {
+		m.detailScrollOffset = len(contentLines) - contentH
+	}
+	if m.detailScrollOffset < 0 {
+		m.detailScrollOffset = 0
+	}
+
+	end := m.detailScrollOffset + contentH
+	if end > len(contentLines) {
+		end = len(contentLines)
+	}
+	visible := strings.Join(contentLines[m.detailScrollOffset:end], "\n")
+
+	return lipgloss.NewStyle().Padding(1, 2).Render(
+		header + "\n" + visible + "\n" + footer)
+}
+
+func (m Model) buildDetailContent(site models.Site, hist monitor.SiteHistory, width int, fullscreen bool) string {
 	dot := m.st.subtleStyle.Render(" · ")
 	label := m.st.subtleStyle
-	var b strings.Builder
 	innerW := width - 4
 	if innerW < 20 {
 		innerW = 20
 	}
 
-	// Status + latency + last check
+	var b strings.Builder
+
+	// Status + latency + last check + state since
 	status := m.fmtStatus(site.Status, site.Paused, m.isMonitorInMaintenance(site.ID))
 	statusParts := []string{status}
 	if site.Latency > 0 {
@@ -43,6 +114,10 @@ func (m Model) viewDetailSidebar(site models.Site, hist monitor.SiteHistory, wid
 	}
 	if !site.LastCheck.IsZero() {
 		statusParts = append(statusParts, m.fmtTimeAgo(site.LastCheck))
+	}
+	if !site.StatusChangedAt.IsZero() {
+		dur := time.Since(site.StatusChangedAt)
+		statusParts = append(statusParts, label.Render("for")+" "+fmtDuration(dur))
 	}
 	b.WriteString("  " + strings.Join(statusParts, dot) + "\n")
 
@@ -52,7 +127,10 @@ func (m Model) viewDetailSidebar(site models.Site, hist monitor.SiteHistory, wid
 		b.WriteString("  " + strings.Join(typeParts, dot) + "\n")
 	}
 
-	// Uptime + retries
+	// Extended endpoint fields
+	m.writeEndpointFields(&b, site, label, innerW, fullscreen)
+
+	// Uptime + retries + last success
 	uptimeStr := m.fmtUptime(hist.Statuses)
 	if m.isMonitorInMaintenance(site.ID) {
 		uptimeStr = m.st.subtleStyle.Render("—")
@@ -61,7 +139,20 @@ func (m Model) viewDetailSidebar(site models.Site, hist monitor.SiteHistory, wid
 	if site.Type != "group" && site.MaxRetries > 0 {
 		uptimeParts = append(uptimeParts, label.Render("Retries")+" "+m.fmtRetries(site))
 	}
+	if site.Type != "push" && !site.LastSuccessAt.IsZero() {
+		uptimeParts = append(uptimeParts, label.Render("Last OK")+" "+m.fmtTimeAgo(site.LastSuccessAt))
+	}
 	b.WriteString("  " + strings.Join(uptimeParts, dot) + "\n")
+
+	// Maintenance window name
+	if m.isMonitorInMaintenance(site.ID) {
+		for _, mw := range m.maintenanceWindows {
+			if mw.Type == "maintenance" && (mw.MonitorID == 0 || mw.MonitorID == site.ID || mw.MonitorID == site.ParentID) {
+				b.WriteString("  " + label.Render("Maint") + " " + m.st.maintStyle.Render(mw.Title) + "\n")
+				break
+			}
+		}
+	}
 
 	// Error line
 	if (site.Status == models.StatusDown || site.Status == models.StatusSSLExp ||
@@ -73,7 +164,61 @@ func (m Model) viewDetailSidebar(site models.Site, hist monitor.SiteHistory, wid
 		b.WriteString("  " + label.Render("Error") + " " + m.st.dangerStyle.Render(limitStr(site.LastError, errW)) + "\n")
 	}
 
+	// Connection chain
+	if (site.Status == models.StatusDown || site.Status == models.StatusSSLExp) && site.LastError != "" {
+		chain := connectionChain(site.LastError, site.Type, site.StatusCode, strings.HasPrefix(site.URL, "https"))
+		if len(chain) > 0 {
+			b.WriteString("\n")
+			for _, step := range chain {
+				var icon string
+				switch step.Status {
+				case stepPassed:
+					icon = m.st.specialStyle.Render("✓")
+				case stepFailed:
+					icon = m.st.dangerStyle.Render("✗")
+				case stepSkipped:
+					icon = m.st.subtleStyle.Render("·")
+				}
+				line := fmt.Sprintf("  %s %-16s", icon, step.Name)
+				if step.Detail != "" {
+					switch step.Status {
+					case stepFailed:
+						line += " " + m.st.dangerStyle.Render(step.Detail)
+					case stepSkipped:
+						line += " " + m.st.subtleStyle.Render(step.Detail)
+					}
+				}
+				b.WriteString(line + "\n")
+			}
+		}
+	}
+
 	b.WriteString("\n")
+
+	// Probe results
+	probeResults := m.engine.GetProbeResults(site.ID)
+	if len(probeResults) > 0 {
+		nodeIDs := make([]string, 0, len(probeResults))
+		for id := range probeResults {
+			nodeIDs = append(nodeIDs, id)
+		}
+		sort.Strings(nodeIDs)
+		for _, nodeID := range nodeIDs {
+			result := probeResults[nodeID]
+			probeStatus := m.st.specialStyle.Render("UP")
+			if !result.IsUp {
+				probeStatus = m.st.dangerStyle.Render("DN")
+			}
+			latency := time.Duration(result.LatencyNs).Milliseconds()
+			ago := time.Since(result.CheckedAt).Truncate(time.Second)
+			line := fmt.Sprintf("  %-14s %s  %dms  %s ago", nodeID, probeStatus, latency, ago)
+			if !result.IsUp && result.ErrorReason != "" {
+				line += "  " + m.st.dangerStyle.Render(result.ErrorReason)
+			}
+			b.WriteString(line + "\n")
+		}
+		b.WriteString("\n")
+	}
 
 	// Latency chart
 	if len(hist.Latencies) > 0 {
@@ -116,6 +261,15 @@ func (m Model) viewDetailSidebar(site models.Site, hist monitor.SiteHistory, wid
 		}
 	}
 
+	// Latency histogram
+	if site.Type != "push" && len(hist.Latencies) > 5 {
+		histContent := m.latencyHistogram(hist.Latencies, hist.Statuses, innerW)
+		if histContent != "" {
+			b.WriteString("\n")
+			b.WriteString(histContent)
+		}
+	}
+
 	b.WriteString("\n")
 
 	// State changes
@@ -148,6 +302,47 @@ func (m Model) viewDetailSidebar(site models.Site, hist monitor.SiteHistory, wid
 	}
 
 	return lipgloss.NewStyle().Width(width).MaxWidth(width).Render(b.String())
+}
+
+func (m Model) writeEndpointFields(b *strings.Builder, site models.Site, label lipgloss.Style, innerW int, fullscreen bool) {
+	dot := m.st.subtleStyle.Render(" · ")
+	var fields []string
+
+	if site.Interval > 0 {
+		fields = append(fields, label.Render("Every")+" "+fmt.Sprintf("%ds", site.Interval))
+	}
+	if site.Timeout > 0 {
+		fields = append(fields, label.Render("Timeout")+" "+fmt.Sprintf("%ds", site.Timeout))
+	}
+	if site.Type == "http" && site.Method != "" && site.Method != "GET" {
+		fields = append(fields, label.Render("Method")+" "+site.Method)
+	}
+	if site.Type == "http" {
+		codes := site.AcceptedCodes
+		if codes == "" {
+			codes = "200-299"
+		}
+		fields = append(fields, label.Render("Codes")+" "+codes)
+	}
+	if site.Regions != "" {
+		fields = append(fields, label.Render("Regions")+" "+site.Regions)
+	}
+
+	if len(fields) > 0 {
+		b.WriteString("  " + strings.Join(fields, dot) + "\n")
+	}
+
+	if site.Description != "" {
+		maxDescW := innerW
+		if !fullscreen && maxDescW > 60 {
+			maxDescW = 60
+		}
+		b.WriteString("  " + label.Render(limitStr(site.Description, maxDescW)) + "\n")
+	}
+
+	if site.Type == "push" && site.Token != "" {
+		b.WriteString("  " + label.Render("Token") + " " + site.Token + "\n")
+	}
 }
 
 func (m Model) detailTypeLine(site models.Site) []string {

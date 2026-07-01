@@ -19,7 +19,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tabDataMsg:
 		return m.handleTabData(msg)
 	case detailDataMsg:
-		if m.detailOpen && m.cursor < len(m.sites) && m.sites[m.cursor].ID != msg.siteID {
+		detailVisible := m.detailOpen || m.state == stateDetailFullscreen
+		if detailVisible && m.cursor < len(m.sites) && m.sites[m.cursor].ID != msg.siteID {
 			return m, nil
 		}
 		m.detailChanges = msg.changes
@@ -50,6 +51,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if m.state == stateLogs {
 		return m.handleLogsFullscreen(msg)
+	}
+	if m.state == stateDetailFullscreen {
+		return m.handleDetailFullscreen(msg)
 	}
 
 	switch msg := msg.(type) {
@@ -203,7 +207,7 @@ func (m *Model) handleTick(t time.Time) (tea.Model, tea.Cmd) {
 // tab-data cadence, so a flap that happens while the panel is on screen shows
 // up without leaving and re-entering. Nil when no detail panel is open.
 func (m *Model) detailRefreshCmd() tea.Cmd {
-	if !m.detailOpen || m.cursor >= len(m.sites) {
+	if (!m.detailOpen && m.state != stateDetailFullscreen) || m.cursor >= len(m.sites) {
 		return nil
 	}
 	return m.loadDetailCmd(m.sites[m.cursor].ID)
@@ -274,6 +278,75 @@ func (m *Model) handleLogsFullscreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case tickMsg:
 		m.refreshLogContent()
+	}
+	return m, nil
+}
+
+func (m *Model) handleDetailFullscreen(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "esc", "q":
+			m.state = stateDashboard
+			m.focusedPanel = panelMonitors
+		case "ctrl+c":
+			return m, tea.Quit
+		case "e":
+			return m.handleEditItem()
+		case "h":
+			if m.cursor < len(m.sites) {
+				site := m.sites[m.cursor]
+				m.historySiteName = site.Name
+				m.historySiteID = site.ID
+				m.historyChanges = nil
+				m.detailMode = detailHistory
+				m.detailScrollOffset = 0
+				return m, m.loadHistoryCmd(site.ID)
+			}
+		case "s":
+			if m.cursor < len(m.sites) {
+				site := m.sites[m.cursor]
+				m.slaSiteName = site.Name
+				m.slaSiteID = site.ID
+				m.slaPeriodIdx = 2
+				m.detailMode = detailSLA
+				m.detailScrollOffset = 0
+				return m, m.loadSLACmd(site.ID, m.slaPeriodIdx)
+			}
+		case "1", "2", "3", "4":
+			if m.detailMode == detailSLA {
+				idx := int(msg.String()[0]-'0') - 1
+				if idx >= 0 && idx < len(slaPeriods) {
+					m.slaPeriodIdx = idx
+					m.detailScrollOffset = 0
+					return m, m.loadSLACmd(m.slaSiteID, idx)
+				}
+			}
+		case "up", "k":
+			m.detailScrollOffset--
+			if m.detailScrollOffset < 0 {
+				m.detailScrollOffset = 0
+			}
+		case "down", "j":
+			m.detailScrollOffset++
+		case "pgup":
+			m.detailScrollOffset -= 10
+			if m.detailScrollOffset < 0 {
+				m.detailScrollOffset = 0
+			}
+		case "pgdown":
+			m.detailScrollOffset += 10
+		}
+	case tea.MouseMsg:
+		switch msg.Button {
+		case tea.MouseButtonWheelUp:
+			m.detailScrollOffset -= 3
+			if m.detailScrollOffset < 0 {
+				m.detailScrollOffset = 0
+			}
+		case tea.MouseButtonWheelDown:
+			m.detailScrollOffset += 3
+		}
 	}
 	return m, nil
 }
@@ -673,6 +746,13 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if len(m.sites) > 0 {
+			narrow := m.termWidth < wideBreakpoint
+			if narrow {
+				m.detailMode = detailDefault
+				m.detailScrollOffset = 0
+				m.state = stateDetailFullscreen
+				return m, m.loadDetailCmd(m.sites[m.cursor].ID)
+			}
 			m.detailOpen = !m.detailOpen
 			m.detailMode = detailDefault
 			m.detailScrollOffset = 0

@@ -92,6 +92,8 @@ func (m Model) View() string {
 		return ""
 	case stateLogs:
 		return m.viewLogsFullscreen()
+	case stateDetailFullscreen:
+		return m.viewDetailFullscreen()
 	case stateAlertDetail:
 		return m.viewAlertDetailPanel()
 	case stateSettings:

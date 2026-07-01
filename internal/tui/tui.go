@@ -119,16 +119,17 @@ const (
 type sessionState int
 
 const (
-	stateDashboard     sessionState = 0
-	stateLogs          sessionState = 1
-	stateAlertDetail   sessionState = 3
-	stateFormSite      sessionState = 4
-	stateFormAlert     sessionState = 5
-	stateFormUser      sessionState = 6
-	stateConfirmDelete sessionState = 7
-	stateFormMaint     sessionState = 8
-	stateSettings      sessionState = 11
-	stateMaintDetail   sessionState = 12
+	stateDashboard        sessionState = 0
+	stateLogs             sessionState = 1
+	stateDetailFullscreen sessionState = 2
+	stateAlertDetail      sessionState = 3
+	stateFormSite         sessionState = 4
+	stateFormAlert        sessionState = 5
+	stateFormUser         sessionState = 6
+	stateConfirmDelete    sessionState = 7
+	stateFormMaint        sessionState = 8
+	stateSettings         sessionState = 11
+	stateMaintDetail      sessionState = 12
 )
 
 type Model struct {
