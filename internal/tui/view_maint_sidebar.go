@@ -7,6 +7,7 @@ import (
 
 	"gitea.lerkolabs.com/lerkolabs/uptop/internal/models"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 )
 
 func (m Model) viewMaintDetailPanel() string {
@@ -113,24 +114,19 @@ func (m Model) viewMaintStrip(width, maxLines int) string {
 	}
 
 	now := time.Now()
-	titleW := 30
-	monW := 20
-	if width < 80 {
-		titleW = width / 3
-		monW = width / 5
-	}
-
 	end := maxLines
 	if end > len(windows) {
 		end = len(windows)
 	}
 
-	style := lipgloss.NewStyle().Width(width).MaxWidth(width)
-	var lines []string
+	selectedVisual := -1
+	if m.focusedPanel == panelMaint {
+		selectedVisual = m.maintCursor
+	}
+
+	var rows [][]string
 	for i := 0; i < end; i++ {
 		mw := windows[i]
-		selected := m.focusedPanel == panelMaint && i == m.maintCursor
-
 		isActive := !mw.StartTime.After(now) && (mw.EndTime.IsZero() || mw.EndTime.After(now))
 
 		var icon string
@@ -140,40 +136,51 @@ func (m Model) viewMaintStrip(width, maxLines int) string {
 			icon = m.st.warnStyle.Render("○")
 		}
 
-		title := limitStr(mw.Title, titleW)
-
 		monName := "All Monitors"
 		if mw.MonitorID > 0 {
 			monName = m.monitorNameByID(mw.MonitorID)
 		}
-		monName = limitStr(monName, monW)
 
 		var status string
 		if isActive {
 			if mw.EndTime.IsZero() {
-				status = m.st.subtleStyle.Render("active · indefinite")
+				status = "indefinite"
 			} else {
-				status = m.st.subtleStyle.Render("active · " + fmtDuration(time.Until(mw.EndTime)) + " left")
+				status = fmtDuration(time.Until(mw.EndTime)) + " left"
 			}
 		} else {
-			status = m.st.subtleStyle.Render("scheduled · " + mw.StartTime.Format("Jan 02 15:04"))
+			status = "starts " + mw.StartTime.Format("Jan 02 15:04")
 		}
 
-		line := fmt.Sprintf(" %s %-*s  %-*s  %s", icon, titleW, title, monW, m.st.subtleStyle.Render(monName), status)
-
-		if selected {
-			line = m.st.tableSelectedStyle.Render(lipgloss.NewStyle().Width(width).Render(line))
-		}
-
-		lines = append(lines, line)
+		rows = append(rows, []string{icon, mw.Title, monName, status})
 	}
 
-	if len(windows) > end {
-		more := fmt.Sprintf("  %d more", len(windows)-end)
-		lines = append(lines, m.st.subtleStyle.Render(more))
-	}
+	colWidths := []int{3, 0, 0, 0}
+	remaining := width - colWidths[0] - 6
+	colWidths[1] = remaining * 40 / 100
+	colWidths[2] = remaining * 30 / 100
+	colWidths[3] = remaining - colWidths[1] - colWidths[2]
 
-	return style.Render(strings.Join(lines, "\n"))
+	t := table.New().
+		Border(lipgloss.HiddenBorder()).
+		Width(width).
+		Rows(rows...).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			isSelected := row == selectedVisual
+			base := m.st.tableCellStyle
+			if row%2 == 1 {
+				base = m.st.tableZebraStyle
+			}
+			if isSelected {
+				base = m.st.tableSelectedStyle
+			}
+			if col < len(colWidths) && colWidths[col] > 0 {
+				base = base.Width(colWidths[col]).MaxWidth(colWidths[col])
+			}
+			return base
+		})
+
+	return t.Render()
 }
 
 func (m *Model) scrollMaintCursor(delta int) {
