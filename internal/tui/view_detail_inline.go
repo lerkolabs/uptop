@@ -210,34 +210,27 @@ func (m Model) detailTypeLine(site models.Site) []string {
 	return parts
 }
 
-func (m Model) detailKeys() string {
-	return m.st.subtleStyle.Render("[e] Edit  [h] History  [s] SLA  [Esc] Back")
-}
-
 func (m Model) detailFooter(width int) string {
-	label := m.st.subtleStyle
-	var lines []string
+	dot := m.st.subtleStyle.Render(" · ")
+	var parts []string
 
 	switch m.detailMode {
 	case detailSLA:
-		var keys []string
 		for i, p := range slaPeriods {
-			k := fmt.Sprintf("[%s] %s", p.key, p.label)
 			if i == m.slaPeriodIdx {
-				keys = append(keys, m.st.titleStyle.Render(k))
+				parts = append(parts, m.st.titleStyle.Render(p.key)+" "+m.st.titleStyle.Render(p.label))
 			} else {
-				keys = append(keys, label.Render(k))
+				parts = append(parts, m.hotkey(p.key, p.label))
 			}
 		}
-		keys = append(keys, label.Render("[Esc] Back"))
-		lines = append(lines, "  "+strings.Join(keys, " "))
+		parts = append(parts, m.hotkey("Esc", "Back"))
 	case detailHistory:
-		lines = append(lines, "  "+label.Render("[Esc] Back"))
+		parts = append(parts, m.hotkey("Esc", "Back"))
 	default:
-		lines = append(lines, "  "+m.detailKeys())
+		parts = append(parts, m.hotkey("e", "Edit"), m.hotkey("h", "History"), m.hotkey("s", "SLA"), m.hotkey("Esc", "Back"))
 	}
 
-	content := strings.Join(lines, "\n")
+	content := "  " + strings.Join(parts, dot)
 	return lipgloss.NewStyle().Width(width).MaxWidth(width).Render(content)
 }
 
