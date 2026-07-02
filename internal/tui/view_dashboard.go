@@ -163,7 +163,7 @@ func (m Model) viewMonitorsLayout() string {
 
 	monTargetH := m.maxTableRows + 5
 	monitors := m.viewSitesTab()
-	monPanel := m.zones.Mark("panel-monitors", m.titledPanelH("Monitors", monitors, "", monW, monTargetH, 0, m.focusedPanel == panelMonitors))
+	monPanel := m.zones.Mark("panel-monitors", m.titledPanelH("Monitors", monitors, "", monW, monTargetH, 0, scrollbar{pos: m.tableOffset, total: len(m.sites), visible: m.maxTableRows}, m.focusedPanel == panelMonitors))
 
 	var topParts []string
 	topParts = append(topParts, monPanel)
@@ -181,7 +181,7 @@ func (m Model) viewMonitorsLayout() string {
 		monHeight := lipgloss.Height(monPanel)
 		detail := m.viewDetailInline(detailW-2, monHeight)
 		footer := m.detailFooter(detailW - 2)
-		detailPanel := m.zones.Mark("panel-detail", m.titledPanelH(title, detail, footer, detailW, monHeight, m.detailScrollOffset, m.focusedPanel == panelDetail))
+		detailPanel := m.zones.Mark("panel-detail", m.titledPanelH(title, detail, footer, detailW, monHeight, m.detailScrollOffset, scrollbar{}, m.focusedPanel == panelDetail))
 		topParts = append(topParts, detailPanel)
 	}
 

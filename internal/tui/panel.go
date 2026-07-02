@@ -6,7 +6,13 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func (m Model) titledPanelH(title, content, footer string, width, height, scrollOffset int, focused bool) string {
+type scrollbar struct {
+	pos     int
+	total   int
+	visible int
+}
+
+func (m Model) titledPanelH(title, content, footer string, width, height, scrollOffset int, sb scrollbar, focused bool) string {
 	if height <= 0 {
 		return m.titledPanel(title, content, width, focused)
 	}
@@ -64,21 +70,58 @@ func (m Model) titledPanelH(title, content, footer string, width, height, scroll
 	}
 	visible := contentLines[scrollOffset:end]
 
-	borderLine := func(line string) string {
-		return bc.Render("│") + line + strings.Repeat(" ", max(0, innerW-lipgloss.Width(line))) + bc.Render("│")
+	sbVisible := sb.visible
+	if sbVisible <= 0 {
+		sbVisible = bodyH
 	}
-	emptyLine := borderLine(strings.Repeat(" ", innerW))
+	showScrollbar := sb.total > 0 && sb.total > sbVisible
+	var thumbStart, thumbEnd int
+	if showScrollbar {
+		thumbSize := bodyH * sbVisible / sb.total
+		if thumbSize < 1 {
+			thumbSize = 1
+		}
+		scrollRange := sb.total - sbVisible
+		if scrollRange < 1 {
+			scrollRange = 1
+		}
+		trackSpace := bodyH - thumbSize
+		thumbStart = sb.pos * trackSpace / scrollRange
+		if thumbStart < 0 {
+			thumbStart = 0
+		}
+		thumbEnd = thumbStart + thumbSize
+		if thumbEnd > bodyH {
+			thumbEnd = bodyH
+		}
+	}
+
+	scrollTrack := bc.Render("│")
+	scrollThumb := lipgloss.NewStyle().Foreground(m.theme.Muted).Render("┃")
+
+	borderLine := func(line string, idx int) string {
+		rightBorder := bc.Render("│")
+		if showScrollbar && idx >= thumbStart && idx < thumbEnd {
+			rightBorder = scrollThumb
+		} else if showScrollbar {
+			rightBorder = scrollTrack
+		}
+		return bc.Render("│") + line + strings.Repeat(" ", max(0, innerW-lipgloss.Width(line))) + rightBorder
+	}
+	emptyLine := func(idx int) string {
+		return borderLine(strings.Repeat(" ", innerW), idx)
+	}
 
 	var lines []string
 	lines = append(lines, top)
-	for _, line := range visible {
-		lines = append(lines, borderLine(line))
+	for i, line := range visible {
+		lines = append(lines, borderLine(line, i))
 	}
-	for len(lines) < height-1-len(footerLines) {
-		lines = append(lines, emptyLine)
+	for i := len(visible); len(lines) < height-1-len(footerLines); i++ {
+		lines = append(lines, emptyLine(i))
 	}
 	for _, line := range footerLines {
-		lines = append(lines, borderLine(line))
+		lines = append(lines, borderLine(line, -1))
 	}
 	lines = append(lines, bottom)
 

@@ -75,7 +75,7 @@ func (m Model) viewDetailFullscreen() string {
 	}
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(
-		m.titledPanelH(title, content, footer, availW, panelH, m.detailScrollOffset, true))
+		m.titledPanelH(title, content, footer, availW, panelH, m.detailScrollOffset, scrollbar{}, true))
 }
 
 func (m Model) buildDetailContent(site models.Site, hist monitor.SiteHistory, width int, fullscreen bool) string {
