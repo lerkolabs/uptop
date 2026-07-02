@@ -662,6 +662,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.focusedPanel = panelMaint
 		}
 		m.recalcLayout()
+		return m, m.saveBottomPanelPref()
 	case "l":
 		if m.bottomPanel == bottomLogs {
 			m.bottomPanel = bottomNone
@@ -671,6 +672,7 @@ func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.focusedPanel = panelLogs
 		}
 		m.recalcLayout()
+		return m, m.saveBottomPanelPref()
 	case "up", "k":
 		if m.focusedPanel == panelDetail && m.detailOpen {
 			m.detailScrollOffset--

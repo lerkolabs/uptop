@@ -50,6 +50,21 @@ func writeCmd(op string, fn func() error) tea.Cmd {
 	}
 }
 
+func (m *Model) saveBottomPanelPref() tea.Cmd {
+	v := "logs"
+	switch m.bottomPanel {
+	case bottomNone:
+		v = "none"
+	case bottomMaint:
+		v = "maint"
+	}
+	st := m.store
+	ctx := m.ctx
+	return writeCmd("Save bottom panel preference", func() error {
+		return st.SetPreference(ctx, "bottom_panel", v)
+	})
+}
+
 func sortSitesForDisplay(allSites []models.Site, collapsed map[int]bool, sortCol int, sortAsc bool) []models.Site {
 	var groups, ungrouped []models.Site
 	children := make(map[int][]models.Site)

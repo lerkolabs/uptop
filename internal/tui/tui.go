@@ -243,6 +243,16 @@ func InitialModel(ctx context.Context, isAdmin bool, s store.Store, eng *monitor
 
 	detailPref, _ := s.GetPreference(ctx, "detail_open")
 
+	bp := bottomLogs
+	if bpPref, _ := s.GetPreference(ctx, "bottom_panel"); bpPref != "" {
+		switch bpPref {
+		case "none":
+			bp = bottomNone
+		case "maint":
+			bp = bottomMaint
+		}
+	}
+
 	return Model{
 		ctx:          ctx,
 		state:        stateDashboard,
@@ -257,7 +267,7 @@ func InitialModel(ctx context.Context, isAdmin bool, s store.Store, eng *monitor
 		theme:        theme,
 		themeIndex:   themeIdx,
 		st:           newStyles(theme),
-		bottomPanel:  bottomLogs,
+		bottomPanel:  bp,
 		detailOpen:   detailPref == "true",
 		demoMode:     os.Getenv("UPTOP_DEMO") == "1",
 		version:      version,
