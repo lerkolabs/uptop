@@ -72,6 +72,20 @@ func (m Model) viewLogsStrip(width, maxLines int) string {
 	return style.Render(strings.Join(visible, "\n"))
 }
 
+func (m Model) filteredLogCount() int {
+	count := 0
+	for _, entry := range m.engine.GetLogs() {
+		if strings.TrimSpace(entry.Message) == "" {
+			continue
+		}
+		if m.logFilterImportant && !isImportantLog(classifyLog(entry.Message)) {
+			continue
+		}
+		count++
+	}
+	return count
+}
+
 func (m *Model) scrollLogs(delta int) {
 	logs := m.engine.GetLogs()
 	total := 0

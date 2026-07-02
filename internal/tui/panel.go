@@ -70,6 +70,9 @@ func (m Model) titledPanelH(title, content, footer string, width, height, scroll
 	}
 	visible := contentLines[scrollOffset:end]
 
+	if sb.total == 0 && len(contentLines) > bodyH {
+		sb = scrollbar{pos: scrollOffset, total: len(contentLines), visible: bodyH}
+	}
 	sbVisible := sb.visible
 	if sbVisible <= 0 {
 		sbVisible = bodyH
@@ -96,8 +99,8 @@ func (m Model) titledPanelH(title, content, footer string, width, height, scroll
 		}
 	}
 
-	scrollTrack := bc.Render("│")
-	scrollThumb := lipgloss.NewStyle().Foreground(m.theme.Muted).Render("┃")
+	scrollTrack := lipgloss.NewStyle().Foreground(m.theme.Border).Render("░")
+	scrollThumb := lipgloss.NewStyle().Foreground(m.theme.Accent).Render("█")
 
 	borderLine := func(line string, idx int) string {
 		rightBorder := bc.Render("│")

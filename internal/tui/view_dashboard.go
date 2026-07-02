@@ -189,12 +189,16 @@ func (m Model) viewMonitorsLayout() string {
 
 	switch m.bottomPanel {
 	case bottomLogs:
-		logContent := m.viewLogsStrip(availW-2, logsStripHeight-2)
-		logPanel := m.zones.Mark("panel-logs", m.titledPanel("Logs", logContent, availW, m.focusedPanel == panelLogs))
+		maxLines := logsStripHeight - 2
+		logContent := m.viewLogsStrip(availW-2, maxLines)
+		totalLogs := m.filteredLogCount()
+		logPanel := m.zones.Mark("panel-logs", m.titledPanelH("Logs", logContent, "", availW, logsStripHeight, 0, scrollbar{pos: m.logScrollOffset, total: totalLogs, visible: maxLines}, m.focusedPanel == panelLogs))
 		return top + "\n" + logPanel
 	case bottomMaint:
-		maintContent := m.viewMaintStrip(availW-2, logsStripHeight-2)
-		maintPanel := m.zones.Mark("panel-maint", m.titledPanel("Maint", maintContent, availW, m.focusedPanel == panelMaint))
+		maxLines := logsStripHeight - 2
+		maintContent := m.viewMaintStrip(availW-2, maxLines)
+		totalMaint := len(m.activeMaintWindows())
+		maintPanel := m.zones.Mark("panel-maint", m.titledPanelH("Maint", maintContent, "", availW, logsStripHeight, 0, scrollbar{pos: 0, total: totalMaint, visible: maxLines}, m.focusedPanel == panelMaint))
 		return top + "\n" + maintPanel
 	}
 	return top
