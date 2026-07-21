@@ -169,6 +169,118 @@ func (m *Model) clampCursor() {
 	}
 }
 
+func (m *Model) detailCmdIfNeeded() tea.Cmd {
+	if m.focusedPanel == panelMonitors && m.detailOpen && m.cursor < len(m.sites) {
+		m.detailMode = detailDefault
+		m.detailScrollOffset = 0
+		return m.loadDetailCmd(m.sites[m.cursor].ID)
+	}
+	return nil
+}
+
+func (m *Model) jumpToTop() {
+	switch m.focusedPanel {
+	case panelDetail:
+		m.detailScrollOffset = 0
+	case panelMaint:
+		m.maintCursor = 0
+	case panelLogs:
+		m.logScrollOffset = 0
+	default:
+		m.cursor = 0
+		m.tableOffset = 0
+		m.syncSelectedID()
+	}
+}
+
+func (m *Model) jumpToBottom() {
+	switch m.focusedPanel {
+	case panelDetail:
+		m.detailScrollOffset = 9999
+	case panelMaint:
+		windows := m.activeMaintWindows()
+		if len(windows) > 0 {
+			m.maintCursor = len(windows) - 1
+		}
+	case panelLogs:
+		total := m.filteredLogCount()
+		if total > 0 {
+			m.logScrollOffset = total - 1
+		}
+	default:
+		max := m.currentListLen() - 1
+		if max >= 0 {
+			m.cursor = max
+			if m.cursor >= m.tableOffset+m.maxTableRows {
+				m.tableOffset = m.cursor - m.maxTableRows + 1
+			}
+			m.syncSelectedID()
+		}
+	}
+}
+
+func (m *Model) halfPageUp() {
+	half := m.maxTableRows / 2
+	if half < 1 {
+		half = 1
+	}
+	switch m.focusedPanel {
+	case panelDetail:
+		m.detailScrollOffset -= half
+		if m.detailScrollOffset < 0 {
+			m.detailScrollOffset = 0
+		}
+	case panelMaint:
+		m.maintCursor -= half
+		if m.maintCursor < 0 {
+			m.maintCursor = 0
+		}
+	case panelLogs:
+		m.scrollLogs(-half)
+	default:
+		m.cursor -= half
+		if m.cursor < 0 {
+			m.cursor = 0
+		}
+		if m.cursor < m.tableOffset {
+			m.tableOffset = m.cursor
+		}
+		m.syncSelectedID()
+	}
+}
+
+func (m *Model) halfPageDown() {
+	half := m.maxTableRows / 2
+	if half < 1 {
+		half = 1
+	}
+	switch m.focusedPanel {
+	case panelDetail:
+		m.detailScrollOffset += half
+	case panelMaint:
+		windows := m.activeMaintWindows()
+		m.maintCursor += half
+		if len(windows) > 0 && m.maintCursor >= len(windows) {
+			m.maintCursor = len(windows) - 1
+		}
+	case panelLogs:
+		m.scrollLogs(half)
+	default:
+		max := m.currentListLen() - 1
+		m.cursor += half
+		if m.cursor > max {
+			m.cursor = max
+		}
+		if m.cursor < 0 {
+			m.cursor = 0
+		}
+		if m.cursor >= m.tableOffset+m.maxTableRows {
+			m.tableOffset = m.cursor - m.maxTableRows + 1
+		}
+		m.syncSelectedID()
+	}
+}
+
 // loadTabDataCmd returns a tea.Cmd that loads the DB-backed tab tables off the
 // UI goroutine. Each call bumps tabSeq and stamps the reply with it, so
 // handleTabData can drop out-of-order results from slower earlier loads. The

@@ -252,6 +252,17 @@ func (m *Model) testAlertCmd(id int, name string) tea.Cmd {
 func (m *Model) handleLogsFullscreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if msg.String() == "g" {
+			if m.pendingG {
+				m.pendingG = false
+				m.logViewport.GotoTop()
+				return m, nil
+			}
+			m.pendingG = true
+			return m, nil
+		}
+		m.pendingG = false
+
 		switch msg.String() {
 		case "esc", "q":
 			m.state = stateDashboard
@@ -261,6 +272,12 @@ func (m *Model) handleLogsFullscreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "f":
 			m.logFilterImportant = !m.logFilterImportant
 			m.refreshLogContent()
+		case "G":
+			m.logViewport.GotoBottom()
+		case "ctrl+u":
+			m.logViewport.ScrollUp(m.logViewport.Height / 2)
+		case "ctrl+d":
+			m.logViewport.ScrollDown(m.logViewport.Height / 2)
 		case "up", "k":
 			m.logViewport.ScrollUp(1)
 		case "down", "j":
@@ -286,6 +303,17 @@ func (m *Model) handleLogsFullscreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *Model) handleDetailFullscreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if msg.String() == "g" {
+			if m.pendingG {
+				m.pendingG = false
+				m.detailScrollOffset = 0
+				return m, nil
+			}
+			m.pendingG = true
+			return m, nil
+		}
+		m.pendingG = false
+
 		switch msg.String() {
 		case "esc", "q":
 			m.state = stateDashboard
@@ -323,6 +351,15 @@ func (m *Model) handleDetailFullscreen(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.loadSLACmd(m.slaSiteID, idx)
 				}
 			}
+		case "G":
+			m.detailScrollOffset = 9999
+		case "ctrl+u":
+			m.detailScrollOffset -= 5
+			if m.detailScrollOffset < 0 {
+				m.detailScrollOffset = 0
+			}
+		case "ctrl+d":
+			m.detailScrollOffset += 5
 		case "up", "k":
 			m.detailScrollOffset--
 			if m.detailScrollOffset < 0 {
@@ -544,7 +581,52 @@ func (m *Model) handleAlertDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleSettingsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.String() == "g" {
+		if m.pendingG {
+			m.pendingG = false
+			m.settingsCursor = 0
+			m.settingsOffset = 0
+			return m, nil
+		}
+		m.pendingG = true
+		return m, nil
+	}
+	m.pendingG = false
+
 	switch msg.String() {
+	case "G":
+		max := m.settingsListLen() - 1
+		if max >= 0 {
+			m.settingsCursor = max
+			if m.settingsCursor >= m.settingsOffset+m.maxTableRows {
+				m.settingsOffset = m.settingsCursor - m.maxTableRows + 1
+			}
+		}
+	case "ctrl+u":
+		half := m.maxTableRows / 2
+		if half < 1 {
+			half = 1
+		}
+		m.settingsCursor -= half
+		if m.settingsCursor < 0 {
+			m.settingsCursor = 0
+		}
+		if m.settingsCursor < m.settingsOffset {
+			m.settingsOffset = m.settingsCursor
+		}
+	case "ctrl+d":
+		half := m.maxTableRows / 2
+		if half < 1 {
+			half = 1
+		}
+		max := m.settingsListLen() - 1
+		m.settingsCursor += half
+		if m.settingsCursor > max {
+			m.settingsCursor = max
+		}
+		if m.settingsCursor >= m.settingsOffset+m.maxTableRows {
+			m.settingsOffset = m.settingsCursor - m.maxTableRows + 1
+		}
 	case "esc", "S":
 		m.state = stateDashboard
 	case "ctrl+c":
@@ -635,7 +717,27 @@ func (m *Model) handleSettingsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.String() == "g" {
+		if m.pendingG {
+			m.pendingG = false
+			m.jumpToTop()
+			return m, m.detailCmdIfNeeded()
+		}
+		m.pendingG = true
+		return m, nil
+	}
+	m.pendingG = false
+
 	switch msg.String() {
+	case "G":
+		m.jumpToBottom()
+		return m, m.detailCmdIfNeeded()
+	case "ctrl+u":
+		m.halfPageUp()
+		return m, m.detailCmdIfNeeded()
+	case "ctrl+d":
+		m.halfPageDown()
+		return m, m.detailCmdIfNeeded()
 	case "q":
 		return m, tea.Quit
 	case "/":

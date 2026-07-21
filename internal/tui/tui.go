@@ -218,6 +218,8 @@ type Model struct {
 	filterMode bool
 	filterText string
 
+	pendingG bool
+
 	// demoMode renders a stable status dot instead of the animated pulse so
 	// screenshots/recordings don't capture the spinner mid-frame. Set via UPTOP_DEMO=1.
 	demoMode bool
